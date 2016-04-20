@@ -154,6 +154,16 @@ def extract_signal_from_polynomial_background(data_and_metadata, signal_range, f
     return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata.data_shape_and_dtype, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
+def subtract_linear_background(data_and_metadata, fit_range):
+    fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
+    def data_fn():
+        y = data_and_metadata.data[range(*fit_range)]
+        A = numpy.vstack([numpy.arange(len(y)), numpy.ones((len(y), ))]).T
+        m, c = numpy.linalg.lstsq(A, y)[0]
+        return data_and_metadata.data - (numpy.arange(data_and_metadata.data_shape[-1]) * m + c)
+    return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata.data_shape_and_dtype, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
+
+
 def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au: float,
                                     atomic_number: int, shell_number: int, subshell_index: int) -> numpy.ndarray:
     """Return the generalized oscillator strength as an ndarray.
@@ -221,3 +231,4 @@ def edges_near_energy_eV(energy_loss_eV: float, energy_loss_delta_eV: float) -> 
 
 # register functions
 Context.registered_functions["extract_signal_from_polynomial_background"] = extract_signal_from_polynomial_background
+Context.registered_functions["subtract_linear_background"] = subtract_linear_background
