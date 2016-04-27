@@ -154,13 +154,58 @@ def extract_signal_from_polynomial_background(data_and_metadata, signal_range, f
     return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata.data_shape_and_dtype, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
-def subtract_linear_background(data_and_metadata, fit_range):
+def subtract_linear_background(data_and_metadata, fit_range, signal_range):
     fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
+    signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
     def data_fn():
-        y = data_and_metadata.data[range(*fit_range)]
+        y = data_and_metadata.data[range(*fit_range, 8)]
         A = numpy.vstack([numpy.arange(len(y)), numpy.ones((len(y), ))]).T
         m, c = numpy.linalg.lstsq(A, y)[0]
-        return data_and_metadata.data - (numpy.arange(data_and_metadata.data_shape[-1]) * m + c)
+        return data_and_metadata.data[range(*signal_range)] - (numpy.arange(data_and_metadata.data_shape[-1]) * m + c)[range(*signal_range)]
+    return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata.data_shape_and_dtype, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
+
+
+def stacked_lstsq(b, rcond=1e-10):
+    """Linear least squares fitting function.
+
+    Solve A x = b, via SVD least squares cutting of small singular values
+    A is an array of shape (..., M, N) and b of shape (..., M).
+    Returns x of shape (..., N)
+
+    The idea for this implementation comes from:
+    http://stackoverflow.com/questions/30442377/how-to-solve-many-overdetermined-systems-of-linear-equations-using-vectorized-co
+    """
+    A = numpy.vstack([numpy.arange(b.shape[0]), numpy.ones((b.shape[0],))]).T
+    u, s, v = numpy.linalg.svd(A, full_matrices=False)
+    s_max = numpy.amax(s, axis=-1, keepdims=True)
+    s_min = rcond * s_max
+    inv_s = numpy.zeros_like(s)
+    inv_s[s >= s_min] = 1 / s[s >= s_min]
+    x = numpy.einsum('...ji,...j->...i', v, inv_s * numpy.einsum('...ji,...j->...i', u, b.T.conj()))
+    return numpy.conj(x, x)
+
+
+def slow_lstsq(b):
+    # this demonstrates how to convert a 1-d function to a stacked function
+    A = numpy.vstack([numpy.arange(b.shape[0]), numpy.ones((b.shape[0], ))]).T
+    return numpy.array([numpy.linalg.lstsq(A, b[..., k])[0] for k in range(b.shape[1])])
+
+
+def stacked_subtract_linear_background(data_and_metadata, fit_range, signal_range):
+    """Subtract linear background from a stacked image.
+
+    A stacked image has the signal dimension first followed by the navigation dimensions.
+
+    There must be two navigation dimensions when using this method.
+    """
+    fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
+    signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
+    def data_fn():
+        data = data_and_metadata.data
+        data_r = data.reshape((data.shape[0], data.shape[1] * data.shape[2]))
+        data_fits = stacked_lstsq(data_r[range(*fit_range), ...]).reshape((data.shape[1], data.shape[2], 2))
+        L = numpy.arange(data_and_metadata.data_shape[0])[range(*signal_range)]
+        return data[range(*signal_range), ...] - (L[:, numpy.newaxis, numpy.newaxis] * data_fits[..., 0] + data_fits[..., 1])
     return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata.data_shape_and_dtype, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
@@ -232,3 +277,4 @@ def edges_near_energy_eV(energy_loss_eV: float, energy_loss_delta_eV: float) -> 
 # register functions
 Context.registered_functions["extract_signal_from_polynomial_background"] = extract_signal_from_polynomial_background
 Context.registered_functions["subtract_linear_background"] = subtract_linear_background
+Context.registered_functions["stacked_subtract_linear_background"] = stacked_subtract_linear_background
