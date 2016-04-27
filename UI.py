@@ -6,10 +6,16 @@ import gettext
 # None
 
 # local libraries
-from nion.swift import Application
-from nion.swift.model import DataItem
-from nion.swift.model import DocumentModel
-from nion.swift.model import Graphics
+import_ok = False
+try:
+    from nion.swift import Application
+    from nion.swift.model import DataItem
+    from nion.swift.model import DocumentModel
+    from nion.swift.model import Graphics
+    from nion.swift.model import Googlelll
+    import_ok = True
+except ImportError:
+    pass
 
 _ = gettext.gettext
 
@@ -96,4 +102,5 @@ def build_menus(document_controller):
     document_controller.processing_menu.add_menu_item(_("Filter Channel"), lambda: filter_channel(document_controller))
 
 
-Application.app.register_menu_handler(build_menus)  # called on import to make the menu entry for this plugin
+if import_ok and Application.app is not None:
+    Application.app.register_menu_handler(build_menus)  # called on import to make the menu entry for this plugin
