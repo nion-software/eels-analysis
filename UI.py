@@ -12,7 +12,6 @@ try:
     from nion.swift.model import DataItem
     from nion.swift.model import DocumentModel
     from nion.swift.model import Graphics
-    from nion.swift.model import Googlelll
     import_ok = True
 except ImportError:
     pass
