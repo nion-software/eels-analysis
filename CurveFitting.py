@@ -1,7 +1,7 @@
 """
     Curve Fitting
 
-    A library of fucntions and classes for general curve fitting techniques.
+    A library of functions and classes for general curve fitting techniques.
 
 """
 
@@ -20,14 +20,14 @@ class MultipleLinearRegression1D(object):
     This module follows the Multiple Regression chapter in P.R. Bevington,
     'Data Reduction and Error Analysis for the Physical Sciences'.
 
-    Two different initializers are provided, one for ordered, equisampled data (for which the
+    Two different initializers are provided, one for ordered, equispaced data (for which the
     x values are immaterial), and another that allows explicit provision of arbitrarily sampled x values.
     """
 
     def __init__(self, data, x_values = None):
         """Initialize with measured data and corresponding x values in 1-D arrays.
 
-        If no x values are supplied, then the data are assumed to be equi-sampled over -1 to 1, inclusive.
+        If no x values are supplied, then the data are assumed to be equispaced over -1 to 1, inclusive.
         """
         self.data = data.copy()
         if x_values == None:
@@ -52,7 +52,7 @@ class PolynomialFit1D(object):
     'Data Reduction and Error Analysis for the Physical Sciences'.
 
     The fit must be initialized with a 1D array of y values plus either a corresponding 1D array of x values,
-    or (if the y value array is ordered and equisampled) the x value for the first y value and the x increment per sample.
+    or (if the y value array is ordered and equispaced) the x value for the first y value and the x increment per sample.
 
     Exponential, Gaussian, and power-law fits are supported via log-scale flags for the y and x dimensions.
     """
@@ -62,7 +62,7 @@ class PolynomialFit1D(object):
         """
             Required: y_values - a 1D NumPy array containing the measured data (ordinate) values.
             Optional: x_values - a 1D NumPy array containing the corresponding independent variable (abcissa) values.
-                first_x and delta_x - alternate specification of x (abcissa) values, only applicable when y_values array is ordered and equisampled.
+                first_x and delta_x - alternate specification of x (abcissa) values, only applicable when y_values array is ordered and equispaced.
                 polynomial_order - non-negative integer value specifying fit polynomial order, e.g. 0 = constant, 1 = line, 2 = parabola, etc.
                 y_log_scale - boolean value specifying whether fit should be applied to log of y values, e.g. exponential, Gaussian, or power-law.
                 x_log_scale - boolean value specifying whether fit should be applied to log of x values, e.g. logarithmic curve or power-law.

@@ -24,7 +24,7 @@ def extract_signal_from_polynomial_background_data(data, signal_range, fit_range
     """A function for performing generic polynomial background subtraction on 1-D spectral data arrays.
 
     The required data (NumPy) array can have 1 or 2 dimensions.  If it is 1-dimensional, then each array element is
-    a spectral intensity (ordinate) value along an equi-sampled x axis with an initial abcissa value given by first_x and
+    a spectral intensity (ordinate) value along an equispaced x axis with an initial abcissa value given by first_x and
     a fixed abcissa increment per data element given by delta_x.  If the data array is 2-dimensional, then one of the
     dimensions must have size 2.  The first entry along that dimension is an x (abcissa) value and the second entry is
     the corresponding spectral intensity (ordinate) value.  Note that in this case, the abcissa values need not be ordered.
