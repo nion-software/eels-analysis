@@ -1,7 +1,7 @@
 """
     Curve Fitting
 
-    A library of fucntions and classes for general curve fitting techniques.
+    A library of functions and classes for general curve fitting techniques.
 
 """
 
@@ -20,14 +20,14 @@ class MultipleLinearRegression1D(object):
     This module follows the Multiple Regression chapter in P.R. Bevington,
     'Data Reduction and Error Analysis for the Physical Sciences'.
 
-    Two different initializers are provided, one for ordered, equisampled data (for which the
+    Two different initializers are provided, one for ordered, equispaced data (for which the
     x values are immaterial), and another that allows explicit provision of arbitrarily sampled x values.
     """
 
     def __init__(self, data, x_values = None):
         """Initialize with measured data and corresponding x values in 1-D arrays.
 
-        If no x values are supplied, then the data are assumed to be equi-sampled over -1 to 1, inclusive.
+        If no x values are supplied, then the data are assumed to be equispaced over -1 to 1, inclusive.
         """
         self.data = data.copy()
         if x_values == None:
@@ -52,7 +52,7 @@ class PolynomialFit1D(object):
     'Data Reduction and Error Analysis for the Physical Sciences'.
 
     The fit must be initialized with a 1D array of y values plus either a corresponding 1D array of x values,
-    or (if the y value array is ordered and equisampled) the x value for the first y value and the x increment per sample.
+    or (if the y value array is ordered and equispaced) the x value for the first y value and the x increment per sample.
 
     Exponential, Gaussian, and power-law fits are supported via log-scale flags for the y and x dimensions.
     """
@@ -61,8 +61,8 @@ class PolynomialFit1D(object):
                  y_log_scale: bool = False, x_log_scale: bool = False):
         """
             Required: y_values - a 1D NumPy array containing the measured data (ordinate) values.
-            Optional: x_values - a 1D NumPy array containing the corresponding independent variable (abcissa) values.
-                first_x and delta_x - alternate specification of x (abcissa) values, only applicable when y_values array is ordered and equisampled.
+            Optional: x_values - a 1D NumPy array containing the corresponding independent variable (abscissa) values.
+                first_x and delta_x - alternate specification of x (abscissa) values, only applicable when y_values array is ordered and equispaced.
                 polynomial_order - non-negative integer value specifying fit polynomial order, e.g. 0 = constant, 1 = line, 2 = parabola, etc.
                 y_log_scale - boolean value specifying whether fit should be applied to log of y values, e.g. exponential, Gaussian, or power-law.
                 x_log_scale - boolean value specifying whether fit should be applied to log of x values, e.g. logarithmic curve or power-law.
@@ -84,32 +84,32 @@ class PolynomialFit1D(object):
             assert self.__fit_ordinates.min() > 0
             self.__fit_ordinates = numpy.log(self.__fit_ordinates)
 
-        # Check validity of x_values array, if applicable, and prepare fit_abcissae array, applying log, if requested.
+        # Check validity of x_values array, if applicable, and prepare fit_abscissae array, applying log, if requested.
         if x_values is not None:
             # x value array must match y value array in size
             assert len(x_values.shape) == 1
             assert x_values.shape[0] == sample_count
-            self.__fit_abcissae = numpy.copy(x_values)
-            self.__fit_abcissa_min = numpy.amin(self.__fit_abcissae)
-            self.__fit_abcissa_max = numpy.amax(self.__fit_abcissae)
+            self.__fit_abscissae = numpy.copy(x_values)
+            self.__fit_abscissa_min = numpy.amin(self.__fit_abscissae)
+            self.__fit_abscissa_max = numpy.amax(self.__fit_abscissae)
         else:
             assert delta_x > 0
-            self.__fit_abcissa_min = first_x
-            self.__fit_abcissa_max = first_x + delta_x * (sample_count - 1)
-            self.__fit_abcissae = numpy.linspace(self.__fit_abcissa_min, self.__fit_abcissa_max, sample_count)
+            self.__fit_abscissa_min = first_x
+            self.__fit_abscissa_max = first_x + delta_x * (sample_count - 1)
+            self.__fit_abscissae = numpy.linspace(self.__fit_abscissa_min, self.__fit_abscissa_max, sample_count)
 
         if self.__x_log_scale:
             # for log-scale fitting, all values must be positive
-            assert self.__fit_abcissa_min > 0
-            self.__fit_abcissa_min = numpy.log(self.__fit_abcissa_min)
-            self.__fit_abcissa_max = numpy.log(self.__fit_abcissa_max)
-            self.__fit_abcissae = numpy.log(self.__fit_abcissae)
+            assert self.__fit_abscissa_min > 0
+            self.__fit_abscissa_min = numpy.log(self.__fit_abscissa_min)
+            self.__fit_abscissa_max = numpy.log(self.__fit_abscissa_max)
+            self.__fit_abscissae = numpy.log(self.__fit_abscissae)
 
-        # To keep computations well-conditioned, it is best to transform the abcissae to the range -1 to 1, inclusive
-        self.__fit_abcissa_scale = 2.0 / (self.__fit_abcissa_max - self.__fit_abcissa_min)
+        # To keep computations well-conditioned, it is best to transform the abscissae to the range -1 to 1, inclusive
+        self.__fit_abscissa_scale = 2.0 / (self.__fit_abscissa_max - self.__fit_abscissa_min)
         # rewrite this below to avoid PyCharm type checking errors during editing
-        # self.__fit_abcissae = self.__fit_abcissa_scale * (self.__fit_abcissae - self.__fit_abcissa_min) - 1
-        self.__fit_abcissae = numpy.subtract(numpy.multiply(self.__fit_abcissa_scale, numpy.subtract(self.__fit_abcissae, self.__fit_abcissa_min)), 1)
+        # self.__fit_abscissae = self.__fit_abscissa_scale * (self.__fit_abscissae - self.__fit_abscissa_min) - 1
+        self.__fit_abscissae = numpy.subtract(numpy.multiply(self.__fit_abscissa_scale, numpy.subtract(self.__fit_abscissae, self.__fit_abscissa_min)), 1)
 
         self.__set_polynomial_order(polynomial_order)
 
@@ -119,19 +119,19 @@ class PolynomialFit1D(object):
 
     def __set_polynomial_order(self, polynomial_order):
         assert polynomial_order >= 0
-        self.fit_polynomial = numpy.poly1d(numpy.polyfit(self.__fit_abcissae, self.__fit_ordinates, polynomial_order))
+        self.fit_polynomial = numpy.poly1d(numpy.polyfit(self.__fit_abscissae, self.__fit_ordinates, polynomial_order))
 
     polynomial_order = property(__get_polynomial_order, __set_polynomial_order)
 
     def compute_fit_for_values(self, values):
         if self.__x_log_scale:
             assert values.min() > 0
-            abcissae = numpy.log(values)
+            abscissae = numpy.log(values)
         else:
-            abcissae = values
+            abscissae = values
 
-        abcissae = self.__fit_abcissa_scale * (abcissae - self.__fit_abcissa_min) - 1
-        computed_fit = self.fit_polynomial(abcissae)
+        abscissae = self.__fit_abscissa_scale * (abscissae - self.__fit_abscissa_min) - 1
+        computed_fit = self.fit_polynomial(abscissae)
         if self.__y_log_scale:
             computed_fit = numpy.exp(computed_fit)
         return computed_fit

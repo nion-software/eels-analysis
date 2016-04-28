@@ -24,13 +24,13 @@ def extract_signal_from_polynomial_background_data(data, signal_range, fit_range
     """A function for performing generic polynomial background subtraction on 1-D spectral data arrays.
 
     The required data (NumPy) array can have 1 or 2 dimensions.  If it is 1-dimensional, then each array element is
-    a spectral intensity (ordinate) value along an equi-sampled x axis with an initial abcissa value given by first_x and
-    a fixed abcissa increment per data element given by delta_x.  If the data array is 2-dimensional, then one of the
-    dimensions must have size 2.  The first entry along that dimension is an x (abcissa) value and the second entry is
-    the corresponding spectral intensity (ordinate) value.  Note that in this case, the abcissa values need not be ordered.
-    This function will return background-subtracted spectral intensities regardless of the abcissa value ordering, or lack thereof.
+    a spectral intensity (ordinate) value along an equispaced x axis with an initial abscissa value given by first_x and
+    a fixed abscissa increment per data element given by delta_x.  If the data array is 2-dimensional, then one of the
+    dimensions must have size 2.  The first entry along that dimension is an x (abscissa) value and the second entry is
+    the corresponding spectral intensity (ordinate) value.  Note that in this case, the abscissa values need not be ordered.
+    This function will return background-subtracted spectral intensities regardless of the abscissa value ordering, or lack thereof.
 
-    The parameters signal_range and fit_ranges are (NumPy) arrays specifying abcissa ranges, of the form [start_x, end_x].
+    The parameters signal_range and fit_ranges are (NumPy) arrays specifying abscissa ranges, of the form [start_x, end_x].
     The former specifies the single range over which the signal of interest occurs, while the latter can specify multiple ranges
     over which to fit the desired polynomial background model, distributed over the second dimension of the fit_ranges array.
     Only a single row in fit_ranges is required, in which case the background will be extrapolated over the signal range and subtracted.
@@ -45,7 +45,7 @@ def extract_signal_from_polynomial_background_data(data, signal_range, fit_range
     data_dimension_count = len(data.shape)
     assert data_dimension_count < 3
 
-    # extract spectral intensity (ordinate) and x (abcissa) arrays
+    # extract spectral intensity (ordinate) and x (abscissa) arrays
     have_x_array = (data_dimension_count == 2)
     if have_x_array:
         assert min(data.shape[0], data.shape[1]) == 2
@@ -61,7 +61,7 @@ def extract_signal_from_polynomial_background_data(data, signal_range, fit_range
     data_size = data_values.shape[0]
     assert data_size > polynomial_order + 3
 
-    # check validity of abcissa value inputs
+    # check validity of abscissa value inputs
     if have_x_array:
         min_x = x_values.min()
         max_x = x_values.max()
