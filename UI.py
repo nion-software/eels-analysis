@@ -82,7 +82,7 @@ def filter_channel(document_controller):
                     src_data_item = src_data_items[0]
                     fit_region = copy.deepcopy(data_item.maybe_data_source.computation.variables[1])
                     src = DocumentModel.DocumentModel.make_source(src_data_item, None, "src", _("Source"), use_display_data=False)
-                    script = "sum(stacked_subtract_linear_background(src.data, fit.interval, signal.interval))"
+                    script = "sum(subtract_linear_background(src.data, fit.interval, signal.interval))"
                     new_data_item = document_model.make_data_item_with_computation(script, [src], [], _("Mapped"))
                     computation = new_data_item.maybe_data_source.computation
                     computation.create_object("signal", document_model.get_object_specifier(selected_region), label=_("Signal"), cascade_delete=True)

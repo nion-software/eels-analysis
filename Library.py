@@ -154,59 +154,118 @@ def extract_signal_from_polynomial_background(data_and_metadata, signal_range, f
     return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata.data_shape_and_dtype, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
-def subtract_linear_background(data_and_metadata, fit_range, signal_range):
-    fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
-    signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
-    def data_fn():
-        y = data_and_metadata.data[range(*fit_range, 8)]
-        A = numpy.vstack([numpy.arange(len(y)), numpy.ones((len(y), ))]).T
-        m, c = numpy.linalg.lstsq(A, y)[0]
-        return data_and_metadata.data[range(*signal_range)] - (numpy.arange(data_and_metadata.data_shape[-1]) * m + c)[range(*signal_range)]
-    return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata.data_shape_and_dtype, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
+def stacked_fit_linear_background(data: numpy.ndarray, rcond=1e-10) -> numpy.ndarray:
+    """Return the linear background using least squares for an ndarray with signal in last index.
 
-
-def stacked_lstsq(b, rcond=1e-10):
-    """Linear least squares fitting function.
-
-    Solve A x = b, via SVD least squares cutting of small singular values
-    A is an array of shape (..., M, N) and b of shape (..., M).
-    Returns x of shape (..., N)
-
-    The idea for this implementation comes from:
+    The outline for this implementation comes from:
     http://stackoverflow.com/questions/30442377/how-to-solve-many-overdetermined-systems-of-linear-equations-using-vectorized-co
     """
-    A = numpy.vstack([numpy.arange(b.shape[0]), numpy.ones((b.shape[0],))]).T
+
+    signal_shape = data.shape[-1]
+
+    # using equation y = Ap where A = [[x 1]] and p = [[m], [c]], solve for p.
+    linear = numpy.arange(signal_shape)
+    ones = numpy.ones((signal_shape,))
+    A = numpy.vstack([linear, ones]).T
+
+    # solve for p using svd. p will have the shape (n, 2) where n is the dimensions of the non-signal indexes of the data.
     u, s, v = numpy.linalg.svd(A, full_matrices=False)
     s_max = numpy.amax(s, axis=-1, keepdims=True)
     s_min = rcond * s_max
     inv_s = numpy.zeros_like(s)
     inv_s[s >= s_min] = 1 / s[s >= s_min]
-    x = numpy.einsum('...ji,...j->...i', v, inv_s * numpy.einsum('...ji,...j->...i', u, b.T.conj()))
+    x = numpy.einsum('...ji,...j->...i', v, inv_s * numpy.einsum('...ji,...j->...i', u, data.conj()))
     return numpy.conj(x, x)
 
 
-def slow_lstsq(b):
-    # this demonstrates how to convert a 1-d function to a stacked function
-    A = numpy.vstack([numpy.arange(b.shape[0]), numpy.ones((b.shape[0], ))]).T
-    return numpy.array([numpy.linalg.lstsq(A, b[..., k])[0] for k in range(b.shape[1])])
+def stacked_linear_background(data: numpy.ndarray) -> numpy.ndarray:
+    """Return the linear background using least squares for an ndarray with signal in last index."""
+
+    signal_shape = data.shape[-1]
+
+    # using equation y = Ap where A = [[x 1]] and p = [[m], [c]], solve for p.
+    linear = numpy.arange(signal_shape)
+
+    # solve for p. p will have the shape (n, 2) where n is the dimensions of the non-signal indexes of the data.
+    p = stacked_fit_linear_background(data)
+
+    # calculate the background by multiply and add
+    return (p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
 
 
-def stacked_subtract_linear_background(data_and_metadata, fit_range, signal_range):
-    """Subtract linear background from a stacked image.
+def slow_fit_linear_background(data: numpy.ndarray) -> numpy.ndarray:
+    """Return the linear background as m, c using least squares for an ndarray with signal in last index.
 
-    A stacked image has the signal dimension first followed by the navigation dimensions.
-
-    There must be two navigation dimensions when using this method.
+    This implementaton also demonstrates how to convert a 1-d function to a stacked function.
     """
+
+    # make reshaped data view
+    signal_shape = data.shape[-1]
+    if len(data.shape) > 1:
+        reshaped_data = data.reshape(numpy.product(data.shape[0:-1]), signal_shape)
+    else:
+        reshaped_data = data.reshape(1, signal_shape)
+
+    # using equation y = Ap where A = [[x 1]] and p = [[m], [c]], solve for p.
+    linear = numpy.arange(signal_shape)
+    ones = numpy.ones((signal_shape,))
+    A = numpy.vstack([linear, ones]).T
+
+    # solve for p. p will have the shape (n, 2) where n is the dimensions of the non-signal indexes of the data.
+    p = numpy.array([numpy.linalg.lstsq(A, reshaped_data[k, ...])[0] for k in range(reshaped_data.shape[0])])
+
+    # reshape and return
+    return p.reshape(data.shape[:-1] + (2,))
+
+
+def slow_linear_background(data: numpy.ndarray) -> numpy.ndarray:
+    """Return the linear background using least squares for an ndarray with signal in last index."""
+
+    signal_shape = data.shape[-1]
+
+    # using equation y = Ap where A = [[x 1]] and p = [[m], [c]], solve for p.
+    linear = numpy.arange(signal_shape)
+
+    # solve for p. p will have the shape (n, 2) where n is the dimensions of the non-signal indexes of the data.
+    p = slow_fit_linear_background(data)
+
+    # calculate the background by multiply and add
+    return (p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
+
+
+def linear_background(data: numpy.ndarray) -> numpy.ndarray:
+    return stacked_linear_background(data)
+
+
+def subtract_linear_background(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
+    """Subtract linear background from data and metadata with signal in first index."""
     fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
     signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
+
     def data_fn():
         data = data_and_metadata.data
-        data_r = data.reshape((data.shape[0], data.shape[1] * data.shape[2]))
-        data_fits = stacked_lstsq(data_r[range(*fit_range), ...]).reshape((data.shape[1], data.shape[2], 2))
-        L = numpy.arange(data_and_metadata.data_shape[0])[range(*signal_range)]
-        return data[range(*signal_range), ...] - (L[:, numpy.newaxis, numpy.newaxis] * data_fits[..., 0] + data_fits[..., 1])
-    return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata.data_shape_and_dtype, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
+        # Swift signal is in 0 index; needs to be in last index
+        # TODO: switch to using numpy.moveaxis when we start using numpy 1.11
+        for i in range(len(data.shape) - 1):
+            data = numpy.rollaxis(data, len(data.shape) - 1)
+
+        # Fit within fit_range; calculate background within signal_range; subtract from source signal range
+        p = stacked_fit_linear_background(data[..., range(*fit_range)])
+        linear = numpy.arange(signal_range[0], signal_range[1])
+        background = (p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
+        result = data[..., range(*signal_range)] - background
+
+        # Roll the axes again
+        # TODO: switch to using numpy.moveaxis when we start using numpy 1.11
+        for i in range(len(data.shape) - 1):
+            result = numpy.rollaxis(result, len(data.shape) - 1)
+
+        return result
+
+    data_shape = list(data_and_metadata.data_shape)
+    data_shape[0] = signal_range[1] - signal_range[0]
+    data_shape = tuple(data_shape)
+    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
 def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au: float,
@@ -277,4 +336,3 @@ def edges_near_energy_eV(energy_loss_eV: float, energy_loss_delta_eV: float) -> 
 # register functions
 Context.registered_functions["extract_signal_from_polynomial_background"] = extract_signal_from_polynomial_background
 Context.registered_functions["subtract_linear_background"] = subtract_linear_background
-Context.registered_functions["stacked_subtract_linear_background"] = stacked_subtract_linear_background
