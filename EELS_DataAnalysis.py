@@ -8,9 +8,8 @@
 import numpy
 
 # local libraries
-import CurveFittingAndAnalysis
-import EELS_EdgeIdentification
-import EELS_CrossSections
+from . import CurveFittingAndAnalysis
+from . import EELS_CrossSections
 
 def zero_loss_peak(low_loss_spectra: numpy.ndarray, low_loss_range_eV: numpy.ndarray) -> tuple:
     """Isolate the zero-loss peak from low-loss spectra and return the zero-loss count, zero-loss peak, and loss-spectrum arrays.
@@ -34,17 +33,17 @@ def core_loss_edge(core_loss_spectra: numpy.ndarray, core_loss_range_eV: numpy.n
     """
     edge_onset_margin_eV = 10
     assert edge_onset_eV > core_loss_range_eV[0] + edge_onset_margin_eV
-    
+
     edge_range = numpy.full_like(core_loss_range_eV, edge_onset_eV)
     edge_range[0] -= edge_onset_margin_eV
     edge_range[1] += edge_delta_eV
     poly_order = 1
     fit_log_y = (background_model_ID <= 1)
     fit_log_x = (background_model_ID == 0)
-    
+
     return CurveFittingAndAnalysis.signal_from_polynomial_background(core_loss_spectra, core_loss_range_eV, edge_range,
                                                                         background_ranges_eV, poly_order, fit_log_y, fit_log_x)
-    
+
 def relative_atomic_abundance(core_loss_spectra: numpy.ndarray, core_loss_range_eV: numpy.ndarray, background_ranges_eV: numpy.ndarray,
                                 atomic_number: int, edge_onset_eV: float, edge_delta_eV: float,
                                 beam_energy_eV: float, convergence_angle_rad: float, collection_angle_rad: float) -> numpy.ndarray:
@@ -55,7 +54,7 @@ def relative_atomic_abundance(core_loss_spectra: numpy.ndarray, core_loss_range_
         in units of (spectrum counts) * atoms / (nm * nm).
     """
     edge_data = core_loss_edge(core_loss_spectra, core_loss_range_eV, edge_onset_eV, edge_delta_eV, background_ranges_eV)
-    
+
     # The following should ultimately be pulled out of the edge ID table, based on atomic number and edge onset
     shell_number = 1
     subshell_index = 1
