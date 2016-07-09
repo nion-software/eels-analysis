@@ -13,10 +13,10 @@ class MultipleCurveFit:
     This model matrix is immediately transformed via singular value decomposition (SVD) into a robust fit matrix that can be applied to any
     corresponding collection of curves (e.g. spectra arranged in a 0, 1, or 2-dimensional array, with count data along the last dimension,
     sampled at exactly the same x-axis values as the model curves), thereby yielding coefficients for a least squares fit.
-    
+
     In order to ensure a well-conditioned fit matrix, each model curve is normalized so that its RMS value is 1.  The inverse scaling factors
     are applied to any fit-coefficient vector returned for external use (see below).
-    
+
     The fit for a given input data set is generated via the compute_fit_for_data function, which updates the normalized fit coefficients array.
     The fit object can then be queried for specific fit results via the following methods:
         get_fit_coefficients - fit coefficient array (with respect to original, non-normalized model curves)
@@ -30,25 +30,25 @@ class MultipleCurveFit:
         """
         assert model_curves.ndim == 2
         self.sample_count = model_curves.shape[-1]
-        
+
         # Determine the RMS value of each model curve and normalize by this factor to help ensure a well-conditioned solution matrix
         # Note that a model curve with RMS value 0 is meaningless and results in a failed assertion
         self._model_rms_values = numpy.sqrt(numpy.sum(numpy.square(model_curves), -1, keepdims = True) / self.sample_count)
         assert numpy.amin(self._model_rms_values) > 0
         self._normalized_model_curves = model_curves / self._model_rms_values
         self._normalized_model_integrals = self._normalized_model_curves.sum(-1, keepdims = True)
-        
+
         # Generate singular value decomposition of normalized model curve matrix
         u, s, v = numpy.linalg.svd(self._normalized_model_curves.T, full_matrices = False)
-        
+
         # Invert singular values, zeroing out any that are smaller than 1e-6 times the largest to yield a well-conditioned fit matrix
         s_min = 1e-6 * numpy.amax(s)
         s_inv = numpy.zeros_like(s)
         s_inv[s > s_min] = 1 / s[s > s_min]
-        
+
         # Generate normalized fit matrix
         self._normalized_fit_matrix = numpy.dot(v, numpy.dot(numpy.diag(s_inv), u.T))
-        
+
         # Track whether a fit has been computed for a specific data set
         self._have_computed_fit_for_data = False
 
@@ -104,7 +104,7 @@ class PolynomialCurveFit:
                 polynomial_model[1, :] = numpy.log(x_values)
             else:
                 polynomial_model[1, :] = x_values
-            
+
             power = 2
             while power <= self._polynomial_order:
                 polynomial_model[power:self._polynomial_order, :] *= polynomial_model[1, :]
@@ -121,7 +121,7 @@ class PolynomialCurveFit:
         assert x_values.ndim == 1
         assert x_values.var() > 0
         assert x_values.size >= polynomial_order + 1
-        
+
         self._polynomial_order = polynomial_order
         self._fit_log_x = fit_log_x
 
@@ -141,7 +141,7 @@ class PolynomialCurveFit:
             # For log y fit, all values must be positive
             assert numpy.amin(y_values) > 0
             y_values = numpy.log(y_values)
-            
+
         self._multicurve_fit.compute_fit_for_data(y_values)
 
     def get_fit_coefficients(self) -> numpy.ndarray:
@@ -175,7 +175,7 @@ class RangeSliceConverter:
         assert range_for_slice.size == 2
         slice_start = round((range_for_slice[0] - self._origin) / self._step)
         slice_stop = round((range_for_slice[1] - self._origin) / self._step)
-        return slice(slice_start, slice_stop)
+        return slice(int(slice_start), int(slice_stop))
 
     def get_range(self, slice_for_range: slice) -> numpy.ndarray:
         range_start = self._origin + slice_for_range.start * self._step
@@ -192,7 +192,7 @@ def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: 
         data_x_range - range of equispaced x coordinates at which all of the 1D data sets are sampled
         signal_x_range - range of x coordinates over which the signal of interest occurs
         background_fit_x_ranges - one or more (possibly overlapping or non-contiguous) ranges that define the signal background to be modelled
-        
+
     All range parameters are given as 2-element arrays of the form [x_start, x_end], where x_start is the x coordinate
     of the first data element in the range and x_end is the x coordinate just after last data element in the range.
     Multiple background ranges are given as successive rows in a 2D array.
@@ -205,7 +205,7 @@ def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: 
         polynomial_order - order of the polynomial model function (i.e. 0: constant, 1: line (default), 2: parabola, etc).
         fit_log_data - pass True to fit a polynomial to the log of the data values (e.g. exponential, Gaussian tail, or power-law fit)
         fit_log_x - pass True to perform the fit with respect to the log of the x values (e.g. logarithmic or power-law fit)
-        
+
     Returns:
         signal_integral - net signal integral array after subtraction of background fit over the specified signal range
         signal_profile - net signal profile array after subtraction of background fit over the profile range (see below)
@@ -215,13 +215,13 @@ def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: 
     assert data_x_range.ndim == 1
     assert data_x_range.size == 2
     assert data_x_range[0] < data_x_range[1]
-    
+
     assert signal_x_range.ndim == 1
     assert signal_x_range.size == 2
     assert signal_x_range[0] <= signal_x_range[1]
     assert signal_x_range[0] >= data_x_range[0]
     assert signal_x_range[1] <= data_x_range[1]
-    
+
     assert background_fit_x_ranges.ndim <= 2
     assert background_fit_x_ranges.shape[-1] == 2
     assert numpy.all(background_fit_x_ranges[..., 0] <= background_fit_x_ranges[..., 1])
@@ -251,7 +251,7 @@ def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: 
         next_slice = data_range_converter.get_slice(clean_fit_ranges[range_index])
         numpy.append(x_values_for_fit, x_values[next_slice])
         numpy.append(data_values_for_fit, data_values[..., next_slice])
-        
+
     # Generate the requested polynomial fit for the specified fit ranges
     background_fit = PolynomialCurveFit(x_values_for_fit, polynomial_order, fit_log_x)
     background_fit.compute_fit_for_data(data_values_for_fit, fit_log_data)
