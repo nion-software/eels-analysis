@@ -144,9 +144,6 @@ def filter_element(document_controller, f, s):
     data_item = display_specifier.data_item
     pick = document_model.get_pick_new(data_item)
     if pick:
-        from nion.data import DataAndMetadata
-        import numpy
-        pick.maybe_data_source.set_data_and_calibration(DataAndMetadata.DataAndMetadata.from_data(numpy.zeros((64,), numpy.float)))
         pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick)
         pick_display_specifier.display.y_min = 0
         pick_display_specifier.display.y_max = 2000
@@ -158,7 +155,6 @@ def filter_element(document_controller, f, s):
         # bg_script = "d1 = subtract_background_signal({src}, fit.interval, signal.interval)\nd2=extract_original_signal({src}, fit.interval, signal.interval)\nvstack((d1, d2))"
         bg = document_model.make_data_item_with_computation(bg_script, [bg_src], [], _("Background Subtracted"))
         if bg:
-            bg.maybe_data_source.set_data_and_calibration(DataAndMetadata.DataAndMetadata.from_data(numpy.zeros((2, 64), numpy.float)))
             bg_display_specifier = DataItem.DisplaySpecifier.from_data_item(bg)
             bg_display_specifier.display.display_type = "line_plot"
             script = "map_background_subtracted_signal(src.data, fit.interval, signal.interval)"
