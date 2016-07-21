@@ -32,16 +32,16 @@ class ElectronShell:
         self.subshell_index = subshell_index
 
     def __str__(self):
-        return "{}-{}".format(PeriodicTable().element_symbol(self.atomic_number), self.shell_str_in_eels_notation)
+        return "{}-{}".format(PeriodicTable().element_symbol(self.atomic_number), self.get_shell_str_in_eels_notation(True))
 
-    def to_long_str(self):
-        binding_energy_eV = PeriodicTable().nominal_binding_energy_eV(self)
-        return "{}{}".format(str(self), " {:.1f} eV".format(binding_energy_eV) if binding_energy_eV is not None else str())
+    def to_long_str(self, include_subshell: bool=False):
+        binding_energy_ev = PeriodicTable().nominal_binding_energy_ev(self)
+        eels_shell_str = "{}-{}".format(PeriodicTable().element_symbol(self.atomic_number), self.get_shell_str_in_eels_notation(include_subshell))
+        return "{}{}".format(eels_shell_str, " {:.1f} eV".format(binding_energy_ev) if binding_energy_ev is not None else str())
 
-    @property
-    def shell_str_in_eels_notation(self) -> str:
+    def get_shell_str_in_eels_notation(self, include_subshell: bool=False) -> str:
         shell_str = chr(ord('K') + self.shell_number - 1)
-        if shell_str != 'K':
+        if (shell_str != 'K') and include_subshell:
             shell_str += str(self.subshell_index)
         return shell_str
 
@@ -82,23 +82,31 @@ class PeriodicTable(metaclass=Singleton):
                 return edge_data_item.get("symbol")
         return None
 
-    def nominal_binding_energy_eV(self, electron_shell: ElectronShell) -> float:
+    def nominal_binding_energy_ev(self, electron_shell: ElectronShell) -> float:
         for edge_data_item in self.__edge_data:
             if edge_data_item.get("z", 0) == electron_shell.atomic_number:
-                return edge_data_item.get("edges", dict()).get(electron_shell.shell_str_in_eels_notation)
+                return edge_data_item.get("edges", dict()).get(electron_shell.get_shell_str_in_eels_notation(True))
         return None
 
     def get_elements_list(self) -> typing.Tuple[int, str]:
+        """Return a list of tuples: atomic number, atomic symbol."""
         return ((edge_data_item.get("z"), edge_data_item.get("symbol")) for edge_data_item in self.__edge_data)
 
     def get_edges_list(self, atomic_number: int) -> typing.Tuple[int, str]:
+        """Return a list of tuples: electron shell (lowest energy within shell number), edge name (without subshell)."""
         for edge_data_item in self.__edge_data:
             if edge_data_item.get("z", 0) == atomic_number:
                 edge_dict = edge_data_item.get("edges", dict())
-                return ((key, ElectronShell.from_eels_notation(atomic_number, key).to_long_str()) for key in sorted(edge_dict.keys()))
+                edge_map = dict()
+                for eels_shell, energy in edge_dict.items():
+                    electron_shell = ElectronShell.from_eels_notation(atomic_number, eels_shell)
+                    base_electron_shell = edge_map.setdefault(electron_shell.shell_number, (None, 1E9))
+                    if energy < base_electron_shell[1]:
+                        edge_map[electron_shell.shell_number] = (electron_shell, energy)
+                return list((edge_map[key][0], edge_map[key][0].to_long_str()) for key in sorted(edge_map.keys()))
         return None
 
 
 # print(ElectronShell.from_eels_notation(6, "M4"))
-# print(ElectronShell.from_eels_notation(6, "M4").shell_str_in_eels_notation)
-# print(PeriodicTable().nominal_binding_energy_eV(ElectronShell.from_eels_notation(35, "M5")))
+# print(ElectronShell.from_eels_notation(6, "M4").get_shell_str_in_eels_notation(True))
+# print(PeriodicTable().nominal_binding_energy_ev(ElectronShell.from_eels_notation(35, "M4")))
