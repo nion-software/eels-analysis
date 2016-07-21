@@ -2,6 +2,7 @@
 import fractions
 import json
 import os
+import typing
 
 # third party libraries
 # None
@@ -32,6 +33,10 @@ class ElectronShell:
 
     def __str__(self):
         return "{}-{}".format(PeriodicTable().element_symbol(self.atomic_number), self.shell_str_in_eels_notation)
+
+    def to_long_str(self):
+        binding_energy_eV = PeriodicTable().nominal_binding_energy_eV(self)
+        return "{}{}".format(str(self), " {:.1f} eV".format(binding_energy_eV) if binding_energy_eV is not None else str())
 
     @property
     def shell_str_in_eels_notation(self) -> str:
@@ -81,6 +86,16 @@ class PeriodicTable(metaclass=Singleton):
         for edge_data_item in self.__edge_data:
             if edge_data_item.get("z", 0) == electron_shell.atomic_number:
                 return edge_data_item.get("edges", dict()).get(electron_shell.shell_str_in_eels_notation)
+        return None
+
+    def get_elements_list(self) -> typing.Tuple[int, str]:
+        return ((edge_data_item.get("z"), edge_data_item.get("symbol")) for edge_data_item in self.__edge_data)
+
+    def get_edges_list(self, atomic_number: int) -> typing.Tuple[int, str]:
+        for edge_data_item in self.__edge_data:
+            if edge_data_item.get("z", 0) == atomic_number:
+                edge_dict = edge_data_item.get("edges", dict())
+                return ((key, ElectronShell.from_eels_notation(atomic_number, key).to_long_str()) for key in sorted(edge_dict.keys()))
         return None
 
 
