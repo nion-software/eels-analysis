@@ -391,7 +391,8 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
     data_shape = list(data_and_metadata.data_shape)
     data_shape[0] = int(round(max(fit_range[1], signal_range[1]))) - int(round(min(fit_range[0], signal_range[0])))
     data_shape = tuple(data_shape)
-    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
+    dimensional_calibrations = data_and_metadata.dimensional_calibrations[1:]
+    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), data_and_metadata.intensity_calibration, dimensional_calibrations)
 
 
 def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au: float,

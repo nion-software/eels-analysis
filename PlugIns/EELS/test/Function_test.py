@@ -129,6 +129,17 @@ class TestFunctions(unittest.TestCase):
         self.assertTrue(numpy.array_equal(expanded.data[200:500], numpy.ones((300, ))))
         self.assertTrue(numpy.array_equal(expanded.data[500:1000], numpy.zeros((500, ))))
 
+    def test_map_background_subtracted_signal_produces_correct_calibrations(self):
+        calibration = Calibration.Calibration(200.0, 2.0, 'eV')
+        calibration_y = Calibration.Calibration(101.0, 1.5, 'nm')
+        calibration_x = Calibration.Calibration(102.0, 2.5, 'nm')
+        spectrum_length = 1000
+        w, h = 20, 20
+        data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length, w, h), numpy.float), dimensional_calibrations=[calibration, calibration_y, calibration_x])
+        mapped = Functions.map_background_subtracted_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        self.assertEqual(len(mapped.dimensional_calibrations), 2)
+        self.assertEqual(mapped.dimensional_calibrations[0], calibration_y)
+        self.assertEqual(mapped.dimensional_calibrations[1], calibration_x)
 
 
 if __name__ == '__main__':
