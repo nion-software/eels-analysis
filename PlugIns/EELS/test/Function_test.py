@@ -17,6 +17,7 @@ from nion.data import DataAndMetadata
 sys.path.append(os.path.dirname(os.path.realpath(os.path.join(__file__, "..", ".."))))
 
 # Note: EELSAnalysis is only available in sys.path above is appended with its _parent_ directory.
+from EELSAnalysis import PeriodicTable
 from EELS import Functions
 
 
@@ -135,8 +136,9 @@ class TestFunctions(unittest.TestCase):
         calibration_x = Calibration.Calibration(102.0, 2.5, 'nm')
         spectrum_length = 1000
         w, h = 20, 20
+        electron_shell = PeriodicTable.ElectronShell(1, 1, 0)
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length, w, h), numpy.float), dimensional_calibrations=[calibration, calibration_y, calibration_x])
-        mapped = Functions.map_background_subtracted_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        mapped = Functions.map_background_subtracted_signal(data_and_metadata, electron_shell, (0.2, 0.3), (0.4, 0.5))
         self.assertEqual(len(mapped.dimensional_calibrations), 2)
         self.assertEqual(mapped.dimensional_calibrations[0], calibration_y)
         self.assertEqual(mapped.dimensional_calibrations[1], calibration_x)

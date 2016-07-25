@@ -220,7 +220,7 @@ def pick_new_edge(document_controller, model_data_item, elemental_mapping):
 
 def map_new_edge(document_controller, model_data_item, elemental_mapping):
     document_model = document_controller.document_model
-    script = "map_background_subtracted_signal(src.data, mapping.fit_interval, mapping.signal_interval)"
+    script = "map_background_subtracted_signal(src.data, mapping.electron_shell, mapping.fit_interval, mapping.signal_interval)"
     src = DocumentModel.DocumentModel.make_source(model_data_item, None, "src", _("Source"), use_display_data=False)
     map_data_item = document_model.make_data_item_with_computation(script, [src], [], "{} {}".format(_("Map"), str(elemental_mapping.electron_shell)))
     if map_data_item:

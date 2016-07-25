@@ -15,7 +15,9 @@ import numpy
 
 # local libraries
 from EELSAnalysis import CurveFitting
-from EELSAnalysis import EELS_DataAnalysis as analyzer
+from EELSAnalysis import EELS_CrossSections
+from EELSAnalysis import EELS_DataAnalysis
+from EELSAnalysis import PeriodicTable
 from nion.data import Context
 from nion.data import DataAndMetadata
 
@@ -291,7 +293,7 @@ def subtract_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadat
             edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
             bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0]), signal_calibration.convert_to_calibrated_value(fit_range[1])])
             # print("d {} s {} e {} d {} b {}".format(data.shape if data is not None else None, spectral_range, edge_onset, edge_delta, bkgd_range))
-            edge_map, edge_profile, bkgd_model, profile_range = analyzer.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)
+            edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)
 
             # Roll the axes again
             # return numpy.moveaxis(bkgd_model, 0, len(bkgd_model.shape) - 1)
@@ -363,10 +365,37 @@ def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, dat
     return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata_dst.data_shape_and_dtype, data_and_metadata_dst.intensity_calibration, data_and_metadata_dst.dimensional_calibrations)
 
 
-def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
+def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, electron_shell: PeriodicTable.ElectronShell, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
     """Subtract si_k background from data and metadata with signal in first index."""
     fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
     signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
+
+    signal_calibration = data_and_metadata.dimensional_calibrations[0]
+    spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(data_and_metadata.dimensional_shape[0])])
+    edge_onset = signal_calibration.convert_to_calibrated_value(signal_range[0])
+    edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
+    bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0]), signal_calibration.convert_to_calibrated_value(fit_range[1])])
+
+    beam_energy_ev = data_and_metadata.metadata.get("beam_energy_eV")
+    beam_convergence_angle_rad = data_and_metadata.metadata.get("beam_convergence_angle_rad")
+    beam_collection_angle_rad = data_and_metadata.metadata.get("beam_collection_angle_rad")
+
+    if beam_energy_ev is not None and beam_convergence_angle_rad is not None and beam_collection_angle_rad is not None:
+        if electron_shell.shell_number == 1 and electron_shell.subshell_index == 1:
+            cross_section = EELS_CrossSections.partial_cross_section_nm2(electron_shell.atomic_number, electron_shell.shell_number, electron_shell.subshell_index, edge_onset, edge_delta, beam_energy_ev, beam_convergence_angle_rad, beam_collection_angle_rad)
+        elif electron_shell.atomic_number == 32 and electron_shell.shell_number == 2 and electron_shell.subshell_index == 3:
+            if abs(edge_delta - 100) < 3:
+                cross_section = 7.31e-8
+            elif abs(edge_delta - 120) < 3:
+                cross_section = 8.79e-8
+            elif abs(edge_delta - 200) < 3:
+                cross_section = 1.40e-8
+            else:
+                cross_section = None
+        else:
+            cross_section = None
+    else:
+        cross_section = None
 
     def data_fn():
         data = data_and_metadata.data
@@ -375,14 +404,9 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
             data = numpy.moveaxis(data, 0, len(data.shape) - 1)
 
             # Fit within fit_range; calculate background within signal_range; subtract from source signal range
-            signal_calibration = data_and_metadata.dimensional_calibrations[0]
-            spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(data_and_metadata.dimensional_shape[0])])
-            edge_onset = signal_calibration.convert_to_calibrated_value(signal_range[0])
-            edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
-            bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0]), signal_calibration.convert_to_calibrated_value(fit_range[1])])
-            edge_map, edge_profile, bkgd_model, profile_range = analyzer.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)
+            edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)
 
-            return edge_map
+            return edge_map if cross_section is None else edge_map / cross_section
         except Exception as e:
             import traceback
             print("Error: {}".format(traceback.format_exc()))
@@ -392,7 +416,10 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
     data_shape[0] = int(round(max(fit_range[1], signal_range[1]))) - int(round(min(fit_range[0], signal_range[0])))
     data_shape = tuple(data_shape)
     dimensional_calibrations = data_and_metadata.dimensional_calibrations[1:]
-    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), data_and_metadata.intensity_calibration, dimensional_calibrations)
+    intensity_calibration = data_and_metadata.intensity_calibration
+    if cross_section is not None:
+        intensity_calibration.units = "~atoms/nm2"
+    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), intensity_calibration, dimensional_calibrations)
 
 
 def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au: float,
