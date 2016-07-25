@@ -216,6 +216,8 @@ def pick_new_edge(document_controller, model_data_item, elemental_mapping):
         pick_computation.expression = "pick = sum(src.data * region_mask(src.data, region)[newaxis, ...], tuple(range(1, len(data_shape(src.data)))))\ns = make_signal_like(extract_original_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)\nbg = make_signal_like(subtract_background_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)\nvstack((pick, s - bg, bg))"
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
+        document_controller.document_model.recompute_immediate(pick_data_item)  # need the data to scale display; so do this here. ugh.
+        pick_display_specifier.display.view_to_intervals(pick_data_item.maybe_data_source.data_and_calibration, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
         document_controller.display_data_item(pick_display_specifier)
     return pick_data_item
 
@@ -510,7 +512,14 @@ def change_elemental_mapping(document_model, model_data_item, data_item, element
         else:
                 data_item.title = "{} {} of {}".format(_("Map"), str(elemental_mapping.electron_shell), model_data_item.title)
         document_model.rebind_computations()
-
+    display = data_item.maybe_data_source.displays[0]
+    if display.display_type == "line_plot":
+        intervals = list()
+        for graphic in display.graphics:
+            if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id in ("fit", "signal"):
+                intervals.append(graphic.interval)
+        document_model.recompute_immediate(data_item)  # need the data to scale display; so do this here. ugh.
+        display.view_to_intervals(data_item.maybe_data_source.data_and_calibration, intervals)
 
 class ElementalMappingPanel(Panel.Panel):
 
@@ -629,16 +638,7 @@ class ElementalMappingPanel(Panel.Panel):
             if model_data_item:
                 def explore_pressed():
                     explore_data_item = explore_edges(document_controller, model_data_item)
-                    # need the data to make connect_explorer_interval work; so do this here. ugh.
-                    buffered_data_source = explore_data_item.maybe_data_source
-                    data_and_metadata = buffered_data_source.computation.evaluate_data()
-                    if data_and_metadata:
-                        with buffered_data_source._changes():
-                            with buffered_data_source.data_ref() as data_ref:
-                                data_ref.data = data_and_metadata.data
-                                buffered_data_source.update_metadata(data_and_metadata.metadata)
-                                buffered_data_source.set_intensity_calibration(data_and_metadata.intensity_calibration)
-                                buffered_data_source.set_dimensional_calibrations(data_and_metadata.dimensional_calibrations)
+                    document_model.recompute_immediate(explore_data_item)  # need the data to make connect_explorer_interval work; so do this here. ugh.
                     self.__elemental_mapping_panel_controller.connect_explorer_interval(explore_data_item)
                 def multiprofile_pressed():
                     multiprofile_data_item = None
@@ -674,6 +674,7 @@ class ElementalMappingPanel(Panel.Panel):
                         for line_profile_region in line_profile_regions[1:]:
                             multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector"))
                             multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width"))
+                        multiprofile_data_item.title = _("Profiles of ") + ", ".join(legend_labels)
                         document_controller.display_data_item(multiprofile_display_specifier)
 
                 explore_button_widget.on_clicked = explore_pressed
