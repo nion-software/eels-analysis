@@ -338,6 +338,26 @@ def is_model(data_item):
     return False
 
 
+def is_map(data_item):
+    if data_item is not None:
+        buffered_data_source = data_item.maybe_data_source
+        if buffered_data_source:
+            data_and_metadata = buffered_data_source.data_and_calibration
+            if data_and_metadata:
+                return data_and_metadata.is_data_2d and data_item.title.startswith("Map")
+    return False
+
+
+def is_calibrated_map(data_item):
+    if data_item is not None:
+        buffered_data_source = data_item.maybe_data_source
+        if buffered_data_source:
+            data_and_metadata = buffered_data_source.data_and_calibration
+            if data_and_metadata:
+                return data_and_metadata.is_data_2d and data_item.title.startswith("Map") and data_and_metadata.intensity_calibration.units.startswith("~atoms")
+    return False
+
+
 class ElementalMappingController:
     # only supports properties of elemental_mappings; no more complex structure allowed
 
@@ -496,7 +516,9 @@ class ElementalMappingPanel(Panel.Panel):
     def __init__(self, document_controller, panel_id, properties):
         super().__init__(document_controller, panel_id, _("Elemental Mappings"))
 
-        self.__elemental_mapping_panel_controller = ElementalMappingController(document_controller.document_model)
+        document_model = document_controller.document_model
+
+        self.__elemental_mapping_panel_controller = ElementalMappingController(document_model)
 
         ui = document_controller.ui
 
@@ -536,8 +558,11 @@ class ElementalMappingPanel(Panel.Panel):
 
         explore_button_widget = ui.create_push_button_widget(_("Explore"))
 
-        explore_row.add(explore_button_widget)
+        multiprofile_button_widget = ui.create_push_button_widget(_("Multiprofile"))
 
+        explore_row.add(explore_button_widget)
+        explore_row.add_spacing(8)
+        explore_row.add(multiprofile_button_widget)
         explore_row.add_stretch()
 
         explore_column.add(explore_row)
@@ -587,12 +612,12 @@ class ElementalMappingPanel(Panel.Panel):
                 if computation:
                     for computation_variable in computation.variables:
                         if computation_variable.name == "src":
-                            src_data_item_value = document_controller.document_model.resolve_object_specifier(computation_variable.specifier)
+                            src_data_item_value = document_model.resolve_object_specifier(computation_variable.specifier)
                             src_data_item = src_data_item_value.data_item if src_data_item_value else None
                             if is_model(src_data_item):
                                 model_data_item = src_data_item
                         if computation_variable.name == "mapping":
-                            current_elemental_mapping_value = document_controller.document_model.resolve_object_specifier(computation_variable.specifier)
+                            current_elemental_mapping_value = document_model.resolve_object_specifier(computation_variable.specifier)
                             current_elemental_mapping = current_elemental_mapping_value.value if current_elemental_mapping_value else None
             model_data_item_ref[0] = model_data_item
             elemental_mapping_column.remove_all()
@@ -614,7 +639,41 @@ class ElementalMappingPanel(Panel.Panel):
                                 buffered_data_source.set_intensity_calibration(data_and_metadata.intensity_calibration)
                                 buffered_data_source.set_dimensional_calibrations(data_and_metadata.dimensional_calibrations)
                     self.__elemental_mapping_panel_controller.connect_explorer_interval(explore_data_item)
+                def multiprofile_pressed():
+                    multiprofile_data_item = None
+                    multiprofile_computation = None
+                    indexes = list()
+                    line_profile_regions = list()
+                    for index, dependent_data_item in enumerate(document_model.get_dependent_data_items(model_data_item)):
+                        if is_calibrated_map(dependent_data_item):
+                            if not multiprofile_data_item:
+                                multiprofile_data_item = DataItem.DataItem()
+                                multiprofile_computation = document_model.create_computation("src1")
+                            indexes.append(index)
+                            display = dependent_data_item.maybe_data_source.displays[0]
+                            line_profile_region = Graphics.LineProfileGraphic()
+                            line_profile_region.start = 0.5, 0.2
+                            line_profile_region.end = 0.5, 0.8
+                            display.add_graphic(line_profile_region)
+                            line_profile_regions.append(line_profile_region)
+                            multiprofile_computation.create_object("src" + str(index), document_model.get_object_specifier(dependent_data_item), label="Src" + str(index), cascade_delete=True)
+                            multiprofile_computation.create_object("region" + str(index), document_model.get_object_specifier(line_profile_region), label="Region" + str(index), cascade_delete=True)
+                    if multiprofile_data_item:
+                        profiles = ",".join(["line_profile(src{0}.display_data, region{0}.vector, region{0}.width)".format(index) for index in indexes])
+                        multiprofile_computation.expression = "vstack(({}))".format(profiles)
+                        multiprofile_buffered_data_source = DataItem.BufferedDataSource()
+                        multiprofile_data_item.append_data_source(multiprofile_buffered_data_source)
+                        multiprofile_buffered_data_source.set_computation(multiprofile_computation)
+                        multiprofile_display_specifier = DataItem.DisplaySpecifier.from_data_item(multiprofile_data_item)
+                        multiprofile_display_specifier.display.display_type = "line_plot"
+                        document_model.append_data_item(multiprofile_data_item)
+                        for line_profile_region in line_profile_regions[1:]:
+                            multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector"))
+                            multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width"))
+                        document_controller.display_data_item(multiprofile_display_specifier)
+
                 explore_button_widget.on_clicked = explore_pressed
+                multiprofile_button_widget.on_clicked = multiprofile_pressed
                 self.__button_group = ui.create_button_group()
                 for index, elemental_mapping in enumerate(self.__elemental_mapping_panel_controller.get_elemental_mappings(model_data_item)):
                     row = ui.create_row_widget()
@@ -627,7 +686,7 @@ class ElementalMappingPanel(Panel.Panel):
                         self.__button_group.add_button(radio_button, index)
                         if elemental_mapping == current_elemental_mapping:
                             radio_button.checked = True
-                        radio_button.on_clicked = functools.partial(change_elemental_mapping, document_controller.document_model, model_data_item, current_data_item_ref[0], elemental_mapping)
+                        radio_button.on_clicked = functools.partial(change_elemental_mapping, document_model, model_data_item, current_data_item_ref[0], elemental_mapping)
                     else:
                         label = ui.create_label_widget(text)
                     delete_button = ui.create_push_button_widget(_("Delete"))
