@@ -142,49 +142,47 @@ def filter_element(document_controller, f, s):
     document_model = document_controller.document_model
     display_specifier = document_controller.selected_display_specifier
     data_item = display_specifier.data_item
-    pick = document_model.get_pick_new(data_item)
+    pick_region = Graphics.RectangleGraphic()
+    pick_region.size = 16 / data_item.maybe_data_source.data_and_calibration.data_shape[-2], 16 / data_item.maybe_data_source.data_and_calibration.data_shape[-1]
+    pick_region.label = _("Pick")
+    data_item.maybe_data_source.displays[0].add_graphic(pick_region)
+    pick = document_model.get_pick_region_new(data_item, pick_region=pick_region)
+    # pick = document_model.get_pick_new(data_item)
     if pick:
         pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick)
-        pick_display_specifier.display.y_min = 0
-        pick_display_specifier.display.y_max = 2000
-        fit_region0 = DocumentModel.DocumentModel.make_region("fit", "interval", params={"label": _("Fit"), "interval": (0.2, 0.3), "graphic_id": "fit"})
-        signal_region0 = DocumentModel.DocumentModel.make_region("signal", "interval", params={"label": _("Signal"), "interval": (0.4, 0.5), "graphic_id": "signal"})
-        bg_src = DocumentModel.DocumentModel.make_source(pick, None, "src", _("Source"), regions=[fit_region0, signal_region0], use_display_data=False)
-        bg_script = "vstack((extract_original_signal({src}, fit.interval, signal.interval), subtract_background_signal({src}, fit.interval, signal.interval)))"
-        # bg_script = "extract_original_signal({src}, fit.interval, signal.interval)"
-        # bg_script = "d1 = subtract_background_signal({src}, fit.interval, signal.interval)\nd2=extract_original_signal({src}, fit.interval, signal.interval)\nvstack((d1, d2))"
-        bg = document_model.make_data_item_with_computation(bg_script, [bg_src], [], _("Background Subtracted"))
-        if bg:
-            bg_display_specifier = DataItem.DisplaySpecifier.from_data_item(bg)
-            bg_display_specifier.display.display_type = "line_plot"
-            script = "map_background_subtracted_signal(src.data, fit.interval, signal.interval)"
-            src2 = DocumentModel.DocumentModel.make_source(data_item, None, "src", _("Source"), use_display_data=False)
-            map = document_model.make_data_item_with_computation(script, [src2], [], _("Mapped"))
-            if map:
-                fit_region = None
-                signal_region = None
-                for region in pick_display_specifier.display.graphics:
-                    if region.graphic_id == "fit":
-                        fit_region = region
-                    if region.graphic_id == "signal":
-                        signal_region = region
-                computation = map.maybe_data_source.computation
-                computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit", cascade_delete=True)
-                computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal", cascade_delete=True)
-                pick_computation = pick.maybe_data_source.computation
-                pick_computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit", cascade_delete=True)
-                pick_computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal", cascade_delete=True)
-                document_controller.display_data_item(pick_display_specifier)
-                document_controller.display_data_item(bg_display_specifier)
-                document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map))
+        pick_display_specifier.display.display_type = "line_plot"
+        fit_region = Graphics.IntervalGraphic()
+        fit_region.label = _("Fit")
+        fit_region.graphic_id = "fit"
+        fit_region.interval = 0.2, 0.3
+        pick_display_specifier.display.add_graphic(fit_region)
+        signal_region = Graphics.IntervalGraphic()
+        signal_region.label = _("Signal")
+        signal_region.graphic_id = "signal"
+        signal_region.interval = 0.4, 0.5
+        pick_display_specifier.display.add_graphic(signal_region)
+        script = "map_background_subtracted_signal(src.data, fit.interval, signal.interval)"
+        src2 = DocumentModel.DocumentModel.make_source(data_item, None, "src", _("Source"), use_display_data=False)
+        map = document_model.make_data_item_with_computation(script, [src2], [], _("Mapped"))
+        if map:
+            computation = map.maybe_data_source.computation
+            computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit", cascade_delete=True)
+            computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal", cascade_delete=True)
+            pick_computation = pick.maybe_data_source.computation
+            pick_computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit")
+            pick_computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal")
+            pick_computation.expression = "pick = sum(src.data * region_mask(src.data, region)[newaxis, ...], tuple(range(1, len(data_shape(src.data)))))\ns = make_signal_like(extract_original_signal(pick, fit.interval, signal.interval), pick)\nbg = make_signal_like(subtract_background_signal(pick, fit.interval, signal.interval), pick)\nvstack((pick, s - bg, bg))"
+            # pick_computation.expression = "pick = pick(src.data, pick_region.position)\ns = make_signal_like(extract_original_signal(pick, fit.interval, signal.interval), pick)\nbg = make_signal_like(subtract_background_signal(pick, fit.interval, signal.interval), pick)\nvstack((pick, s - bg, bg))"
+            document_controller.display_data_item(pick_display_specifier)
+            document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map))
 
-                src_data_and_metadata = data_item.maybe_data_source.data_and_calibration
-                fit_region_start = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(f[0]) / src_data_and_metadata.data_shape[0]
-                fit_region_end = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(f[1]) / src_data_and_metadata.data_shape[0]
-                signal_region_start = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(s[0]) / src_data_and_metadata.data_shape[0]
-                signal_region_end = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(s[1]) / src_data_and_metadata.data_shape[0]
-                fit_region.interval = fit_region_start, fit_region_end
-                signal_region.interval = signal_region_start, signal_region_end
+            src_data_and_metadata = data_item.maybe_data_source.data_and_calibration
+            fit_region_start = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(f[0]) / src_data_and_metadata.data_shape[0]
+            fit_region_end = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(f[1]) / src_data_and_metadata.data_shape[0]
+            signal_region_start = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(s[0]) / src_data_and_metadata.data_shape[0]
+            signal_region_end = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(s[1]) / src_data_and_metadata.data_shape[0]
+            fit_region.interval = fit_region_start, fit_region_end
+            signal_region.interval = signal_region_start, signal_region_end
 
 
 def build_menus(document_controller):
