@@ -99,42 +99,12 @@ def filter_channel(document_controller):
                     script = "sum(subtract_linear_background(src.data, fit.interval, signal.interval))"
                     new_data_item = document_model.make_data_item_with_computation(script, [src], [], _("Mapped"))
                     computation = new_data_item.maybe_data_source.computation
-                    computation.create_object("signal", document_model.get_object_specifier(selected_region), label=_("Signal"), cascade_delete=True)
+                    computation.create_object("signal", document_model.get_object_specifier(selected_region), label=_("Signal"))
                     computation.add_variable(fit_region)
                     if new_data_item:
                         new_display_specifier = DataItem.DisplaySpecifier.from_data_item(new_data_item)
                         document_controller.display_data_item(new_display_specifier)
                         return new_data_item
-    return None
-
-
-def xfilter_element(document_controller):
-    document_model = document_controller.document_model
-    display_specifier = document_controller.selected_display_specifier
-    data_item = display_specifier.data_item
-    if data_item:
-        display = data_item.maybe_data_source.displays[0]
-        fit_region = None
-        signal_region = None
-        for region in display.graphics:
-            if region.graphic_id == "fit":
-                fit_region = region
-            if region.graphic_id == "signal":
-                signal_region = region
-        if fit_region and signal_region:
-            src_data_items = document_model.get_source_data_items(data_item)
-            if len(src_data_items) == 1:
-                src_data_item = src_data_items[0]
-                src = DocumentModel.DocumentModel.make_source(src_data_item, None, "src", _("Source"), use_display_data=False)
-                script = "map_background_subtracted_signal(src.data, fit.interval, signal.interval)"
-                new_data_item = document_model.make_data_item_with_computation(script, [src], [], _("Mapped"))
-                computation = new_data_item.maybe_data_source.computation
-                computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit", cascade_delete=True)
-                computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal", cascade_delete=True)
-                if new_data_item:
-                    new_display_specifier = DataItem.DisplaySpecifier.from_data_item(new_data_item)
-                    document_controller.display_data_item(new_display_specifier)
-                    return new_data_item
     return None
 
 
@@ -166,8 +136,8 @@ def filter_element(document_controller, f, s):
         map = document_model.make_data_item_with_computation(script, [src2], [], _("Mapped"))
         if map:
             computation = map.maybe_data_source.computation
-            computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit", cascade_delete=True)
-            computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal", cascade_delete=True)
+            computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit")
+            computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal")
             pick_computation = pick.maybe_data_source.computation
             pick_computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit")
             pick_computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal")
