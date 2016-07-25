@@ -199,6 +199,7 @@ def pick_new_edge(document_controller, model_data_item, elemental_mapping):
         pick_data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
         pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
         pick_display_specifier.display.display_type = "line_plot"
+        pick_display_specifier.display.legend_labels = ["Signal", "Subtracted", "Background"]
         fit_region = Graphics.IntervalGraphic()
         fit_region.label = _("Fit")
         fit_region.graphic_id = "fit"
@@ -643,6 +644,7 @@ class ElementalMappingPanel(Panel.Panel):
                     multiprofile_data_item = None
                     multiprofile_computation = None
                     indexes = list()
+                    legend_labels = list()
                     line_profile_regions = list()
                     for index, dependent_data_item in enumerate(document_model.get_dependent_data_items(model_data_item)):
                         if is_calibrated_map(dependent_data_item):
@@ -650,6 +652,7 @@ class ElementalMappingPanel(Panel.Panel):
                                 multiprofile_data_item = DataItem.DataItem()
                                 multiprofile_computation = document_model.create_computation("src1")
                             indexes.append(index)
+                            legend_labels.append(dependent_data_item.title[4:dependent_data_item.title.index(" of ")])
                             display = dependent_data_item.maybe_data_source.displays[0]
                             line_profile_region = Graphics.LineProfileGraphic()
                             line_profile_region.start = 0.5, 0.2
@@ -666,6 +669,7 @@ class ElementalMappingPanel(Panel.Panel):
                         multiprofile_buffered_data_source.set_computation(multiprofile_computation)
                         multiprofile_display_specifier = DataItem.DisplaySpecifier.from_data_item(multiprofile_data_item)
                         multiprofile_display_specifier.display.display_type = "line_plot"
+                        multiprofile_display_specifier.display.legend_labels = legend_labels
                         document_model.append_data_item(multiprofile_data_item)
                         for line_profile_region in line_profile_regions[1:]:
                             multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector"))
