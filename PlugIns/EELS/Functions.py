@@ -7,7 +7,8 @@
 """
 
 # standard libraries
-# None
+import copy
+import math
 
 # third party libraries
 import numpy
@@ -15,7 +16,6 @@ import numpy
 # local libraries
 from EELSAnalysis import CurveFitting
 from EELSAnalysis import EELS_DataAnalysis as analyzer
-from nion.data import Calibration
 from nion.data import Context
 from nion.data import DataAndMetadata
 
@@ -303,9 +303,15 @@ def subtract_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadat
             raise
 
     data_shape = list(data_and_metadata.data_shape)
-    data_shape[0] = int(round(max(fit_range[1], signal_range[1]))) - int(round(min(fit_range[0], signal_range[0])))
+    max_channel = int(round(max(fit_range[1], signal_range[1])))
+    min_channel = int(round(min(fit_range[0], signal_range[0])))
+    data_shape[0] = max_channel - min_channel
     data_shape = tuple(data_shape)
-    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
+    dimensional_calibrations = copy.deepcopy(data_and_metadata.dimensional_calibrations)
+    original_calibration = copy.deepcopy(dimensional_calibrations[0])
+    dimensional_calibrations[0].offset = original_calibration.convert_to_calibrated_value(min_channel)
+    dimensional_calibrations[0].scale = (original_calibration.convert_to_calibrated_value(max_channel) - dimensional_calibrations[0].offset) / data_shape[0]
+    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), data_and_metadata.intensity_calibration, dimensional_calibrations)
 
 
 def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
@@ -318,9 +324,43 @@ def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, 
         return data_and_metadata.data[int(round(min(fit_range[0], signal_range[0]))):int(round(max(fit_range[1], signal_range[1]))), ...]
 
     data_shape = list(data_and_metadata.data_shape)
-    data_shape[0] = int(round(max(fit_range[1], signal_range[1]))) - int(round(min(fit_range[0], signal_range[0])))
+    max_channel = int(round(max(fit_range[1], signal_range[1])))
+    min_channel = int(round(min(fit_range[0], signal_range[0])))
+    data_shape[0] = max_channel - min_channel
     data_shape = tuple(data_shape)
-    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
+    dimensional_calibrations = copy.deepcopy(data_and_metadata.dimensional_calibrations)
+    original_calibration = copy.deepcopy(dimensional_calibrations[0])
+    dimensional_calibrations[0].offset = original_calibration.convert_to_calibrated_value(min_channel)
+    dimensional_calibrations[0].scale = (original_calibration.convert_to_calibrated_value(max_channel) - dimensional_calibrations[0].offset) / data_shape[0]
+    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), data_and_metadata.intensity_calibration, dimensional_calibrations)
+
+
+def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, data_and_metadata_dst: DataAndMetadata.DataAndMetadata):
+    if not data_and_metadata_src.dimensional_calibrations or not data_and_metadata_dst.dimensional_calibrations:
+        return None
+    if abs(data_and_metadata_src.dimensional_calibrations[0].scale - data_and_metadata_dst.dimensional_calibrations[0].scale) > 1E-7:
+        return None
+    if data_and_metadata_src.dimensional_calibrations[0].units != data_and_metadata_dst.dimensional_calibrations[0].units:
+        return None
+    if data_and_metadata_src.dimensional_calibrations[0].convert_to_calibrated_value(0) < data_and_metadata_dst.dimensional_calibrations[0].convert_to_calibrated_value(0):
+        return None
+    if data_and_metadata_src.dimensional_calibrations[0].convert_to_calibrated_value(data_and_metadata_src.data_shape[0]) > data_and_metadata_dst.dimensional_calibrations[0].convert_to_calibrated_value(data_and_metadata_dst.data_shape[0]):
+        return None
+
+    def data_fn():
+        try:
+            data = numpy.copy(data_and_metadata_dst.data)
+            index = int(data_and_metadata_dst.dimensional_calibrations[0].convert_from_calibrated_value(data_and_metadata_src.dimensional_calibrations[0].convert_to_calibrated_value(0)))
+            data[:] = 0
+            data[index:index + data_and_metadata_src.data_shape[0]] = data_and_metadata_src.data
+            return data
+        except Exception as e:
+            print(e)
+            import traceback
+            traceback.print_stack()
+            raise
+
+    return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata_dst.data_shape_and_dtype, data_and_metadata_dst.intensity_calibration, data_and_metadata_dst.dimensional_calibrations)
 
 
 def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
@@ -424,3 +464,4 @@ Context.registered_functions["subtract_linear_background"] = subtract_linear_bac
 Context.registered_functions["subtract_background_signal"] = subtract_background_signal
 Context.registered_functions["map_background_subtracted_signal"] = map_background_subtracted_signal
 Context.registered_functions["extract_original_signal"] = extract_original_signal
+Context.registered_functions["make_signal_like"] = make_signal_like

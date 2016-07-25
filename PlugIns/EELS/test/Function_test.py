@@ -96,5 +96,40 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(signal.data_shape, signal.data.shape)
         self.assertEqual(background.data_shape, background.data.shape)
 
+    def test_extracted_signal_has_correct_calibration_and_data(self):
+        calibration = Calibration.Calibration(200.0, 2.0, 'eV')
+        spectrum_length = 1000
+        data_and_metadata = DataAndMetadata.DataAndMetadata.from_data((numpy.random.randn(spectrum_length) * 100).astype(numpy.int32), dimensional_calibrations=[calibration])
+        signal = Functions.extract_original_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        self.assertEqual(data_and_metadata.dimensional_calibrations[0], calibration)  # dummy check
+        self.assertAlmostEqual(signal.dimensional_calibrations[0].offset, 0.2 * spectrum_length * calibration.scale + calibration.offset)
+        self.assertAlmostEqual(signal.dimensional_calibrations[0].scale, calibration.scale)
+        self.assertEqual(signal.dimensional_calibrations[0].units, calibration.units)
+        self.assertTrue(numpy.array_equal(signal.data, data_and_metadata.data[200:500]))
+
+    def test_background_signal_has_correct_calibration_offset(self):
+        calibration = Calibration.Calibration(200.0, 2.0, 'eV')
+        spectrum_length = 1000
+        data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length,), numpy.float), dimensional_calibrations=[calibration])
+        background = Functions.subtract_background_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        self.assertEqual(data_and_metadata.dimensional_calibrations[0], calibration)  # dummy check
+        self.assertAlmostEqual(background.dimensional_calibrations[0].offset, 0.2 * spectrum_length * calibration.scale + calibration.offset)
+        self.assertAlmostEqual(background.dimensional_calibrations[0].scale, calibration.scale)
+        self.assertEqual(background.dimensional_calibrations[0].units, calibration.units)
+
+    def test_make_signal_like_puts_data_in_correct_place(self):
+        calibration = Calibration.Calibration(200.0, 2.0, 'eV')
+        spectrum_length = 1000
+        data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length,), numpy.float), dimensional_calibrations=[calibration])
+        signal = Functions.extract_original_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        signal = DataAndMetadata.DataAndMetadata.from_data(numpy.ones(300, ), signal.intensity_calibration, signal.dimensional_calibrations)
+        expanded = Functions.make_signal_like(signal, data_and_metadata)
+        self.assertEqual(expanded.dimensional_calibrations[0], calibration)
+        self.assertTrue(numpy.array_equal(expanded.data[0:200], numpy.zeros((200, ))))
+        self.assertTrue(numpy.array_equal(expanded.data[200:500], numpy.ones((300, ))))
+        self.assertTrue(numpy.array_equal(expanded.data[500:1000], numpy.zeros((500, ))))
+
+
+
 if __name__ == '__main__':
     unittest.main()

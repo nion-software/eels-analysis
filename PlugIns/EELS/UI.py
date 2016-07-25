@@ -171,6 +171,9 @@ def filter_element(document_controller, f, s):
                 computation = map.maybe_data_source.computation
                 computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit", cascade_delete=True)
                 computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal", cascade_delete=True)
+                pick_computation = pick.maybe_data_source.computation
+                pick_computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit", cascade_delete=True)
+                pick_computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal", cascade_delete=True)
                 document_controller.display_data_item(pick_display_specifier)
                 document_controller.display_data_item(bg_display_specifier)
                 document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map))
