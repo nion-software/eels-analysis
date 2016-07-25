@@ -50,7 +50,7 @@ class ElectronShell:
     def from_eels_notation(cls, atomic_number: int, eels_shell: str) -> "ElectronShell":
         shell_number = ord(eels_shell[0].upper()) - ord('K') + 1
         if eels_shell == "K":
-            return ElectronShell(atomic_number, shell_number, 0)
+            return ElectronShell(atomic_number, shell_number, 1)
         subshell_index = int(eels_shell[1:])
         return ElectronShell(atomic_number, shell_number, subshell_index)
 

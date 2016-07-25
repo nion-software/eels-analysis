@@ -9,7 +9,7 @@ import numpy
 def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_eV: float,
                             beam_energy_eV: float, collection_angle_rad: float) -> numpy.ndarray:
     """Return the K-shell generalized oscillator strength (GOS) calculated on the hydrogenic model as an ndarray.
-    
+
     This algorithm is based on the hydrogenic model formulation given by Egerton in chapter 3 of his book
     entitled Electron Energy-Loss Spectroscopy in the Electron Microscope (in its 3rd edition as of 2011).
     Egerton's original expressions (formula numbers given below) have been slightly reformulated by Mike Kundmann
@@ -31,7 +31,7 @@ def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_
     beamBeta2 = 1 - 1 / beamGamma ** 2
 
     energySampleCount = numpy.fmin(numpy.fmax(50, 100 * numpy.round(edge_delta_eV / 100)), 1000) + 1
-    thetaSampleCount = numpy.fmin(numpy.fmax(50, 100 * numpy.round(collection_angle_rad / 0.050)), 400) + 1
+    thetaSampleCount = int(numpy.fmin(numpy.fmax(50, 100 * numpy.round(collection_angle_rad / 0.050)), 400) + 1)
 
     screenedZ2 = 1.
     shellOccupancy = 1
@@ -73,11 +73,11 @@ def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_
     # Determine energy array index at which "free" states begin
     boundStateMask = numpy.zeros_like(epsilonR)
     boundStateMask[epsilonR < screenedZ2] = 1
-    freeStateStartIndex = boundStateMask.sum()
+    freeStateStartIndex = int(boundStateMask.sum())
 
     # Generate GOS 'exponential' factor map, i.e. the exponential factors in Egerton's equations 3.125 and 3.126
     gosFactor = numpy.zeros_like(Q2)
-    
+
     # Compute bound-state portion = exp(-y), as in 3.126.
     # Note that -y has been reformulated as log[(Q^2-E/Ry+2(1-kH)Zs^2)/(Q^2-E/Ry+2(1+kH)Zs^2))/kH.
     epsilonR_bound = epsilonR[:freeStateStartIndex]
@@ -99,7 +99,7 @@ def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_
         gosFactor_free[...] = numpy.exp(-2 * gosFactor_free / kH_free) / (1 - numpy.exp(-2 * numpy.pi / kH_free))
 
     gos *= gosFactor
-    
+
     return gos
 
 def generalized_oscillator_strength(atomic_number: int, shell_number: int, subshell_index: int, edge_onset_eV: float, edge_delta_eV: float,
@@ -123,12 +123,12 @@ def generalized_oscillator_strength(atomic_number: int, shell_number: int, subsh
         gos = k_shell_hydrogenic_gos(atomic_number, edge_onset_eV, edge_delta_eV, beam_energy_eV, collection_angle_rad)
     else:
         print("No GOS routine available for L, M, N, and O electron shells.")
-    
+
     return gos
 
 def kohl_collection_efficiency(theta_rad: numpy.ndarray, alpha_rad: float, beta_rad: float) -> numpy.ndarray:
     """Return the Kohl collection efficiency for events with scattering angles (in radians) given by the theta array.
-    
+
     alpha_rad is the convergence semi-angle of the incident beam in radians.
     beta_rad is the collection semi-angle (usually defined by the spectrometer entrance aperture) in radians.
 
@@ -136,14 +136,14 @@ def kohl_collection_efficiency(theta_rad: numpy.ndarray, alpha_rad: float, beta_
     In effect, it computes the fraction of scattering events at angle theta that manage to enter the collection aperture in terms
     of the overlapping angular area of the convergence and collection apertures. In this implementation, the overlap area is
     divided by the smaller of the convergence and collection aperture angular areas, thereby yielding the collection efficiency
-    with respect to the captured total spectrum intensity. This is a departure from Kohl's published expression, which gives the 
+    with respect to the captured total spectrum intensity. This is a departure from Kohl's published expression, which gives the
     collection efficiency with respect to the incident beam intensity (even when alpha > beta and much of the incident beam is blocked).
     """
     assert theta_rad.ndim == 1
-    
+
     sum_angle = alpha_rad + beta_rad
     diff_angle = numpy.fabs(alpha_rad - beta_rad)
-    
+
     # Bypass the (negligible) overlap area correction if either aperture has an angular radius 1% or less of the other.
     # In this case, the expressions below are not well-conditioned against round-off error anyway, so best not to apply them.
     if alpha_rad <= beta_rad / 100:
@@ -152,25 +152,25 @@ def kohl_collection_efficiency(theta_rad: numpy.ndarray, alpha_rad: float, beta_
     elif beta_rad <= alpha_rad / 100:
         sum_angle = alpha_rad
         diff_angle = alpha_rad
-    
+
     # Determine theta range requiring aperture overlap computation, i.e. that with non-zero efficiency < 1.
     theta_start = theta_rad[theta_rad <= diff_angle].size
     theta_end = theta_rad[theta_rad < sum_angle].size
-        
+
     # Determine the collection efficiency array.
     collection_efficiency = numpy.zeros_like(theta_rad)
     collection_efficiency[:theta_start] = 1
     if theta_end > theta_start:
         theta_slice = theta_rad[theta_start:theta_end]
         efficiency_slice = collection_efficiency[theta_start:theta_end]
-        
+
         # Start with the sum of the intersecting sector areas
         efficiency_slice[...] = numpy.arccos((1 + beta_rad / theta_slice) * (theta_slice - beta_rad)/(2 * alpha_rad) + alpha_rad / (2 * theta_slice)) * alpha_rad ** 2
         efficiency_slice[...] += numpy.arccos((1 + alpha_rad / theta_slice) * (theta_slice - alpha_rad)/(2 * beta_rad) + beta_rad / (2 * theta_slice)) * beta_rad ** 2
-    
+
         # Subtract the "directional" sector triangles to yield the area of the overlapping "lens" region of the two angular apertures
         efficiency_slice[...] -= numpy.sqrt((sum_angle - theta_slice) * (sum_angle + theta_slice) * (theta_slice - diff_angle) * (theta_slice + diff_angle)) / 2
-        
+
         # Divide by the smallest aperture angular area to yield a spectrum collection efficiency in the range (0, 1)
         efficiency_slice[...] /= numpy.pi * min(alpha_rad, beta_rad) ** 2
 
@@ -181,7 +181,7 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
     """Return the partial cross section for the specified electron shell and experimental parameters.
 
     Uses generalized_oscillator_strength and kohl_collection_efficiency functions.
-    
+
     This algorithm is based on the Bethe theory formulation given by Egerton in chapter 3 of his book entitled
     Electron Energy-Loss Spectroscopy in the Electron Microscope (in its 3rd edition as of 2011).
     Egerton's original expressions (formula numbers given below) have been slightly reformulated by Mike Kundmann
@@ -197,7 +197,7 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
     assert edge_delta_eV > 0
     assert convergence_angle_rad >= 0
     assert collection_angle_rad > 0
-    
+
     hBarC_eV_nm = 197.325
     electronRestEnergy_eV = 510999.0
     fineStructureConstant = 1 / 137.036
@@ -205,7 +205,7 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
 
     beamGamma = 1 + beam_energy_eV / electronRestEnergy_eV
     beamBeta2 = 1 - 1 / beamGamma ** 2
-    
+
     max_scattering_angle_rad = convergence_angle_rad + collection_angle_rad
     gos = generalized_oscillator_strength(atomic_number, shell_number, subshell_index, edge_onset_eV, edge_delta_eV, beam_energy_eV, max_scattering_angle_rad, )
 
@@ -232,15 +232,15 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
     # This is a slightly reformulated, but exactly equivalent, version of Egerton's equation 3.26.
     dSigma = 2 * (1 - phiE) * (fineStructureConstant * beamGamma * bohrRadius_nm) ** 2 / (epsilon * Q2) * gos
 
-    # Integrate over solid angle out to collection angle to yield dSigma/dE, 
+    # Integrate over solid angle out to collection angle to yield dSigma/dE,
     # Apply collection efficiency factor to correct for convergence angle via the Kohl method.
-    collection_efficiency = kohl_collection_efficiency(theta_rad, convergence_angle_rad, collection_angle_rad)    
+    collection_efficiency = kohl_collection_efficiency(theta_rad, convergence_angle_rad, collection_angle_rad)
     dSigma *= 2 * numpy.pi * theta_rad.reshape(thetaSampleCount, 1) * collection_efficiency.reshape(thetaSampleCount, 1)
     theta_step = max_scattering_angle_rad / (thetaSampleCount - 1)
     energyDiffSigma = numpy.trapz(dSigma, dx = theta_step, axis = 0)
-    
+
     # Integrate over energy window to get partial cross-section
     energy_step = edge_delta_eV / (energySampleCount - 1)
     partialCrossSection = numpy.trapz(energyDiffSigma, dx = energy_step)
-    
+
     return partialCrossSection
