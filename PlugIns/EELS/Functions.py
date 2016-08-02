@@ -418,7 +418,7 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
     dimensional_calibrations = data_and_metadata.dimensional_calibrations[1:]
     intensity_calibration = data_and_metadata.intensity_calibration
     if cross_section is not None:
-        intensity_calibration.units = "~atoms/nm2"
+        intensity_calibration.units = "~"
     return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), intensity_calibration, dimensional_calibrations)
 
 

@@ -357,7 +357,7 @@ def is_calibrated_map(data_item):
         if buffered_data_source:
             data_and_metadata = buffered_data_source.data_and_calibration
             if data_and_metadata:
-                return data_and_metadata.is_data_2d and data_item.title.startswith("Map") and data_and_metadata.intensity_calibration.units.startswith("~atoms")
+                return data_and_metadata.is_data_2d and data_item.title.startswith("Map") and data_and_metadata.intensity_calibration.units.startswith("~")
     return False
 
 
@@ -664,8 +664,15 @@ class ElementalMappingPanel(Panel.Panel):
                             multiprofile_computation.create_object("src" + str(index), document_model.get_object_specifier(dependent_data_item), label="Src" + str(index), cascade_delete=True)
                             multiprofile_computation.create_object("region" + str(index), document_model.get_object_specifier(line_profile_region), label="Region" + str(index), cascade_delete=True)
                     if multiprofile_data_item:
-                        profiles = ",".join(["line_profile(src{0}.display_data, region{0}.vector, region{0}.width)".format(index) for index in indexes])
-                        multiprofile_computation.expression = "vstack(({}))".format(profiles)
+                        script = ""
+                        for index in indexes:
+                            script += "d{0} = line_profile(src{0}.display_data, region{0}.vector, region{0}.width)\n".format(index)
+                        profiles = ",".join(["d{0}".format(index) for index in indexes])
+                        script += "mx=amax(vstack(({})))\n".format(profiles)
+                        for index in indexes:
+                            script += "d{0} /= mx\n".format(index)
+                        script += "vstack(({}))".format(profiles)
+                        multiprofile_computation.expression = script
                         multiprofile_buffered_data_source = DataItem.BufferedDataSource()
                         multiprofile_data_item.append_data_source(multiprofile_buffered_data_source)
                         multiprofile_buffered_data_source.set_computation(multiprofile_computation)
