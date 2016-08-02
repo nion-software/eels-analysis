@@ -8,12 +8,8 @@
 
 # standard libraries
 import copy
-import math
 
-# third party libraries
 import numpy
-
-# local libraries
 from EELSAnalysis import CurveFitting
 from EELSAnalysis import EELS_CrossSections
 from EELSAnalysis import EELS_DataAnalysis
@@ -153,9 +149,9 @@ def extract_signal_from_polynomial_background(data_and_metadata, signal_range, f
                                                 polynomial_order = 1, fit_log_data = False, fit_log_x = False):
     signal_range = numpy.asarray(signal_range) * data_and_metadata.data_shape[0]
     fit_ranges = numpy.asarray(fit_ranges) * data_and_metadata.data_shape[0]
-    def data_fn():
-        return extract_signal_from_polynomial_background_data(data_and_metadata.data, signal_range, fit_ranges, first_x, delta_x, polynomial_order, fit_log_data, fit_log_x)
-    return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata.data_shape_and_dtype, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
+    data = extract_signal_from_polynomial_background_data(data_and_metadata.data, signal_range, fit_ranges, first_x, delta_x, polynomial_order, fit_log_data,
+                                                          fit_log_x)
+    return DataAndMetadata.new_data_and_metadata(data, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
 def stacked_fit_linear_background(data: numpy.ndarray, rcond=1e-10) -> numpy.ndarray:
@@ -246,30 +242,20 @@ def subtract_linear_background(data_and_metadata: DataAndMetadata.DataAndMetadat
     fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
     signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
 
-    def data_fn():
-        data = data_and_metadata.data
-        # Swift signal is in 0 index; needs to be in last index
-        # TODO: switch to using numpy.moveaxis when we start using numpy 1.11
-        for i in range(len(data.shape) - 1):
-            data = numpy.rollaxis(data, len(data.shape) - 1)
+    data = data_and_metadata.data
+    # Swift signal is in 0 index; needs to be in last index
+    data = numpy.moveaxis(data, 0, len(data.shape) - 1)
 
-        # Fit within fit_range; calculate background within signal_range; subtract from source signal range
-        p = stacked_fit_linear_background(data[..., range(*fit_range)])
-        linear = numpy.arange(signal_range[0], signal_range[1])
-        background = (p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
-        result = data[..., range(*signal_range)] - background
+    # Fit within fit_range; calculate background within signal_range; subtract from source signal range
+    p = stacked_fit_linear_background(data[..., range(*fit_range)])
+    linear = numpy.arange(signal_range[0], signal_range[1])
+    background = (p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
+    result = data[..., range(*signal_range)] - background
 
-        # Roll the axes again
-        # TODO: switch to using numpy.moveaxis when we start using numpy 1.11
-        for i in range(len(data.shape) - 1):
-            result = numpy.rollaxis(result, len(data.shape) - 1)
+    # Roll the axes again
+    result = numpy.moveaxis(result, len(result.shape) - 1, 0)
 
-        return result
-
-    data_shape = list(data_and_metadata.data_shape)
-    data_shape[0] = int(round(signal_range[1])) - int(round(signal_range[0]))
-    data_shape = tuple(data_shape)
-    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
+    return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
 def subtract_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
@@ -277,32 +263,26 @@ def subtract_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadat
     fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
     signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
 
-    def data_fn():
-        data = data_and_metadata.data
-        try:
-            if len(data_and_metadata.dimensional_calibrations) == 0:
-                return None
+    data = data_and_metadata.data
 
-            # Swift signal is in 0 index; needs to be in last index
-            data = numpy.moveaxis(data, 0, len(data.shape) - 1)
+    if len(data_and_metadata.dimensional_calibrations) == 0:
+        return None
 
-            # Fit within fit_range; calculate background within signal_range; subtract from source signal range
-            signal_calibration = data_and_metadata.dimensional_calibrations[0]
-            spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(data_and_metadata.dimensional_shape[0])])
-            edge_onset = signal_calibration.convert_to_calibrated_value(signal_range[0])
-            edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
-            bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0]), signal_calibration.convert_to_calibrated_value(fit_range[1])])
-            # print("d {} s {} e {} d {} b {}".format(data.shape if data is not None else None, spectral_range, edge_onset, edge_delta, bkgd_range))
-            edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)
+    # Swift signal is in 0 index; needs to be in last index
+    data = numpy.moveaxis(data, 0, len(data.shape) - 1)
 
-            # Roll the axes again
-            # return numpy.moveaxis(bkgd_model, 0, len(bkgd_model.shape) - 1)
-            return numpy.squeeze(bkgd_model)
-        except Exception as e:
-            import traceback
-            print("Error: {}".format(traceback.format_exc()))
-            # return None
-            raise
+    # Fit within fit_range; calculate background within signal_range; subtract from source signal range
+    signal_calibration = data_and_metadata.dimensional_calibrations[0]
+    spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(data_and_metadata.dimensional_shape[0])])
+    edge_onset = signal_calibration.convert_to_calibrated_value(signal_range[0])
+    edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
+    bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0]), signal_calibration.convert_to_calibrated_value(fit_range[1])])
+    # print("d {} s {} e {} d {} b {}".format(data.shape if data is not None else None, spectral_range, edge_onset, edge_delta, bkgd_range))
+    edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)
+
+    # Roll the axes again
+    # return numpy.moveaxis(bkgd_model, 0, len(bkgd_model.shape) - 1)
+    result = numpy.squeeze(bkgd_model)
 
     data_shape = list(data_and_metadata.data_shape)
     max_channel = int(round(max(fit_range[1], signal_range[1])))
@@ -313,7 +293,8 @@ def subtract_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadat
     original_calibration = copy.deepcopy(dimensional_calibrations[0])
     dimensional_calibrations[0].offset = original_calibration.convert_to_calibrated_value(min_channel)
     dimensional_calibrations[0].scale = (original_calibration.convert_to_calibrated_value(max_channel) - dimensional_calibrations[0].offset) / data_shape[0]
-    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), data_and_metadata.intensity_calibration, dimensional_calibrations)
+
+    return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, dimensional_calibrations)
 
 
 def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
@@ -321,9 +302,7 @@ def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, 
     fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
     signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
 
-    def data_fn():
-        # Swift signal is in 0 index; needs to be in last index
-        return data_and_metadata.data[int(round(min(fit_range[0], signal_range[0]))):int(round(max(fit_range[1], signal_range[1]))), ...]
+    result = data_and_metadata.data[int(round(min(fit_range[0], signal_range[0]))):int(round(max(fit_range[1], signal_range[1]))), ...]
 
     data_shape = list(data_and_metadata.data_shape)
     max_channel = int(round(max(fit_range[1], signal_range[1])))
@@ -334,7 +313,8 @@ def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, 
     original_calibration = copy.deepcopy(dimensional_calibrations[0])
     dimensional_calibrations[0].offset = original_calibration.convert_to_calibrated_value(min_channel)
     dimensional_calibrations[0].scale = (original_calibration.convert_to_calibrated_value(max_channel) - dimensional_calibrations[0].offset) / data_shape[0]
-    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), data_and_metadata.intensity_calibration, dimensional_calibrations)
+
+    return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, dimensional_calibrations)
 
 
 def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, data_and_metadata_dst: DataAndMetadata.DataAndMetadata):
@@ -349,20 +329,12 @@ def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, dat
     if data_and_metadata_src.dimensional_calibrations[0].convert_to_calibrated_value(data_and_metadata_src.data_shape[0]) > data_and_metadata_dst.dimensional_calibrations[0].convert_to_calibrated_value(data_and_metadata_dst.data_shape[0]):
         return None
 
-    def data_fn():
-        try:
-            data = numpy.copy(data_and_metadata_dst.data)
-            index = int(data_and_metadata_dst.dimensional_calibrations[0].convert_from_calibrated_value(data_and_metadata_src.dimensional_calibrations[0].convert_to_calibrated_value(0)))
-            data[:] = 0
-            data[index:index + data_and_metadata_src.data_shape[0]] = data_and_metadata_src.data
-            return data
-        except Exception as e:
-            print(e)
-            import traceback
-            traceback.print_stack()
-            raise
+    data = numpy.copy(data_and_metadata_dst.data)
+    index = int(data_and_metadata_dst.dimensional_calibrations[0].convert_from_calibrated_value(data_and_metadata_src.dimensional_calibrations[0].convert_to_calibrated_value(0)))
+    data[:] = 0
+    data[index:index + data_and_metadata_src.data_shape[0]] = data_and_metadata_src.data
 
-    return DataAndMetadata.DataAndMetadata(data_fn, data_and_metadata_dst.data_shape_and_dtype, data_and_metadata_dst.intensity_calibration, data_and_metadata_dst.dimensional_calibrations)
+    return DataAndMetadata.new_data_and_metadata(data, data_and_metadata_dst.intensity_calibration, data_and_metadata_dst.dimensional_calibrations)
 
 
 def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, electron_shell: PeriodicTable.ElectronShell, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
@@ -397,27 +369,22 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
     else:
         cross_section = None
 
-    def data_fn():
-        data = data_and_metadata.data
-        try:
-            # Swift signal is in 0 index; needs to be in last index
-            data = numpy.moveaxis(data, 0, len(data.shape) - 1)
+    data = data_and_metadata.data
 
-            # Fit within fit_range; calculate background within signal_range; subtract from source signal range
-            edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)
+    # Swift signal is in 0 index; needs to be in last index
+    data = numpy.moveaxis(data, 0, len(data.shape) - 1)
 
-            return edge_map if cross_section is None else edge_map / cross_section
-        except Exception as e:
-            import traceback
-            print("Error: {}".format(traceback.format_exc()))
-            raise
+    # Fit within fit_range; calculate background within signal_range; subtract from source signal range
+    edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)
 
-    data_shape = data_and_metadata.data_shape[1:]
+    result = edge_map if cross_section is None else edge_map / cross_section
+
     dimensional_calibrations = data_and_metadata.dimensional_calibrations[1:]
-    intensity_calibration = data_and_metadata.intensity_calibration
+    intensity_calibration = copy.deepcopy(data_and_metadata.intensity_calibration)
     if cross_section is not None:
         intensity_calibration.units = "~"
-    return DataAndMetadata.DataAndMetadata(data_fn, (data_shape, data_and_metadata.data_dtype), intensity_calibration, dimensional_calibrations)
+
+    return DataAndMetadata.new_data_and_metadata(result, intensity_calibration, dimensional_calibrations)
 
 
 def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au: float,
