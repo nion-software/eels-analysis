@@ -126,7 +126,7 @@ def filter_element(document_controller, f, s):
     display_specifier = document_controller.selected_display_specifier
     data_item = display_specifier.data_item
     pick_region = Graphics.EllipseGraphic()
-    pick_region.size = 16 / data_item.maybe_data_source.data_and_calibration.data_shape[-2], 16 / data_item.maybe_data_source.data_and_calibration.data_shape[-1]
+    pick_region.size = 16 / data_item.maybe_data_source.dimensional_shape[-2], 16 / data_item.maybe_data_source.dimensional_shape[-1]
     pick_region.label = _("Pick")
     data_item.maybe_data_source.displays[0].add_graphic(pick_region)
     pick = document_model.get_pick_region_new(data_item, pick_region=pick_region)
@@ -159,18 +159,19 @@ def filter_element(document_controller, f, s):
             document_controller.display_data_item(pick_display_specifier)
             document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map))
 
-            src_data_and_metadata = data_item.maybe_data_source.data_and_calibration
-            fit_region_start = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(f[0]) / src_data_and_metadata.data_shape[0]
-            fit_region_end = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(f[1]) / src_data_and_metadata.data_shape[0]
-            signal_region_start = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(s[0]) / src_data_and_metadata.data_shape[0]
-            signal_region_end = src_data_and_metadata.dimensional_calibrations[0].convert_from_calibrated_value(s[1]) / src_data_and_metadata.data_shape[0]
+            src_dimensional_shape = data_item.maybe_data_source.dimensional_shape
+            src_dimensional_calibrations = data_item.maybe_data_source.dimensional_calibrations
+            fit_region_start = src_dimensional_calibrations[0].convert_from_calibrated_value(f[0]) / src_dimensional_shape[0]
+            fit_region_end = src_dimensional_calibrations[0].convert_from_calibrated_value(f[1]) / src_dimensional_shape[0]
+            signal_region_start = src_dimensional_calibrations[0].convert_from_calibrated_value(s[0]) / src_dimensional_shape[0]
+            signal_region_end = src_dimensional_calibrations[0].convert_from_calibrated_value(s[1]) / src_dimensional_shape[0]
             fit_region.interval = fit_region_start, fit_region_end
             signal_region.interval = signal_region_start, signal_region_end
 
 def explore_edges(document_controller, model_data_item):
     document_model = document_controller.document_model
     pick_region = Graphics.EllipseGraphic()
-    pick_region.size = 16 / model_data_item.maybe_data_source.data_and_calibration.data_shape[-2], 16 / model_data_item.maybe_data_source.data_and_calibration.data_shape[-1]
+    pick_region.size = 16 / model_data_item.maybe_data_source.dimensional_shape[-2], 16 / model_data_item.maybe_data_source.dimensional_shape[-1]
     pick_region.label = _("Explore")
     model_data_item.maybe_data_source.displays[0].add_graphic(pick_region)
     pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
@@ -190,7 +191,7 @@ def explore_edges(document_controller, model_data_item):
 def pick_new_edge(document_controller, model_data_item, elemental_mapping):
     document_model = document_controller.document_model
     pick_region = Graphics.EllipseGraphic()
-    pick_region.size = 16 / model_data_item.maybe_data_source.data_and_calibration.data_shape[-2], 16 / model_data_item.maybe_data_source.data_and_calibration.data_shape[-1]
+    pick_region.size = 16 / model_data_item.maybe_data_source.dimensional_shape[-2], 16 / model_data_item.maybe_data_source.dimensional_shape[-1]
     pick_region.label = "{} {}".format(_("Pick"), str(elemental_mapping.electron_shell))
     model_data_item.maybe_data_source.displays[0].add_graphic(pick_region)
     pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
@@ -217,7 +218,7 @@ def pick_new_edge(document_controller, model_data_item, elemental_mapping):
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
         document_controller.document_model.recompute_immediate(pick_data_item)  # need the data to scale display; so do this here. ugh.
-        pick_display_specifier.display.view_to_intervals(pick_data_item.maybe_data_source.data_and_calibration, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
+        pick_display_specifier.display.view_to_intervals(pick_data_item.maybe_data_source.data_and_metadata, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
         document_controller.display_data_item(pick_display_specifier)
     return pick_data_item
 
@@ -322,42 +323,33 @@ Symbolic.ComputationVariable.register_computation_variable_type(elemental_mappin
 def is_explorer(data_item):
     if data_item is not None:
         buffered_data_source = data_item.maybe_data_source
-        if buffered_data_source:
-            data_and_metadata = buffered_data_source.data_and_calibration
-            if data_and_metadata and data_and_metadata.is_data_1d:
-                for graphic in buffered_data_source.displays[0].graphics:
-                    if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
-                        return True
+        if buffered_data_source and buffered_data_source.is_data_1d:
+            for graphic in buffered_data_source.displays[0].graphics:
+                if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
+                    return True
     return False
 
 
 def is_model(data_item):
     if data_item is not None:
         buffered_data_source = data_item.maybe_data_source
-        if buffered_data_source:
-            data_and_metadata = buffered_data_source.data_and_calibration
-            if data_and_metadata:
-                return data_and_metadata.is_data_3d
+        return buffered_data_source and buffered_data_source.is_data_3d
     return False
 
 
 def is_map(data_item):
     if data_item is not None:
         buffered_data_source = data_item.maybe_data_source
-        if buffered_data_source:
-            data_and_metadata = buffered_data_source.data_and_calibration
-            if data_and_metadata:
-                return data_and_metadata.is_data_2d and data_item.title.startswith("Map")
+        if buffered_data_source and buffered_data_source.is_data_2d:
+            return data_item.title.startswith("Map")
     return False
 
 
 def is_calibrated_map(data_item):
     if data_item is not None:
         buffered_data_source = data_item.maybe_data_source
-        if buffered_data_source:
-            data_and_metadata = buffered_data_source.data_and_calibration
-            if data_and_metadata:
-                return data_and_metadata.is_data_2d and data_item.title.startswith("Map") and data_and_metadata.intensity_calibration.units.startswith("~")
+        if buffered_data_source and buffered_data_source.is_data_2d:
+            return data_item.title.startswith("Map") and buffered_data_source.intensity_calibration.units.startswith("~")
     return False
 
 
@@ -459,12 +451,12 @@ class ElementalMappingController:
         del self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid]
         self.__write_metadata(data_item)
 
-    def graphic_property_changed(self, data_item, data_and_metadata, key, value):
+    def graphic_property_changed(self, data_item, dimensional_shape, dimensional_calibrations, key, value):
         if key == "interval":
-            ss = value[0] * data_and_metadata.data_shape[-1]
-            ee = value[1] * data_and_metadata.data_shape[-1]
-            s = data_and_metadata.dimensional_calibrations[-1].convert_to_calibrated_value(ss)
-            e = data_and_metadata.dimensional_calibrations[-1].convert_to_calibrated_value(ee)
+            ss = value[0] * dimensional_shape[-1]
+            ee = value[1] * dimensional_shape[-1]
+            s = dimensional_calibrations[-1].convert_to_calibrated_value(ss)
+            e = dimensional_calibrations[-1].convert_to_calibrated_value(ee)
             self.__energy_intervals[data_item.uuid] = s, e
             self.explore_interval_changed.fire(data_item, (s, e))
 
@@ -473,13 +465,13 @@ class ElementalMappingController:
 
     def connect_explorer_interval(self, data_item):
         buffered_data_source = data_item.maybe_data_source
-        if buffered_data_source:
-            data_and_metadata = buffered_data_source.data_and_calibration
-            if data_and_metadata and data_and_metadata.is_data_1d:
-                for graphic in buffered_data_source.displays[0].graphics:
-                    if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
-                        self.__explore_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, data_item, data_and_metadata))
-                        self.graphic_property_changed(data_item, data_and_metadata, "interval", graphic.interval)
+        if buffered_data_source and buffered_data_source.is_data_1d:
+            for graphic in buffered_data_source.displays[0].graphics:
+                if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
+                    dimensional_shape = buffered_data_source.dimensional_shape
+                    dimensional_calibrations = buffered_data_source.dimensional_calibrations
+                    self.__explore_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, data_item, dimensional_shape, dimensional_calibrations))
+                    self.graphic_property_changed(data_item, dimensional_shape, dimensional_calibrations, "interval", graphic.interval)
 
 
 def change_elemental_mapping(document_model, model_data_item, data_item, elemental_mapping):
@@ -518,7 +510,7 @@ def change_elemental_mapping(document_model, model_data_item, data_item, element
             if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id in ("fit", "signal"):
                 intervals.append(graphic.interval)
         document_model.recompute_immediate(data_item)  # need the data to scale display; so do this here. ugh.
-        display.view_to_intervals(data_item.maybe_data_source.data_and_calibration, intervals)
+        display.view_to_intervals(data_item.maybe_data_source.data_and_metadata, intervals)
 
 
 class ElementalMappingPanel(Panel.Panel):
@@ -597,14 +589,15 @@ class ElementalMappingPanel(Panel.Panel):
                 fit_interval_eV = binding_energy_eV * 0.93, binding_energy_eV * 0.98
                 buffered_data_source = model_data_item.maybe_data_source
                 if buffered_data_source:
-                    data_and_metadata = buffered_data_source.data_and_calibration
-                    if data_and_metadata and data_and_metadata.dimensional_calibrations is not None and len(data_and_metadata.dimensional_calibrations) > 0:
-                        calibration = data_and_metadata.dimensional_calibrations[0]
+                    dimensional_shape = buffered_data_source.dimensional_shape
+                    dimensional_calibrations = buffered_data_source.dimensional_calibrations
+                    if dimensional_shape is not None and dimensional_calibrations is not None and len(dimensional_calibrations) > 0:
+                        calibration = dimensional_calibrations[0]
                         if calibration.units == "eV":
-                            fit_region_start = calibration.convert_from_calibrated_value(fit_interval_eV[0]) / data_and_metadata.data_shape[0]
-                            fit_region_end = calibration.convert_from_calibrated_value(fit_interval_eV[1]) / data_and_metadata.data_shape[0]
-                            signal_region_start = calibration.convert_from_calibrated_value(signal_interval_eV[0]) / data_and_metadata.data_shape[0]
-                            signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / data_and_metadata.data_shape[0]
+                            fit_region_start = calibration.convert_from_calibrated_value(fit_interval_eV[0]) / dimensional_shape[0]
+                            fit_region_end = calibration.convert_from_calibrated_value(fit_interval_eV[1]) / dimensional_shape[0]
+                            signal_region_start = calibration.convert_from_calibrated_value(signal_interval_eV[0]) / dimensional_shape[0]
+                            signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[0]
                             fit_interval = fit_region_start, fit_region_end
                             signal_interval = signal_region_start, signal_region_end
                             elemental_mapping = ElementalMapping(electron_shell, fit_interval, signal_interval)
