@@ -389,7 +389,7 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
             elif abs(edge_delta - 120) < 3:
                 cross_section = 8.79e-8
             elif abs(edge_delta - 200) < 3:
-                cross_section = 1.40e-8
+                cross_section = 1.40e-7
             else:
                 cross_section = None
         else:
