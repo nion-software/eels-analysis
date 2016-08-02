@@ -482,7 +482,6 @@ class ElementalMappingController:
                         self.graphic_property_changed(data_item, data_and_metadata, "interval", graphic.interval)
 
 
-
 def change_elemental_mapping(document_model, model_data_item, data_item, elemental_mapping):
     mapping_computation_variable = None
     pick_region_specifier = None
@@ -520,6 +519,7 @@ def change_elemental_mapping(document_model, model_data_item, data_item, element
                 intervals.append(graphic.interval)
         document_model.recompute_immediate(data_item)  # need the data to scale display; so do this here. ugh.
         display.view_to_intervals(data_item.maybe_data_source.data_and_calibration, intervals)
+
 
 class ElementalMappingPanel(Panel.Panel):
 
@@ -579,16 +579,17 @@ class ElementalMappingPanel(Panel.Panel):
 
         model_data_item_ref = [None]  # type: typing.List[DataItem]
         current_data_item_ref = [None]  # type: typing.List[DataItem]
-        edges = []  # type: typing.List[PeriodicTable.ElectronShell]
+        explore_interval_ref = [None]  # type: typing.List[typing.Tuple[float, float]]
 
         def explore_interval_changed(data_item, interval) -> None:
             if data_item and data_item == current_data_item_ref[0] and interval is not None:
-                edges.clear()
-                edges.extend(PeriodicTable.PeriodicTable().find_edges_in_energy_interval(interval))
+                explore_interval_ref[0] = interval
+            else:
+                explore_interval_ref[0] = None
 
         self.__explore_interval_changed_listener = self.__elemental_mapping_panel_controller.explore_interval_changed.listen(explore_interval_changed)
 
-        def add_edge(electron_shell: PeriodicTable.ElectronShell) -> None:
+        def add_edge(electron_shell: PeriodicTable.ElectronShell, data_item: DataItem.DataItem) -> None:
             model_data_item = model_data_item_ref[0]
             if model_data_item:
                 binding_energy_eV = PeriodicTable.PeriodicTable().nominal_binding_energy_ev(electron_shell)
@@ -609,6 +610,7 @@ class ElementalMappingPanel(Panel.Panel):
                             elemental_mapping = ElementalMapping(electron_shell, fit_interval, signal_interval)
                             self.__elemental_mapping_panel_controller.add_elemental_mapping(model_data_item, elemental_mapping)
                             data_item_changed(model_data_item)
+                            data_item_changed(data_item)
 
         def data_item_changed(data_item) -> None:
             current_data_item_ref[0] = data_item
@@ -760,7 +762,7 @@ class ElementalMappingPanel(Panel.Panel):
                     add_edge_column.add(add_button_row)
 
                     def add_edge_current():
-                        add_edge(edge_widget.current_item[0])
+                        add_edge(edge_widget.current_item[0], data_item)
 
                     add_button_widget.on_clicked = add_edge_current
 
@@ -785,13 +787,15 @@ class ElementalMappingPanel(Panel.Panel):
                 def update_add_buttons():
                     col1.remove_all()
                     col2.remove_all()
-                    for i, edge in enumerate(edges[0:4]):
-                        button = ui.create_push_button_widget(edge.to_long_str())
-                        button.on_clicked = functools.partial(add_edge, edge)
-                        col = col1 if i % 2 == 0 else col2
-                        col.add(button)
-                    col1.add_stretch()
-                    col2.add_stretch()
+                    if explore_interval_ref[0] is not None:
+                        edges = PeriodicTable.PeriodicTable().find_edges_in_energy_interval(explore_interval_ref[0])
+                        for i, edge in enumerate(edges[0:4]):
+                            button = ui.create_push_button_widget(edge.to_long_str())
+                            button.on_clicked = functools.partial(add_edge, edge, data_item)
+                            col = col1 if i % 2 == 0 else col2
+                            col.add(button)
+                        col1.add_stretch()
+                        col2.add_stretch()
 
                 refresh_widget = ui.create_push_button_widget("\u21BB")
                 refresh_widget.on_clicked = lambda: data_item_changed(current_data_item_ref[0])  # TODO: re-layout in Qt is awful
