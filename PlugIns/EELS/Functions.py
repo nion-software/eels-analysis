@@ -412,9 +412,7 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
             print("Error: {}".format(traceback.format_exc()))
             raise
 
-    data_shape = list(data_and_metadata.data_shape)
-    data_shape[0] = int(round(max(fit_range[1], signal_range[1]))) - int(round(min(fit_range[0], signal_range[0])))
-    data_shape = tuple(data_shape)
+    data_shape = data_and_metadata.data_shape[1:]
     dimensional_calibrations = data_and_metadata.dimensional_calibrations[1:]
     intensity_calibration = data_and_metadata.intensity_calibration
     if cross_section is not None:
