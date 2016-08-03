@@ -39,7 +39,7 @@ class TestFunctions(unittest.TestCase):
                 r1 = random.randint(0, 100)
                 r2 = random.randint(0, 100)
                 data[row, column, :] = numpy.linspace(r1, r2, depth) + numpy.random.uniform(-1, 1, depth) / 2
-        linear_background = Functions.slow_linear_background(data)
+        linear_background = Functions.slow_linear_background(data, -1)
         linear_background_subtracted = data - linear_background
         self.assertEqual(linear_background_subtracted.shape, (height, width, depth))
         self.assertTrue(numpy.all(linear_background_subtracted < 1))
@@ -53,39 +53,39 @@ class TestFunctions(unittest.TestCase):
                 r1 = random.randint(0, 100)
                 r2 = random.randint(0, 100)
                 data[row, column, :] = numpy.linspace(r1, r2, depth) + numpy.random.uniform(-1, 1, depth) / 2
-        linear_background = Functions.stacked_linear_background(data)
+        linear_background = Functions.stacked_linear_background(data, -1)
         linear_background_subtracted = data - linear_background
         self.assertEqual(linear_background_subtracted.shape, (height, width, depth))
         self.assertTrue(numpy.all(linear_background_subtracted < 1))
         self.assertTrue(numpy.all(linear_background_subtracted > -1))
 
     def test_subtract_linear_background(self):
-        depth, height, width = 80, 6, 8
-        data = numpy.zeros((depth, height, width))
+        height, width, depth = 6, 8, 80
+        data = numpy.zeros((height, width, depth))
         for row in range(height):
             for column in range(width):
                 r1 = random.randint(0, 100)
                 r2 = random.randint(0, 100)
-                data[:, row, column] = numpy.linspace(r1, r2, depth) + numpy.random.uniform(-1, 1, depth) / 2
+                data[row, column, :] = numpy.linspace(r1, r2, depth) + numpy.random.uniform(-1, 1, depth) / 2
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(data)
         background_subtracted = Functions.subtract_linear_background(data_and_metadata, (0.0, 1.0), (0.0, 1.0))
-        self.assertEqual(background_subtracted.data_shape, (depth, height, width))
+        self.assertEqual(background_subtracted.data_shape, (height, width, depth), -1)
         self.assertTrue(numpy.all(numpy.less(background_subtracted.data, 1)))
         self.assertTrue(numpy.all(numpy.greater(background_subtracted.data, -1)))
 
     def test_subtract_linear_background_with_different_signal_and_fit(self):
-        depth, height, width = 80, 6, 8
-        data = numpy.zeros((depth, height, width))
+        height, width, depth = 6, 8, 80
+        data = numpy.zeros((height, width, depth))
         for row in range(height):
             for column in range(width):
                 r1 = random.randint(0, 100)
                 r2 = random.randint(0, 100)
-                data[:, row, column] = numpy.linspace(r1, r2, depth) + numpy.random.uniform(-1, 1, depth) / 2
+                data[row, column, :] = numpy.linspace(r1, r2, depth) + numpy.random.uniform(-1, 1, depth) / 2
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(data)
         background_subtracted = Functions.subtract_linear_background(data_and_metadata, (0.1, 0.5), (0.6, 0.9))
-        self.assertEqual(background_subtracted.data_shape, (int(depth * 0.3), height, width))
-        self.assertTrue(numpy.all(numpy.less(background_subtracted.data[54:72, ...], 1)))
-        self.assertTrue(numpy.all(numpy.greater(background_subtracted.data[54:72, ...], -1)))
+        self.assertEqual(background_subtracted.data_shape, (height, width, int(depth * 0.3)))
+        self.assertTrue(numpy.all(numpy.less(background_subtracted.data[..., 54:72], 1)))
+        self.assertTrue(numpy.all(numpy.greater(background_subtracted.data[..., 54:72], -1)))
 
     def test_signal_and_background_shape_are_consistent_1d(self):
         calibration = Calibration.Calibration(418.92, 0.97, 'eV')

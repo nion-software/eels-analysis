@@ -43,7 +43,7 @@ def extract_signal_from_polynomial_background_data(data, signal_range, fit_range
 
     # check shape and validity of data array
     data_dimension_count = len(data.shape)
-    assert data_dimension_count < 3
+    assert data_dimension_count <= 2
 
     # extract spectral intensity (ordinate) and x (abscissa) arrays
     have_x_array = (data_dimension_count == 2)
@@ -154,18 +154,19 @@ def extract_signal_from_polynomial_background(data_and_metadata, signal_range, f
     return DataAndMetadata.new_data_and_metadata(data, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
-def stacked_fit_linear_background(data: numpy.ndarray, rcond=1e-10) -> numpy.ndarray:
+def stacked_fit_linear_background(data: numpy.ndarray, signal_index: int, rcond=1e-10) -> numpy.ndarray:
     """Return the linear background using least squares for an ndarray with signal in last index.
 
     The outline for this implementation comes from:
     http://stackoverflow.com/questions/30442377/how-to-solve-many-overdetermined-systems-of-linear-equations-using-vectorized-co
     """
 
-    signal_shape = data.shape[-1]
+    assert signal_index == -1
+    signal_length = data.shape[signal_index]
 
     # using equation y = Ap where A = [[x 1]] and p = [[m], [c]], solve for p.
-    linear = numpy.arange(signal_shape)
-    ones = numpy.ones((signal_shape,))
+    linear = numpy.arange(signal_length)
+    ones = numpy.ones((signal_length,))
     A = numpy.vstack([linear, ones]).T
 
     # solve for p using svd. p will have the shape (n, 2) where n is the dimensions of the non-signal indexes of the data.
@@ -178,172 +179,182 @@ def stacked_fit_linear_background(data: numpy.ndarray, rcond=1e-10) -> numpy.nda
     return numpy.conj(x, x)
 
 
-def stacked_linear_background(data: numpy.ndarray) -> numpy.ndarray:
+def stacked_linear_background(data: numpy.ndarray, signal_index: int) -> numpy.ndarray:
     """Return the linear background using least squares for an ndarray with signal in last index."""
 
-    signal_shape = data.shape[-1]
+    assert signal_index == -1
+    signal_length = data.shape[signal_index]
 
     # using equation y = Ap where A = [[x 1]] and p = [[m], [c]], solve for p.
-    linear = numpy.arange(signal_shape)
+    linear = numpy.arange(signal_length)
 
     # solve for p. p will have the shape (n, 2) where n is the dimensions of the non-signal indexes of the data.
-    p = stacked_fit_linear_background(data)
+    p = stacked_fit_linear_background(data, signal_index)
 
     # calculate the background by multiply and add
     return (p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
 
 
-def slow_fit_linear_background(data: numpy.ndarray) -> numpy.ndarray:
+def slow_fit_linear_background(data: numpy.ndarray, signal_index: int) -> numpy.ndarray:
     """Return the linear background as m, c using least squares for an ndarray with signal in last index.
 
     This implementaton also demonstrates how to convert a 1-d function to a stacked function.
     """
 
     # make reshaped data view
-    signal_shape = data.shape[-1]
+    assert signal_index == -1
+    signal_length = data.shape[signal_index]
     if len(data.shape) > 1:
-        reshaped_data = data.reshape(numpy.product(data.shape[0:-1]), signal_shape)
+        reshaped_data = data.reshape(numpy.product(data.shape[0:signal_index]), signal_length)
     else:
-        reshaped_data = data.reshape(1, signal_shape)
+        reshaped_data = data.reshape(1, signal_length)
 
     # using equation y = Ap where A = [[x 1]] and p = [[m], [c]], solve for p.
-    linear = numpy.arange(signal_shape)
-    ones = numpy.ones((signal_shape,))
+    linear = numpy.arange(signal_length)
+    ones = numpy.ones((signal_length,))
     A = numpy.vstack([linear, ones]).T
 
     # solve for p. p will have the shape (n, 2) where n is the dimensions of the non-signal indexes of the data.
     p = numpy.array([numpy.linalg.lstsq(A, reshaped_data[k, ...])[0] for k in range(reshaped_data.shape[0])])
 
     # reshape and return
-    return p.reshape(data.shape[:-1] + (2,))
+    return p.reshape(data.shape[:signal_index] + (2,))
 
 
-def slow_linear_background(data: numpy.ndarray) -> numpy.ndarray:
+def slow_linear_background(data: numpy.ndarray, signal_index: int) -> numpy.ndarray:
     """Return the linear background using least squares for an ndarray with signal in last index."""
 
-    signal_shape = data.shape[-1]
+    assert signal_index == -1
+    signal_length = data.shape[signal_index]
 
     # using equation y = Ap where A = [[x 1]] and p = [[m], [c]], solve for p.
-    linear = numpy.arange(signal_shape)
+    linear = numpy.arange(signal_length)
 
     # solve for p. p will have the shape (n, 2) where n is the dimensions of the non-signal indexes of the data.
-    p = slow_fit_linear_background(data)
+    p = slow_fit_linear_background(data, signal_index)
 
     # calculate the background by multiply and add
     return (p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
 
 
-def linear_background(data: numpy.ndarray) -> numpy.ndarray:
-    return stacked_linear_background(data)
+def linear_background(data: numpy.ndarray, signal_index: int) -> numpy.ndarray:
+    return stacked_linear_background(data, signal_index)
 
 
 def subtract_linear_background(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
-    """Subtract linear background from data and metadata with signal in first index."""
-    fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
-    signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.int)
+    """Subtract linear background from data and metadata with signal in last index."""
+    signal_index = -1
+
+    signal_length = data_and_metadata.dimensional_shape[signal_index]
+
+    fit_range = (numpy.asarray(fit_range) * signal_length).astype(numpy.int)
+    signal_range = (numpy.asarray(signal_range) * signal_length).astype(numpy.int)
 
     data = data_and_metadata.data
-    # Swift signal is in 0 index; needs to be in last index
-    data = numpy.moveaxis(data, 0, len(data.shape) - 1)
 
     # Fit within fit_range; calculate background within signal_range; subtract from source signal range
-    p = stacked_fit_linear_background(data[..., range(*fit_range)])
+    p = stacked_fit_linear_background(data[..., range(*fit_range)], signal_index)
     linear = numpy.arange(signal_range[0], signal_range[1])
     background = (p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
     result = data[..., range(*signal_range)] - background
-
-    # Roll the axes again
-    result = numpy.moveaxis(result, len(result.shape) - 1, 0)
 
     return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
 def subtract_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
     """Subtract si_k background from data and metadata with signal in first index."""
-    fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
-    signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
+    signal_index = -1
+
+    signal_length = data_and_metadata.dimensional_shape[signal_index]
+
+    fit_range = (numpy.asarray(fit_range) * signal_length).astype(numpy.float)
+    signal_range = (numpy.asarray(signal_range) * signal_length).astype(numpy.float)
 
     data = data_and_metadata.data
 
     if len(data_and_metadata.dimensional_calibrations) == 0:
         return None
 
-    # Swift signal is in 0 index; needs to be in last index
-    data = numpy.moveaxis(data, 0, len(data.shape) - 1)
-
     # Fit within fit_range; calculate background within signal_range; subtract from source signal range
-    signal_calibration = data_and_metadata.dimensional_calibrations[0]
-    spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(data_and_metadata.dimensional_shape[0])])
+    signal_calibration = data_and_metadata.dimensional_calibrations[signal_index]
+    spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(signal_length)])
     edge_onset = signal_calibration.convert_to_calibrated_value(signal_range[0])
     edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
     bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0]), signal_calibration.convert_to_calibrated_value(fit_range[1])])
     # print("d {} s {} e {} d {} b {}".format(data.shape if data is not None else None, spectral_range, edge_onset, edge_delta, bkgd_range))
     edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)
 
-    # Roll the axes again
-    # return numpy.moveaxis(bkgd_model, 0, len(bkgd_model.shape) - 1)
+    # Squeeze the result
     result = numpy.squeeze(bkgd_model)
 
     data_shape = list(data_and_metadata.data_shape)
     max_channel = int(round(max(fit_range[1], signal_range[1])))
     min_channel = int(round(min(fit_range[0], signal_range[0])))
-    data_shape[0] = max_channel - min_channel
+    data_shape[signal_index] = max_channel - min_channel
     data_shape = tuple(data_shape)
     dimensional_calibrations = copy.deepcopy(data_and_metadata.dimensional_calibrations)
-    original_calibration = copy.deepcopy(dimensional_calibrations[0])
-    dimensional_calibrations[0].offset = original_calibration.convert_to_calibrated_value(min_channel)
-    dimensional_calibrations[0].scale = (original_calibration.convert_to_calibrated_value(max_channel) - dimensional_calibrations[0].offset) / data_shape[0]
+    dimensional_calibrations[signal_index].offset = signal_calibration.convert_to_calibrated_value(min_channel)
+    dimensional_calibrations[signal_index].scale = (signal_calibration.convert_to_calibrated_value(max_channel) - dimensional_calibrations[signal_index].offset) / data_shape[signal_index]
 
     return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, dimensional_calibrations)
 
 
 def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
     """Subtract si_k background from data and metadata with signal in first index."""
-    fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
-    signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
+    signal_index = -1
 
-    result = data_and_metadata.data[int(round(min(fit_range[0], signal_range[0]))):int(round(max(fit_range[1], signal_range[1]))), ...]
+    signal_length = data_and_metadata.dimensional_shape[signal_index]
+
+    fit_range = (numpy.asarray(fit_range) * signal_length).astype(numpy.float)
+    signal_range = (numpy.asarray(signal_range) * signal_length).astype(numpy.float)
+
+    result = data_and_metadata.data[..., int(round(min(fit_range[0], signal_range[0]))):int(round(max(fit_range[1], signal_range[1])))]
 
     data_shape = list(data_and_metadata.data_shape)
     max_channel = int(round(max(fit_range[1], signal_range[1])))
     min_channel = int(round(min(fit_range[0], signal_range[0])))
-    data_shape[0] = max_channel - min_channel
+    data_shape[signal_index] = max_channel - min_channel
     data_shape = tuple(data_shape)
     dimensional_calibrations = copy.deepcopy(data_and_metadata.dimensional_calibrations)
-    original_calibration = copy.deepcopy(dimensional_calibrations[0])
-    dimensional_calibrations[0].offset = original_calibration.convert_to_calibrated_value(min_channel)
-    dimensional_calibrations[0].scale = (original_calibration.convert_to_calibrated_value(max_channel) - dimensional_calibrations[0].offset) / data_shape[0]
+    original_calibration = copy.deepcopy(dimensional_calibrations[signal_index])
+    dimensional_calibrations[signal_index].offset = original_calibration.convert_to_calibrated_value(min_channel)
+    dimensional_calibrations[signal_index].scale = (original_calibration.convert_to_calibrated_value(max_channel) - dimensional_calibrations[signal_index].offset) / data_shape[signal_index]
 
     return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, dimensional_calibrations)
 
 
 def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, data_and_metadata_dst: DataAndMetadata.DataAndMetadata):
+    signal_index = -1
     if not data_and_metadata_src.dimensional_calibrations or not data_and_metadata_dst.dimensional_calibrations:
         return None
-    if abs(data_and_metadata_src.dimensional_calibrations[0].scale - data_and_metadata_dst.dimensional_calibrations[0].scale) > 1E-7:
+    if abs(data_and_metadata_src.dimensional_calibrations[signal_index].scale - data_and_metadata_dst.dimensional_calibrations[signal_index].scale) > 1E-7:
         return None
-    if data_and_metadata_src.dimensional_calibrations[0].units != data_and_metadata_dst.dimensional_calibrations[0].units:
+    if data_and_metadata_src.dimensional_calibrations[signal_index].units != data_and_metadata_dst.dimensional_calibrations[signal_index].units:
         return None
-    if data_and_metadata_src.dimensional_calibrations[0].convert_to_calibrated_value(0) < data_and_metadata_dst.dimensional_calibrations[0].convert_to_calibrated_value(0):
+    if data_and_metadata_src.dimensional_calibrations[signal_index].convert_to_calibrated_value(0) < data_and_metadata_dst.dimensional_calibrations[signal_index].convert_to_calibrated_value(0):
         return None
-    if data_and_metadata_src.dimensional_calibrations[0].convert_to_calibrated_value(data_and_metadata_src.data_shape[0]) > data_and_metadata_dst.dimensional_calibrations[0].convert_to_calibrated_value(data_and_metadata_dst.data_shape[0]):
+    if data_and_metadata_src.dimensional_calibrations[signal_index].convert_to_calibrated_value(data_and_metadata_src.data_shape[signal_index]) > data_and_metadata_dst.dimensional_calibrations[signal_index].convert_to_calibrated_value(data_and_metadata_dst.data_shape[signal_index]):
         return None
 
     data = numpy.copy(data_and_metadata_dst.data)
-    index = int(data_and_metadata_dst.dimensional_calibrations[0].convert_from_calibrated_value(data_and_metadata_src.dimensional_calibrations[0].convert_to_calibrated_value(0)))
+    index = int(data_and_metadata_dst.dimensional_calibrations[signal_index].convert_from_calibrated_value(data_and_metadata_src.dimensional_calibrations[signal_index].convert_to_calibrated_value(0)))
     data[:] = 0
-    data[index:index + data_and_metadata_src.data_shape[0]] = data_and_metadata_src.data
+    data[index:index + data_and_metadata_src.data_shape[signal_index]] = data_and_metadata_src.data
 
     return DataAndMetadata.new_data_and_metadata(data, data_and_metadata_dst.intensity_calibration, data_and_metadata_dst.dimensional_calibrations)
 
 
 def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, electron_shell: PeriodicTable.ElectronShell, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
     """Subtract si_k background from data and metadata with signal in first index."""
-    fit_range = (numpy.asarray(fit_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
-    signal_range = (numpy.asarray(signal_range) * data_and_metadata.data_shape[0]).astype(numpy.float)
+    signal_index = -1
 
-    signal_calibration = data_and_metadata.dimensional_calibrations[0]
-    spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(data_and_metadata.dimensional_shape[0])])
+    signal_length = data_and_metadata.dimensional_shape[signal_index]
+
+    fit_range = (numpy.asarray(fit_range) * signal_length).astype(numpy.float)
+    signal_range = (numpy.asarray(signal_range) * signal_length).astype(numpy.float)
+
+    signal_calibration = data_and_metadata.dimensional_calibrations[signal_index]
+    spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(data_and_metadata.dimensional_shape[signal_index])])
     edge_onset = signal_calibration.convert_to_calibrated_value(signal_range[0])
     edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
     bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0]), signal_calibration.convert_to_calibrated_value(fit_range[1])])
@@ -370,9 +381,6 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
         cross_section = None
 
     data = data_and_metadata.data
-
-    # Swift signal is in 0 index; needs to be in last index
-    data = numpy.moveaxis(data, 0, len(data.shape) - 1)
 
     # Fit within fit_range; calculate background within signal_range; subtract from source signal range
     edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)

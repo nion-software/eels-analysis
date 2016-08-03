@@ -126,7 +126,7 @@ def filter_element(document_controller, f, s):
     display_specifier = document_controller.selected_display_specifier
     data_item = display_specifier.data_item
     pick_region = Graphics.EllipseGraphic()
-    pick_region.size = 16 / data_item.maybe_data_source.dimensional_shape[-2], 16 / data_item.maybe_data_source.dimensional_shape[-1]
+    pick_region.size = 16 / data_item.maybe_data_source.dimensional_shape[0], 16 / data_item.maybe_data_source.dimensional_shape[1]
     pick_region.label = _("Pick")
     data_item.maybe_data_source.displays[0].add_graphic(pick_region)
     pick = document_model.get_pick_region_new(data_item, pick_region=pick_region)
@@ -154,24 +154,24 @@ def filter_element(document_controller, f, s):
             pick_computation = pick.maybe_data_source.computation
             pick_computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit")
             pick_computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal")
-            pick_computation.expression = "pick = sum(src.data * region_mask(src.data, region)[newaxis, ...], tuple(range(1, len(data_shape(src.data)))))\ns = make_signal_like(extract_original_signal(pick, fit.interval, signal.interval), pick)\nbg = make_signal_like(subtract_background_signal(pick, fit.interval, signal.interval), pick)\nvstack((pick, s - bg, bg))"
+            pick_computation.expression = "pick = sum_region(src.data, region_mask(src.data, region))\ns = make_signal_like(extract_original_signal(pick, fit.interval, signal.interval), pick)\nbg = make_signal_like(subtract_background_signal(pick, fit.interval, signal.interval), pick)\nvstack((pick, s - bg, bg))"
             # pick_computation.expression = "pick = pick(src.data, pick_region.position)\ns = make_signal_like(extract_original_signal(pick, fit.interval, signal.interval), pick)\nbg = make_signal_like(subtract_background_signal(pick, fit.interval, signal.interval), pick)\nvstack((pick, s - bg, bg))"
             document_controller.display_data_item(pick_display_specifier)
             document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map))
 
             src_dimensional_shape = data_item.maybe_data_source.dimensional_shape
             src_dimensional_calibrations = data_item.maybe_data_source.dimensional_calibrations
-            fit_region_start = src_dimensional_calibrations[0].convert_from_calibrated_value(f[0]) / src_dimensional_shape[0]
-            fit_region_end = src_dimensional_calibrations[0].convert_from_calibrated_value(f[1]) / src_dimensional_shape[0]
-            signal_region_start = src_dimensional_calibrations[0].convert_from_calibrated_value(s[0]) / src_dimensional_shape[0]
-            signal_region_end = src_dimensional_calibrations[0].convert_from_calibrated_value(s[1]) / src_dimensional_shape[0]
+            fit_region_start = src_dimensional_calibrations[-1].convert_from_calibrated_value(f[0]) / src_dimensional_shape[-1]
+            fit_region_end = src_dimensional_calibrations[-1].convert_from_calibrated_value(f[1]) / src_dimensional_shape[-1]
+            signal_region_start = src_dimensional_calibrations[-1].convert_from_calibrated_value(s[0]) / src_dimensional_shape[-1]
+            signal_region_end = src_dimensional_calibrations[-1].convert_from_calibrated_value(s[1]) / src_dimensional_shape[-1]
             fit_region.interval = fit_region_start, fit_region_end
             signal_region.interval = signal_region_start, signal_region_end
 
 def explore_edges(document_controller, model_data_item):
     document_model = document_controller.document_model
     pick_region = Graphics.EllipseGraphic()
-    pick_region.size = 16 / model_data_item.maybe_data_source.dimensional_shape[-2], 16 / model_data_item.maybe_data_source.dimensional_shape[-1]
+    pick_region.size = 16 / model_data_item.maybe_data_source.dimensional_shape[0], 16 / model_data_item.maybe_data_source.dimensional_shape[1]
     pick_region.label = _("Explore")
     model_data_item.maybe_data_source.displays[0].add_graphic(pick_region)
     pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
@@ -191,7 +191,7 @@ def explore_edges(document_controller, model_data_item):
 def pick_new_edge(document_controller, model_data_item, elemental_mapping):
     document_model = document_controller.document_model
     pick_region = Graphics.EllipseGraphic()
-    pick_region.size = 16 / model_data_item.maybe_data_source.dimensional_shape[-2], 16 / model_data_item.maybe_data_source.dimensional_shape[-1]
+    pick_region.size = 16 / model_data_item.maybe_data_source.dimensional_shape[0], 16 / model_data_item.maybe_data_source.dimensional_shape[1]
     pick_region.label = "{} {}".format(_("Pick"), str(elemental_mapping.electron_shell))
     model_data_item.maybe_data_source.displays[0].add_graphic(pick_region)
     pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
@@ -214,7 +214,7 @@ def pick_new_edge(document_controller, model_data_item, elemental_mapping):
         # TODO: CHANGES VIA CONNECTIONS DON'T GET WRITTEN TO METADATA
         pick_computation = pick_data_item.maybe_data_source.computation
         pick_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
-        pick_computation.expression = "pick = sum(src.data * region_mask(src.data, region)[newaxis, ...], tuple(range(1, len(data_shape(src.data)))))\ns = make_signal_like(extract_original_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)\nbg = make_signal_like(subtract_background_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)\nvstack((pick, s - bg, bg))"
+        pick_computation.expression = "pick = sum_region(src.data, region_mask(src.data, region))\ns = make_signal_like(extract_original_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)\nbg = make_signal_like(subtract_background_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)\nvstack((pick, s - bg, bg))"
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
         document_controller.document_model.recompute_immediate(pick_data_item)  # need the data to scale display; so do this here. ugh.
@@ -592,12 +592,12 @@ class ElementalMappingPanel(Panel.Panel):
                     dimensional_shape = buffered_data_source.dimensional_shape
                     dimensional_calibrations = buffered_data_source.dimensional_calibrations
                     if dimensional_shape is not None and dimensional_calibrations is not None and len(dimensional_calibrations) > 0:
-                        calibration = dimensional_calibrations[0]
+                        calibration = dimensional_calibrations[-1]
                         if calibration.units == "eV":
-                            fit_region_start = calibration.convert_from_calibrated_value(fit_interval_eV[0]) / dimensional_shape[0]
-                            fit_region_end = calibration.convert_from_calibrated_value(fit_interval_eV[1]) / dimensional_shape[0]
-                            signal_region_start = calibration.convert_from_calibrated_value(signal_interval_eV[0]) / dimensional_shape[0]
-                            signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[0]
+                            fit_region_start = calibration.convert_from_calibrated_value(fit_interval_eV[0]) / dimensional_shape[-1]
+                            fit_region_end = calibration.convert_from_calibrated_value(fit_interval_eV[1]) / dimensional_shape[-1]
+                            signal_region_start = calibration.convert_from_calibrated_value(signal_interval_eV[0]) / dimensional_shape[-1]
+                            signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[-1]
                             fit_interval = fit_region_start, fit_region_end
                             signal_interval = signal_region_start, signal_region_end
                             elemental_mapping = ElementalMapping(electron_shell, fit_interval, signal_interval)
