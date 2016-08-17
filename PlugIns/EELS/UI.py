@@ -427,7 +427,7 @@ class ElementalMappingController:
             buffered_data_source.set_metadata(metadata)
 
     def get_elemental_mappings(self, data_item):
-        return getattr(data_item, "elemental_mappings")
+        return getattr(data_item, "elemental_mappings", list())
 
     def add_elemental_mapping(self, data_item, elemental_mapping):
         # add the elemental_mapping to the list on the data item.
