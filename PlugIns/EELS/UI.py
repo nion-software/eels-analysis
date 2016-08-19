@@ -814,13 +814,14 @@ class ElementalMappingPanel(Panel.Panel):
 
                 add_edge_column.add(add_row)
 
-        self.__target_data_item_stream = HistogramPanel.TargetDataItemStream(document_controller)
+        self.__target_data_item_stream = HistogramPanel.TargetDataItemStream(document_controller).add_ref()
         self.__listener = self.__target_data_item_stream.value_stream.listen(data_item_changed)
         data_item_changed(self.__target_data_item_stream.value)
 
     def close(self):
         self.__listener.close()
         self.__listener = None
+        self.__target_data_item_stream.remove_ref()
         self.__target_data_item_stream = None
         self.__elemental_mapping_panel_controller.close()
         self.__elemental_mapping_panel_controller = None
