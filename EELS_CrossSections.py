@@ -94,8 +94,8 @@ def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_
         epsilonR_free = epsilonR[freeStateStartIndex:]
         kH_free = kH[freeStateStartIndex:]
         Q2_free = Q2[:, freeStateStartIndex:]
-        gosFactor_free[...] = gosFactor[:, freeStateStartIndex:]
-        gosFactor_free[...] = numpy.atan2(2 * screenedZ2 * kH_free, Q2_bound - epsilonR_free + 2 * screenedZ2)
+        gosFactor_free = gosFactor[:, freeStateStartIndex:]
+        gosFactor_free[...] = numpy.arctan2(2 * screenedZ2 * kH_free, Q2_free - epsilonR_free + 2 * screenedZ2)
         gosFactor_free[...] = numpy.exp(-2 * gosFactor_free / kH_free) / (1 - numpy.exp(-2 * numpy.pi / kH_free))
 
     gos *= gosFactor
