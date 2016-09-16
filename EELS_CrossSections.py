@@ -6,6 +6,7 @@
 
 import numpy
 
+
 def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_eV: float,
                             beam_energy_eV: float, collection_angle_rad: float) -> numpy.ndarray:
     """Return the K-shell generalized oscillator strength (GOS) calculated on the hydrogenic model as an ndarray.
@@ -102,6 +103,7 @@ def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_
 
     return gos
 
+
 def generalized_oscillator_strength(atomic_number: int, shell_number: int, subshell_index: int, edge_onset_eV: float, edge_delta_eV: float,
                                         beam_energy_eV: float, collection_angle_rad: float) -> numpy.ndarray:
     """Return the generalized oscillator strength (GOS) for the specified electron shell as an ndarray.
@@ -125,6 +127,7 @@ def generalized_oscillator_strength(atomic_number: int, shell_number: int, subsh
         print("No GOS routine available for L, M, N, and O electron shells.")
 
     return gos
+
 
 def kohl_collection_efficiency(theta_rad: numpy.ndarray, alpha_rad: float, beta_rad: float) -> numpy.ndarray:
     """Return the Kohl collection efficiency for events with scattering angles (in radians) given by the theta array.
@@ -176,9 +179,11 @@ def kohl_collection_efficiency(theta_rad: numpy.ndarray, alpha_rad: float, beta_
 
     return collection_efficiency
 
-def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_index: int, edge_onset_eV: float, edge_delta_eV: float,
-                                beam_energy_eV: float, convergence_angle_rad: float, collection_angle_rad: float) -> float:
-    """Return the partial cross section for the specified electron shell and experimental parameters.
+
+def energy_diff_cross_section_nm2_per_eV(atomic_number: int, shell_number: int, subshell_index: int,
+                                         edge_onset_eV: float, edge_delta_eV: float, beam_energy_eV: float,
+                                         convergence_angle_rad: float, collection_angle_rad: float) -> numpy.ndarray:
+    """Return the energy differential cross section for the specified electron shell and experimental parameters.
 
     Uses generalized_oscillator_strength and kohl_collection_efficiency functions.
 
@@ -190,7 +195,7 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
     In particular, note that the latter is carried out with respect to scattering angle theta, rather than log(qa0^2).
     This also simplifies the convergence angle correction, which follows Kohl's aperture cross-correlation approach.
 
-    The returned cross-section value is in units of nm * nm.
+    The returned differential cross-section value is in units of nm * nm / eV.
     """
     assert beam_energy_eV > 0
     assert edge_onset_eV > 0
@@ -207,7 +212,8 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
     beamBeta2 = 1 - 1 / beamGamma ** 2
 
     max_scattering_angle_rad = convergence_angle_rad + collection_angle_rad
-    gos = generalized_oscillator_strength(atomic_number, shell_number, subshell_index, edge_onset_eV, edge_delta_eV, beam_energy_eV, max_scattering_angle_rad, )
+    gos = generalized_oscillator_strength(atomic_number, shell_number, subshell_index,
+                                          edge_onset_eV, edge_delta_eV, beam_energy_eV, max_scattering_angle_rad)
 
     energySampleCount = gos.shape[1]
     thetaSampleCount = gos.shape[0]
@@ -239,7 +245,26 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
     theta_step = max_scattering_angle_rad / (thetaSampleCount - 1)
     energyDiffSigma = numpy.trapz(dSigma, dx = theta_step, axis = 0)
 
+    return energyDiffSigma
+
+
+def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_index: int,
+                              edge_onset_eV: float, edge_delta_eV: float, beam_energy_eV: float,
+                              convergence_angle_rad: float, collection_angle_rad: float) -> float:
+    """Return the partial cross section for the specified electron shell and experimental parameters.
+
+    Uses energy_diff_cross_section_nm2_per_eV function.
+
+    The returned cross-section value is in units of nm * nm.
+    """
+
+    # Generate the energy differential cross-section array.
+    energyDiffSigma = energy_diff_cross_section_nm2_per_eV(atomic_number, shell_number, subshell_index,
+                                                           edge_onset_eV, edge_delta_eV, beam_energy_eV,
+                                                           convergence_angle_rad, collection_angle_rad)
+
     # Integrate over energy window to get partial cross-section
+    energySampleCount = energyDiffSigma.shape[0]
     energy_step = edge_delta_eV / (energySampleCount - 1)
     partialCrossSection = numpy.trapz(energyDiffSigma, dx = energy_step)
 
