@@ -458,11 +458,3 @@ def edges_near_energy_eV(energy_loss_eV: float, energy_loss_delta_eV: float) -> 
     """Return a list of edges near the energy_loss.
     """
     pass
-
-# register functions
-Context.registered_functions["extract_signal_from_polynomial_background"] = extract_signal_from_polynomial_background
-Context.registered_functions["subtract_linear_background"] = subtract_linear_background
-Context.registered_functions["subtract_background_signal"] = subtract_background_signal
-Context.registered_functions["map_background_subtracted_signal"] = map_background_subtracted_signal
-Context.registered_functions["extract_original_signal"] = extract_original_signal
-Context.registered_functions["make_signal_like"] = make_signal_like

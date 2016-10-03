@@ -32,14 +32,47 @@ except ImportError:
 _ = gettext.gettext
 
 
+processing_descriptions = {
+    "eels.eels_extract_signal":
+        { 'script': 'from EELS import Functions as ea\nfrom nion.data import xdata_1_0 as xd\ntarget.xdata = xd.vstack((ea.extract_signal_from_polynomial_background({src}, signal.interval, (fit.interval, )), {src}))',
+          'sources': [{'label': 'Source', 'name': 'src', 'regions': [
+              {'name': 'fit', 'params': {'label': 'Fit', 'interval': (0.2, 0.3)}, 'type': 'interval'},
+              {'name': 'signal', 'params': {'label': 'Signal', 'interval': (0.4, 0.5)}, 'type': 'interval'},
+          ]}],
+          'title': 'Background Subtracted',
+        },
+    "eels.subtract_linear_background":
+        { 'script': 'from EELS import Functions as ea\nfrom nion.data import xdata_1_0 as xd\ntarget.xdata = xd.vstack((ea.subtract_linear_background({src}, fit.interval, (0, 1)), {src}))',
+          'sources': [{'label': 'Source', 'name': 'src', 'regions': [
+              {'name': 'fit', 'params': {'label': 'Fit', 'interval': (0.2, 0.3)}, 'type': 'interval'},
+          ]}],
+          'title': 'Linear Background Subtracted',
+        },
+    "eels.subtract_background_signal":
+        { 'script': 'from EELS import Functions as ea\nfrom nion.data import xdata_1_0 as xd\nsignal_xdata = ea.extract_original_signal({src}, fit.interval, signal.interval)\nbackground = ea.subtract_background_signal({src}, fit.interval, signal.interval)\ntarget.xdata = xd.vstack((signal_xdata, background, signal_xdata - background))',
+          'sources': [{'label': 'Source', 'name': 'src', 'regions': [
+              {'name': 'fit', 'params': {'label': 'Fit', 'interval': (0.2, 0.3)}, 'type': 'interval'},
+              {'name': 'signal', 'params': {'label': 'Signal', 'interval': (0.4, 0.5)}, 'type': 'interval'},
+          ]}],
+          'title': 'Background Subtracted',
+        },
+    "eels.explore":
+        { 'expression': 'xd.sum_region({src}, region.mask_xdata_with_shape({src}.data_shape[0:2]))',
+          'sources': [
+              {'name': 'src', 'label': 'Source', 'use_display_data': False, 'regions': [{'name': 'region', 'type': 'rectangle', 'params': {'label': 'Pick Region'}}], 'requirements': [{'type': 'dimensionality', 'min': 3, 'max': 3}]}
+          ],
+          'title': 'Explore',
+          'out_regions': [
+              {'name': 'interval_region', 'type': 'interval', 'params': {'label': 'Display Slice'}},
+              {'name': 'explore', 'type': 'interval', 'params': {'label': 'Explore', 'interval': (0.4, 0.6), 'graphic_id': 'explore'}},
+          ],
+          'connections': [{'type': 'property', 'src': 'display', 'src_prop': 'slice_interval', 'dst': 'interval_region', 'dst_prop': 'interval'}]},
+    }
+
+
 def processing_extract_signal(document_controller):
     display_specifier = document_controller.selected_display_specifier
-
-    fit_region = DocumentModel.DocumentModel.make_region("fit", "interval", params={"label": _("Fit"), "interval": (0.2, 0.3)})
-    signal_region = DocumentModel.DocumentModel.make_region("signal", "interval", params={"label": _("Signal"), "interval": (0.4, 0.5)})
-    src = DocumentModel.DocumentModel.make_source(display_specifier.data_item, None, "src", _("Source"), regions=[fit_region, signal_region])
-    data_item = document_controller.document_model.make_data_item_with_computation("vstack((extract_signal_from_polynomial_background({src}, signal.interval, (fit.interval, )), {src})", [src], [],
-                                                                                   _("Background Subtracted"))
+    data_item = document_controller.document_model.make_data_item_with_computation("eels.eels_extract_signal", [(display_specifier.data_item, None)], {"src": [None, None]})
     if data_item:
         new_display_specifier = DataItem.DisplaySpecifier.from_data_item(data_item)
         document_controller.display_data_item(new_display_specifier)
@@ -49,10 +82,7 @@ def processing_extract_signal(document_controller):
 
 def processing_subtract_linear_background(document_controller):
     display_specifier = document_controller.selected_display_specifier
-    fit_region = DocumentModel.DocumentModel.make_region("fit", "interval", params={"label": _("Fit"), "interval": (0.2, 0.3)})
-    src = DocumentModel.DocumentModel.make_source(display_specifier.data_item, None, "src", _("Source"), regions=[fit_region, ])
-    data_item = document_controller.document_model.make_data_item_with_computation("vstack((subtract_linear_background({src}, fit.interval, (0, 1)), {src}))", [src], [],
-                                                                                   _("Linear Background Subtracted"))
+    data_item = document_controller.document_model.make_data_item_with_computation("eels.subtract_linear_background", [(display_specifier.data_item, None)], {"src": [None]})
     if data_item:
         new_display_specifier = DataItem.DisplaySpecifier.from_data_item(data_item)
         document_controller.display_data_item(new_display_specifier)
@@ -62,11 +92,7 @@ def processing_subtract_linear_background(document_controller):
 
 def processing_subtract_background_signal(document_controller):
     display_specifier = document_controller.selected_display_specifier
-    fit_region = DocumentModel.DocumentModel.make_region("fit", "interval", params={"label": _("Fit"), "interval": (0.2, 0.3), "graphic_id": "fit"})
-    signal_region = DocumentModel.DocumentModel.make_region("signal", "interval", params={"label": _("Signal"), "interval": (0.4, 0.5), "graphic_id": "signal"})
-    src = DocumentModel.DocumentModel.make_source(display_specifier.data_item, None, "src", _("Source"), regions=[fit_region, signal_region])
-    data_item = document_controller.document_model.make_data_item_with_computation("s = extract_original_signal({src}, fit.interval, signal.interval)\nbg = subtract_background_signal({src}, fit.interval, signal.interval)\nvstack((s, bg, s - bg))", [src], [],
-                                                                                   _("Background Subtracted"))
+    data_item = document_controller.document_model.make_data_item_with_computation("eels.subtract_background_signal", [(display_specifier.data_item, None)], {"src": [None, None]})
     if data_item:
         new_display_specifier = DataItem.DisplaySpecifier.from_data_item(data_item)
         document_controller.display_data_item(new_display_specifier)
@@ -74,128 +100,26 @@ def processing_subtract_background_signal(document_controller):
     return None
 
 
-def show_color_channels(document_controller):
-    display_specifier = document_controller.selected_display_specifier
-    display = display_specifier.display
-    if display:
-        names = (_("Red"), _("Green"), _("Blue"))
-        for r in range(1, 4):
-            region = Graphics.ChannelGraphic()
-            region.label = names[r - 1]
-            region.position = r / 4
-            region.is_shape_locked = True
-            display.add_graphic(region)
-
-
-def filter_channel(document_controller):
-    document_model = document_controller.document_model
-    display_specifier = document_controller.selected_display_specifier
-    data_item = display_specifier.data_item
-    if data_item:
-        display = data_item.maybe_data_source.displays[0]
-        selected_graphics = display.selected_graphics
-        selected_graphic = selected_graphics[0] if len(selected_graphics) == 1 else None
-        selected_region = None
-        for region in display.graphics:
-            if region == selected_graphic:
-                selected_region = region
-                break
-        if selected_region:
-            src_data_items = document_model.get_source_data_items(data_item)
-            if len(src_data_items) == 1:
-                pick_data_item = src_data_items[0]
-                src_data_items = document_model.get_source_data_items(pick_data_item)
-                if len(src_data_items) == 1:
-                    src_data_item = src_data_items[0]
-                    fit_region = copy.deepcopy(data_item.maybe_data_source.computation.variables[1])
-                    src = DocumentModel.DocumentModel.make_source(src_data_item, None, "src", _("Source"), use_display_data=False)
-                    script = "sum(subtract_linear_background(src.data, fit.interval, signal.interval))"
-                    new_data_item = document_model.make_data_item_with_computation(script, [src], [], _("Mapped"))
-                    computation = new_data_item.maybe_data_source.computation
-                    computation.create_object("signal", document_model.get_object_specifier(selected_region), label=_("Signal"))
-                    computation.add_variable(fit_region)
-                    if new_data_item:
-                        new_display_specifier = DataItem.DisplaySpecifier.from_data_item(new_data_item)
-                        document_controller.display_data_item(new_display_specifier)
-                        return new_data_item
-    return None
-
-
-def filter_element(document_controller, f, s):
-    document_model = document_controller.document_model
-    display_specifier = document_controller.selected_display_specifier
-    data_item = display_specifier.data_item
-    pick_region = Graphics.EllipseGraphic()
-    pick_region.size = 16 / data_item.maybe_data_source.dimensional_shape[0], 16 / data_item.maybe_data_source.dimensional_shape[1]
-    pick_region.label = _("Pick")
-    data_item.maybe_data_source.displays[0].add_graphic(pick_region)
-    pick = document_model.get_pick_region_new(data_item, pick_region=pick_region)
-    # pick = document_model.get_pick_new(data_item)
-    if pick:
-        pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick)
-        pick_display_specifier.display.display_type = "line_plot"
-        fit_region = Graphics.IntervalGraphic()
-        fit_region.label = _("Fit")
-        fit_region.graphic_id = "fit"
-        fit_region.interval = 0.2, 0.3
-        pick_display_specifier.display.add_graphic(fit_region)
-        signal_region = Graphics.IntervalGraphic()
-        signal_region.label = _("Signal")
-        signal_region.graphic_id = "signal"
-        signal_region.interval = 0.4, 0.5
-        pick_display_specifier.display.add_graphic(signal_region)
-        script = "map_background_subtracted_signal(src.data, fit.interval, signal.interval)"
-        src2 = DocumentModel.DocumentModel.make_source(data_item, None, "src", _("Source"), use_display_data=False)
-        map = document_model.make_data_item_with_computation(script, [src2], [], _("Mapped"))
-        if map:
-            computation = map.maybe_data_source.computation
-            computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit")
-            computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal")
-            pick_computation = pick.maybe_data_source.computation
-            pick_computation.create_object("fit", document_model.get_object_specifier(fit_region), label="Fit")
-            pick_computation.create_object("signal", document_model.get_object_specifier(signal_region), label="Signal")
-            pick_computation.expression = "pick = sum_region(src.data, region_mask(src.data, region))\ns = make_signal_like(extract_original_signal(pick, fit.interval, signal.interval), pick)\nbg = make_signal_like(subtract_background_signal(pick, fit.interval, signal.interval), pick)\nvstack((pick, s - bg, bg))"
-            # pick_computation.expression = "pick = pick(src.data, pick_region.position)\ns = make_signal_like(extract_original_signal(pick, fit.interval, signal.interval), pick)\nbg = make_signal_like(subtract_background_signal(pick, fit.interval, signal.interval), pick)\nvstack((pick, s - bg, bg))"
-            document_controller.display_data_item(pick_display_specifier)
-            document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map))
-
-            src_dimensional_shape = data_item.maybe_data_source.dimensional_shape
-            src_dimensional_calibrations = data_item.maybe_data_source.dimensional_calibrations
-            fit_region_start = src_dimensional_calibrations[-1].convert_from_calibrated_value(f[0]) / src_dimensional_shape[-1]
-            fit_region_end = src_dimensional_calibrations[-1].convert_from_calibrated_value(f[1]) / src_dimensional_shape[-1]
-            signal_region_start = src_dimensional_calibrations[-1].convert_from_calibrated_value(s[0]) / src_dimensional_shape[-1]
-            signal_region_end = src_dimensional_calibrations[-1].convert_from_calibrated_value(s[1]) / src_dimensional_shape[-1]
-            fit_region.interval = fit_region_start, fit_region_end
-            signal_region.interval = signal_region_start, signal_region_end
-
 def explore_edges(document_controller, model_data_item):
-    document_model = document_controller.document_model
-    pick_region = Graphics.EllipseGraphic()
+    pick_region = Graphics.RectangleGraphic()
     pick_region.size = 16 / model_data_item.maybe_data_source.dimensional_shape[0], 16 / model_data_item.maybe_data_source.dimensional_shape[1]
     pick_region.label = _("Explore")
     model_data_item.maybe_data_source.displays[0].add_graphic(pick_region)
-    pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
-    # pick_data_item = document_model.get_pick_new(data_item)
+    pick_data_item = document_controller.document_model.make_data_item_with_computation("eels.explore", [(model_data_item, None)], {"src": [pick_region]})
     if pick_data_item:
-        pick_data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
-        pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
-        pick_display_specifier.display.display_type = "line_plot"
-        explore_interval = Graphics.IntervalGraphic()
-        explore_interval.label = _("Explore")
-        explore_interval.graphic_id = "explore"
-        explore_interval.interval = 0.4, 0.6
-        pick_display_specifier.display.add_graphic(explore_interval)
-        document_controller.display_data_item(pick_display_specifier)
-    return pick_data_item
+        new_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
+        document_controller.display_data_item(new_display_specifier)
+        return pick_data_item
+    return None
+
 
 def pick_new_edge(document_controller, model_data_item, elemental_mapping):
     document_model = document_controller.document_model
-    pick_region = Graphics.EllipseGraphic()
+    pick_region = Graphics.RectangleGraphic()
     pick_region.size = 16 / model_data_item.maybe_data_source.dimensional_shape[0], 16 / model_data_item.maybe_data_source.dimensional_shape[1]
     pick_region.label = "{} {}".format(_("Pick"), str(elemental_mapping.electron_shell))
     model_data_item.maybe_data_source.displays[0].add_graphic(pick_region)
     pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
-    # pick_data_item = document_model.get_pick_new(data_item)
     if pick_data_item:
         pick_data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
         pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
@@ -214,38 +138,87 @@ def pick_new_edge(document_controller, model_data_item, elemental_mapping):
         # TODO: CHANGES VIA CONNECTIONS DON'T GET WRITTEN TO METADATA
         pick_computation = pick_data_item.maybe_data_source.computation
         pick_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
-        pick_computation.expression = "pick = sum_region(src.data, region_mask(src.data, region))\ns = make_signal_like(extract_original_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)\nbg = make_signal_like(subtract_background_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)\nvstack((pick, s - bg, bg))"
+        pick_computation.expression = """from EELS import Functions as ea
+from nion.data import xdata_1_0 as xd
+pick = xd.sum_region(src.xdata, region.mask_xdata_with_shape(src.xdata.data_shape[0:2]))
+s = ea.make_signal_like(ea.extract_original_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
+bg = ea.make_signal_like(ea.subtract_background_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
+target.xdata = xd.vstack((pick, s - bg, bg))"""
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
+        document_controller.periodic()
         document_controller.document_model.recompute_immediate(pick_data_item)  # need the data to scale display; so do this here. ugh.
         pick_display_specifier.display.view_to_intervals(pick_data_item.maybe_data_source.data_and_metadata, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
         document_controller.display_data_item(pick_display_specifier)
     return pick_data_item
 
+
 def map_new_edge(document_controller, model_data_item, elemental_mapping):
     document_model = document_controller.document_model
-    script = "map_background_subtracted_signal(src.data, mapping.electron_shell, mapping.fit_interval, mapping.signal_interval)"
-    src = DocumentModel.DocumentModel.make_source(model_data_item, None, "src", _("Source"), use_display_data=False)
-    map_data_item = document_model.make_data_item_with_computation(script, [src], [], "{} {}".format(_("Map"), str(elemental_mapping.electron_shell)))
-    if map_data_item:
-        computation = map_data_item.maybe_data_source.computation
-        computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
-        document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map_data_item))
+
+    map_data_item = DataItem.new_data_item()
+    map_data_item.title = "{} of {}".format(_("Map"), str(elemental_mapping.electron_shell))
+    map_data_item.category = model_data_item.category
+    document_model.append_data_item(map_data_item)
+    display_specifier = DataItem.DisplaySpecifier.from_data_item(map_data_item)
+    buffered_data_source = display_specifier.buffered_data_source
+    script = "from EELS import Functions as ea\ntarget.xdata = ea.map_background_subtracted_signal(src.xdata, mapping.electron_shell, mapping.fit_interval, mapping.signal_interval)"
+    computation = document_model.create_computation(script)
+    computation.label = "EELS Map"
+    computation.processing_id = "eels.map"
+    computation.create_object("src", document_model.get_object_specifier(model_data_item), label="Source", cascade_delete=True)
+    computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
+    buffered_data_source.set_computation(computation)
+
+    document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map_data_item))
+
     return map_data_item
 
 
-def build_menus(document_controller):
-    document_controller.processing_menu.add_menu_item(_("Subtract Linear Background"), lambda: processing_subtract_linear_background(document_controller))
-    document_controller.processing_menu.add_menu_item(_("Subtract Background Signal"), lambda: processing_subtract_background_signal(document_controller))
-    document_controller.processing_menu.add_menu_item(_("Extract Signal"), lambda: processing_extract_signal(document_controller))
-    document_controller.processing_menu.add_menu_item(_("Show Color Channels"), lambda: show_color_channels(document_controller))
-    document_controller.processing_menu.add_menu_item(_("Filter Channel"), lambda: filter_channel(document_controller))
-    document_controller.processing_menu.add_menu_item(_("Elemental Map (Si K)"), lambda: filter_element(document_controller, (1700, 1800), (1839, 2039)))
-    document_controller.processing_menu.add_menu_item(_("Elemental Map (Ga L)"), lambda: filter_element(document_controller, (1100, 1200), (1220, 1420)))
-
-
-if import_ok and Application.app is not None:
-    Application.app.register_menu_handler(build_menus)  # called on import to make the menu entry for this plugin
+def build_multiprofile(document_controller, model_data_item):
+    document_model = document_controller.document_model
+    multiprofile_data_item = None
+    multiprofile_computation = None
+    indexes = list()
+    legend_labels = list()
+    line_profile_regions = list()
+    for index, dependent_data_item in enumerate(document_model.get_dependent_data_items(model_data_item)):
+        if is_calibrated_map(dependent_data_item):
+            if not multiprofile_data_item:
+                multiprofile_data_item = DataItem.new_data_item()
+                multiprofile_computation = document_model.create_computation("")
+                multiprofile_computation.label = "EELS Multiprofile"
+                multiprofile_computation.processing_id = "eels.multiprofile"
+            indexes.append(index)
+            legend_labels.append(dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:])
+            display = dependent_data_item.maybe_data_source.displays[0]
+            line_profile_region = Graphics.LineProfileGraphic()
+            line_profile_region.start = 0.5, 0.2
+            line_profile_region.end = 0.5, 0.8
+            display.add_graphic(line_profile_region)
+            line_profile_regions.append(line_profile_region)
+            multiprofile_computation.create_object("src" + str(index), document_model.get_object_specifier(dependent_data_item), label="Src" + str(index), cascade_delete=True)
+            multiprofile_computation.create_object("region" + str(index), document_model.get_object_specifier(line_profile_region), label="Region" + str(index), cascade_delete=True)
+    if multiprofile_data_item:
+        script = "from EELS import Functions as ea\nfrom nion.data import xdata_1_0 as xd\nimport numpy\n"
+        for index in indexes:
+            script += "d{0} = xd.line_profile(src{0}.display_xdata, region{0}.vector, region{0}.width)\n".format(index)
+        profiles = ",".join(["d{0}".format(index) for index in indexes])
+        script += "mx=numpy.amax(xd.vstack(({})).data)\n".format(profiles)
+        for index in indexes:
+            script += "d{0} /= mx\n".format(index)
+        script += "target.xdata = xd.vstack(({}))".format(profiles)
+        multiprofile_computation.expression = script
+        multiprofile_display_specifier = DataItem.DisplaySpecifier.from_data_item(multiprofile_data_item)
+        multiprofile_display_specifier.buffered_data_source.set_computation(multiprofile_computation)
+        multiprofile_display_specifier.display.display_type = "line_plot"
+        multiprofile_display_specifier.display.legend_labels = legend_labels
+        document_model.append_data_item(multiprofile_data_item)
+        for line_profile_region in line_profile_regions[1:]:
+            multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector"))
+            multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width"))
+        multiprofile_data_item.title = _("Profiles of ") + ", ".join(legend_labels)
+        document_controller.display_data_item(multiprofile_display_specifier)
 
 
 class ElementalMapping:
@@ -618,7 +591,7 @@ class ElementalMappingPanel(Panel.Panel):
                     for computation_variable in computation.variables:
                         if computation_variable.name == "src":
                             src_data_item_value = document_model.resolve_object_specifier(computation_variable.specifier)
-                            src_data_item = src_data_item_value.data_item if src_data_item_value else None
+                            src_data_item = src_data_item_value.value if src_data_item_value else None
                             if is_model(src_data_item):
                                 model_data_item = src_data_item
                         if computation_variable.name == "mapping":
@@ -635,52 +608,9 @@ class ElementalMappingPanel(Panel.Panel):
                     explore_data_item = explore_edges(document_controller, model_data_item)
                     document_model.recompute_immediate(explore_data_item)  # need the data to make connect_explorer_interval work; so do this here. ugh.
                     self.__elemental_mapping_panel_controller.connect_explorer_interval(explore_data_item)
-                def multiprofile_pressed():
-                    multiprofile_data_item = None
-                    multiprofile_computation = None
-                    indexes = list()
-                    legend_labels = list()
-                    line_profile_regions = list()
-                    for index, dependent_data_item in enumerate(document_model.get_dependent_data_items(model_data_item)):
-                        if is_calibrated_map(dependent_data_item):
-                            if not multiprofile_data_item:
-                                multiprofile_data_item = DataItem.DataItem()
-                                multiprofile_computation = document_model.create_computation("src1")
-                            indexes.append(index)
-                            legend_labels.append(dependent_data_item.title[4:dependent_data_item.title.index(" of ")])
-                            display = dependent_data_item.maybe_data_source.displays[0]
-                            line_profile_region = Graphics.LineProfileGraphic()
-                            line_profile_region.start = 0.5, 0.2
-                            line_profile_region.end = 0.5, 0.8
-                            display.add_graphic(line_profile_region)
-                            line_profile_regions.append(line_profile_region)
-                            multiprofile_computation.create_object("src" + str(index), document_model.get_object_specifier(dependent_data_item), label="Src" + str(index), cascade_delete=True)
-                            multiprofile_computation.create_object("region" + str(index), document_model.get_object_specifier(line_profile_region), label="Region" + str(index), cascade_delete=True)
-                    if multiprofile_data_item:
-                        script = ""
-                        for index in indexes:
-                            script += "d{0} = line_profile(src{0}.display_data, region{0}.vector, region{0}.width)\n".format(index)
-                        profiles = ",".join(["d{0}".format(index) for index in indexes])
-                        script += "mx=amax(vstack(({})))\n".format(profiles)
-                        for index in indexes:
-                            script += "d{0} /= mx\n".format(index)
-                        script += "vstack(({}))".format(profiles)
-                        multiprofile_computation.expression = script
-                        multiprofile_buffered_data_source = DataItem.BufferedDataSource()
-                        multiprofile_data_item.append_data_source(multiprofile_buffered_data_source)
-                        multiprofile_buffered_data_source.set_computation(multiprofile_computation)
-                        multiprofile_display_specifier = DataItem.DisplaySpecifier.from_data_item(multiprofile_data_item)
-                        multiprofile_display_specifier.display.display_type = "line_plot"
-                        multiprofile_display_specifier.display.legend_labels = legend_labels
-                        document_model.append_data_item(multiprofile_data_item)
-                        for line_profile_region in line_profile_regions[1:]:
-                            multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector"))
-                            multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width"))
-                        multiprofile_data_item.title = _("Profiles of ") + ", ".join(legend_labels)
-                        document_controller.display_data_item(multiprofile_display_specifier)
 
                 explore_button_widget.on_clicked = explore_pressed
-                multiprofile_button_widget.on_clicked = multiprofile_pressed
+                multiprofile_button_widget.on_clicked = functools.partial(build_multiprofile, document_controller, model_data_item)
                 self.__button_group = ui.create_button_group()
                 for index, elemental_mapping in enumerate(self.__elemental_mapping_panel_controller.get_elemental_mappings(model_data_item)):
                     row = ui.create_row_widget()
@@ -835,3 +765,5 @@ class ElementalMappingPanel(Panel.Panel):
 
 workspace_manager = Workspace.WorkspaceManager()
 workspace_manager.register_panel(ElementalMappingPanel, "elemental-mapping-panel", _("Elemental Mappings"), ["left", "right"], "left")
+
+DocumentModel.DocumentModel.register_processing_descriptions(processing_descriptions)
