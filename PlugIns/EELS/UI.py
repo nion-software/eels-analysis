@@ -113,7 +113,7 @@ def explore_edges(document_controller, model_data_item):
     return None
 
 
-def pick_new_edge(document_controller, model_data_item, elemental_mapping):
+async def pick_new_edge(document_controller, model_data_item, elemental_mapping) -> None:
     document_model = document_controller.document_model
     pick_region = Graphics.RectangleGraphic()
     pick_region.size = 16 / model_data_item.maybe_data_source.dimensional_shape[0], 16 / model_data_item.maybe_data_source.dimensional_shape[1]
@@ -146,8 +146,7 @@ bg = ea.make_signal_like(ea.subtract_background_signal(pick, mapping.fit_interva
 target.xdata = xd.vstack((pick, s - bg, bg))"""
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
-        document_controller.periodic()
-        document_controller.document_model.recompute_immediate(pick_data_item)  # need the data to scale display; so do this here. ugh.
+        await document_controller.document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to scale display; so do this here. ugh.
         pick_display_specifier.display.view_to_intervals(pick_data_item.maybe_data_source.data_and_metadata, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
         document_controller.display_data_item(pick_display_specifier)
     return pick_data_item
@@ -447,7 +446,7 @@ class ElementalMappingController:
                     self.graphic_property_changed(data_item, dimensional_shape, dimensional_calibrations, "interval", graphic.interval)
 
 
-def change_elemental_mapping(document_model, model_data_item, data_item, elemental_mapping):
+async def change_elemental_mapping(event_loop, document_model, model_data_item, data_item, elemental_mapping):
     mapping_computation_variable = None
     pick_region_specifier = None
     computation = data_item.maybe_data_source.computation if data_item else None
@@ -482,7 +481,7 @@ def change_elemental_mapping(document_model, model_data_item, data_item, element
         for graphic in display.graphics:
             if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id in ("fit", "signal"):
                 intervals.append(graphic.interval)
-        document_model.recompute_immediate(data_item)  # need the data to scale display; so do this here. ugh.
+        await document_model.recompute_immediate(event_loop, data_item)  # need the data to scale display; so do this here. ugh.
         display.view_to_intervals(data_item.maybe_data_source.data_and_metadata, intervals)
 
 
@@ -605,9 +604,11 @@ class ElementalMappingPanel(Panel.Panel):
                 self.__button_group = None
             if model_data_item:
                 def explore_pressed():
-                    explore_data_item = explore_edges(document_controller, model_data_item)
-                    document_model.recompute_immediate(explore_data_item)  # need the data to make connect_explorer_interval work; so do this here. ugh.
-                    self.__elemental_mapping_panel_controller.connect_explorer_interval(explore_data_item)
+                    async def explore():
+                        explore_data_item = explore_edges(document_controller, model_data_item)
+                        await document_model.recompute_immediate(document_controller.event_loop, explore_data_item)  # need the data to make connect_explorer_interval work; so do this here. ugh.
+                        self.__elemental_mapping_panel_controller.connect_explorer_interval(explore_data_item)
+                    document_controller.event_loop.create_task(explore())
 
                 explore_button_widget.on_clicked = explore_pressed
                 multiprofile_button_widget.on_clicked = functools.partial(build_multiprofile, document_controller, model_data_item)
@@ -623,7 +624,9 @@ class ElementalMappingPanel(Panel.Panel):
                         self.__button_group.add_button(radio_button, index)
                         if elemental_mapping == current_elemental_mapping:
                             radio_button.checked = True
-                        radio_button.on_clicked = functools.partial(change_elemental_mapping, document_model, model_data_item, current_data_item_ref[0], elemental_mapping)
+                        def change_elemental_mapping_clicked(elemental_mapping):
+                            document_controller.event_loop.create_task(change_elemental_mapping(document_controller.event_loop, document_model, model_data_item, current_data_item_ref[0], elemental_mapping))
+                        radio_button.on_clicked = functools.partial(change_elemental_mapping_clicked, elemental_mapping)  # elemental_mapping is in the loop
                     else:
                         label = ui.create_label_widget(text)
                     delete_button = ui.create_push_button_widget(_("Delete"))
@@ -631,7 +634,7 @@ class ElementalMappingPanel(Panel.Panel):
                     map_button = ui.create_push_button_widget(_("Map"))
                     def pick_pressed(elemental_mapping):
                         if current_data_item_ref[0] == model_data_item:
-                            pick_new_edge(document_controller, model_data_item, elemental_mapping)
+                            document_controller.event_loop.create_task(pick_new_edge(document_controller, model_data_item, elemental_mapping))
                     def map_pressed(elemental_mapping):
                         if current_data_item_ref[0] == model_data_item:
                             map_new_edge(document_controller, model_data_item, elemental_mapping)
