@@ -14,7 +14,6 @@ from EELSAnalysis import CurveFitting
 from EELSAnalysis import EELS_CrossSections
 from EELSAnalysis import EELS_DataAnalysis
 from EELSAnalysis import PeriodicTable
-from nion.data import Context
 from nion.data import DataAndMetadata
 
 
