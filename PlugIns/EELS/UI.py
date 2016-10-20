@@ -201,7 +201,7 @@ def build_multiprofile(document_controller, model_data_item):
     if multiprofile_data_item:
         script = "from EELS import Functions as ea\nfrom nion.data import xdata_1_0 as xd\nimport numpy\n"
         for index in indexes:
-            script += "d{0} = xd.line_profile(src{0}.display_xdata, region{0}.vector, region{0}.width)\n".format(index)
+            script += "d{0} = xd.line_profile(src{0}.display_xdata, region{0}.vector, region{0}.line_width)\n".format(index)
         profiles = ",".join(["d{0}".format(index) for index in indexes])
         script += "mx=numpy.amax(xd.vstack(({})).data)\n".format(profiles)
         for index in indexes:
