@@ -264,7 +264,7 @@ class ElementalMapping:
     def electron_shell(self, value):
         if self.__electron_shell != value:
             self.__electron_shell = value
-            self.property_changed_event.fire("electron_shell", value)
+            self.property_changed_event.fire("electron_shell")
 
     @property
     def fit_interval(self):
@@ -274,7 +274,7 @@ class ElementalMapping:
     def fit_interval(self, value):
         if self.__fit_interval != value:
             self.__fit_interval = value
-            self.property_changed_event.fire("fit_interval", value)
+            self.property_changed_event.fire("fit_interval")
 
     @property
     def signal_interval(self):
@@ -284,7 +284,7 @@ class ElementalMapping:
     def signal_interval(self, value):
         if self.__signal_interval != value:
             self.__signal_interval = value
-            self.property_changed_event.fire("signal_interval", value)
+            self.property_changed_event.fire("signal_interval")
 
 
 elemental_mapping_computation_variable_type = Symbolic.ComputationVariableType('elemental_mapping', "ElementalMapping", ElementalMapping)
@@ -354,7 +354,7 @@ class ElementalMappingController:
                             elemental_mappings.append(elemental_mapping)
                             elemental_mapping_computation_variable_type.register_object(elemental_mapping)
                             data_item.persistent_object_context.register(elemental_mapping)  # TODO: check this again
-                            self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid] = elemental_mapping.property_changed_event.listen(lambda k, v: self.__write_metadata(data_item))
+                            self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid] = elemental_mapping.property_changed_event.listen(lambda k: self.__write_metadata(data_item))
                         setattr(data_item, "elemental_mappings", elemental_mappings)
                 if is_explorer(data_item):
                     self.connect_explorer_interval(data_item)
@@ -408,7 +408,7 @@ class ElementalMappingController:
         assert all(em.uuid != elemental_mapping.uuid for em in elemental_mappings)
         elemental_mappings.append(elemental_mapping)
         elemental_mapping_computation_variable_type.register_object(elemental_mapping)
-        self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid] = elemental_mapping.property_changed_event.listen(lambda k, v: self.__write_metadata(data_item))
+        self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid] = elemental_mapping.property_changed_event.listen(lambda k: self.__write_metadata(data_item))
         data_item.persistent_object_context.register(elemental_mapping)  # TODO: check this again
         self.__write_metadata(data_item)
 
@@ -423,8 +423,9 @@ class ElementalMappingController:
         del self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid]
         self.__write_metadata(data_item)
 
-    def graphic_property_changed(self, data_item, dimensional_shape, dimensional_calibrations, key, value):
+    def graphic_property_changed(self, graphic, data_item, dimensional_shape, dimensional_calibrations, key):
         if key == "interval":
+            value = graphic.interval
             ss = value[0] * dimensional_shape[-1]
             ee = value[1] * dimensional_shape[-1]
             s = dimensional_calibrations[-1].convert_to_calibrated_value(ss)
@@ -442,8 +443,8 @@ class ElementalMappingController:
                 if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
                     dimensional_shape = buffered_data_source.dimensional_shape
                     dimensional_calibrations = buffered_data_source.dimensional_calibrations
-                    self.__explore_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, data_item, dimensional_shape, dimensional_calibrations))
-                    self.graphic_property_changed(data_item, dimensional_shape, dimensional_calibrations, "interval", graphic.interval)
+                    self.__explore_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, graphic, data_item, dimensional_shape, dimensional_calibrations))
+                    self.graphic_property_changed(graphic, data_item, dimensional_shape, dimensional_calibrations, "interval")
 
 
 async def change_elemental_mapping(event_loop, document_model, model_data_item, data_item, elemental_mapping):
