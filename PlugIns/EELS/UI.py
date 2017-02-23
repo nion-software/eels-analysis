@@ -12,10 +12,7 @@ import uuid
 # local libraries
 import_ok = False
 try:
-    from nion.utils import Binding
-    from nion.utils import Converter
     from nion.utils import Event
-    from nion.swift import Application
     from nion.swift import HistogramPanel
     from nion.swift import Panel
     from nion.swift import Workspace
