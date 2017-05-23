@@ -162,9 +162,9 @@ def map_new_edge(document_controller, model_data_item, elemental_mapping):
     computation = document_model.create_computation(script)
     computation.label = "EELS Map"
     computation.processing_id = "eels.map"
-    computation.create_object("src", document_model.get_object_specifier(model_data_item), label="Source", cascade_delete=True)
+    computation.create_object("src", document_model.get_object_specifier(model_data_item), label="Source")
     computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
-    buffered_data_source.set_computation(computation)
+    document_model.set_data_item_computation(display_specifier.data_item, computation)
 
     document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map_data_item))
 
@@ -193,8 +193,8 @@ def build_multiprofile(document_controller, model_data_item):
             line_profile_region.end = 0.5, 0.8
             display.add_graphic(line_profile_region)
             line_profile_regions.append(line_profile_region)
-            multiprofile_computation.create_object("src" + str(index), document_model.get_object_specifier(dependent_data_item), label="Src" + str(index), cascade_delete=True)
-            multiprofile_computation.create_object("region" + str(index), document_model.get_object_specifier(line_profile_region), label="Region" + str(index), cascade_delete=True)
+            multiprofile_computation.create_object("src" + str(index), document_model.get_object_specifier(dependent_data_item), label="Src" + str(index))
+            multiprofile_computation.create_object("region" + str(index), document_model.get_object_specifier(line_profile_region), label="Region" + str(index))
     if multiprofile_data_item:
         script = "from EELS import Functions as ea\nfrom nion.data import xdata_1_0 as xd\nimport numpy\n"
         for index in indexes:
@@ -206,10 +206,10 @@ def build_multiprofile(document_controller, model_data_item):
         script += "target.xdata = xd.vstack(({}))".format(profiles)
         multiprofile_computation.expression = script
         multiprofile_display_specifier = DataItem.DisplaySpecifier.from_data_item(multiprofile_data_item)
-        multiprofile_display_specifier.buffered_data_source.set_computation(multiprofile_computation)
         multiprofile_display_specifier.display.display_type = "line_plot"
         multiprofile_display_specifier.display.legend_labels = legend_labels
         document_model.append_data_item(multiprofile_data_item)
+        document_model.set_data_item_computation(multiprofile_data_item, multiprofile_computation)
         for line_profile_region in line_profile_regions[1:]:
             multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector"))
             multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width"))
