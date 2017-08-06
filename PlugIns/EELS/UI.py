@@ -290,7 +290,7 @@ Symbolic.ComputationVariable.register_computation_variable_type(elemental_mappin
 
 
 def is_explorer(data_item):
-    if data_item is not None:
+    if isinstance(data_item, DataItem.DataItem):
         buffered_data_source = data_item.maybe_data_source
         if buffered_data_source and buffered_data_source.is_data_1d:
             for graphic in buffered_data_source.displays[0].graphics:
@@ -300,14 +300,14 @@ def is_explorer(data_item):
 
 
 def is_model(data_item):
-    if data_item is not None:
+    if isinstance(data_item, DataItem.DataItem):
         buffered_data_source = data_item.maybe_data_source
         return buffered_data_source and buffered_data_source.is_data_3d
     return False
 
 
 def is_map(data_item):
-    if data_item is not None:
+    if isinstance(data_item, DataItem.DataItem):
         buffered_data_source = data_item.maybe_data_source
         if buffered_data_source and buffered_data_source.is_data_2d:
             return data_item.title.startswith("Map")
@@ -315,7 +315,7 @@ def is_map(data_item):
 
 
 def is_calibrated_map(data_item):
-    if data_item is not None:
+    if isinstance(data_item, DataItem.DataItem):
         buffered_data_source = data_item.maybe_data_source
         if buffered_data_source and buffered_data_source.is_data_2d:
             return data_item.title.startswith("Map") and buffered_data_source.intensity_calibration.units.startswith("~")
