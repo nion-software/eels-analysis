@@ -588,7 +588,7 @@ class ElementalMappingPanel(Panel.Panel):
                     for computation_variable in computation.variables:
                         if computation_variable.name == "src":
                             src_data_item_value = document_model.resolve_object_specifier(computation_variable.specifier)
-                            src_data_item = src_data_item_value.value if src_data_item_value else None
+                            src_data_item = src_data_item_value.value.data_item if src_data_item_value else None
                             if is_model(src_data_item):
                                 model_data_item = src_data_item
                         if computation_variable.name == "mapping":
