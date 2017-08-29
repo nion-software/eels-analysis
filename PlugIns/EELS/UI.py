@@ -99,9 +99,9 @@ def processing_subtract_background_signal(document_controller):
 
 def explore_edges(document_controller, model_data_item):
     pick_region = Graphics.RectangleGraphic()
-    pick_region.size = 16 / model_data_item.maybe_data_source.dimensional_shape[0], 16 / model_data_item.maybe_data_source.dimensional_shape[1]
+    pick_region.size = 16 / model_data_item.dimensional_shape[0], 16 / model_data_item.dimensional_shape[1]
     pick_region.label = _("Explore")
-    model_data_item.maybe_data_source.displays[0].add_graphic(pick_region)
+    model_data_item.displays[0].add_graphic(pick_region)
     pick_data_item = document_controller.document_model.make_data_item_with_computation("eels.explore", [(model_data_item, None)], {"src": [pick_region]})
     if pick_data_item:
         new_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
@@ -113,9 +113,9 @@ def explore_edges(document_controller, model_data_item):
 async def pick_new_edge(document_controller, model_data_item, elemental_mapping) -> None:
     document_model = document_controller.document_model
     pick_region = Graphics.RectangleGraphic()
-    pick_region.size = 16 / model_data_item.maybe_data_source.dimensional_shape[0], 16 / model_data_item.maybe_data_source.dimensional_shape[1]
+    pick_region.size = 16 / model_data_item.dimensional_shape[0], 16 / model_data_item.dimensional_shape[1]
     pick_region.label = "{} {}".format(_("Pick"), str(elemental_mapping.electron_shell))
-    model_data_item.maybe_data_source.displays[0].add_graphic(pick_region)
+    model_data_item.displays[0].add_graphic(pick_region)
     pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
     if pick_data_item:
         pick_data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
@@ -133,7 +133,7 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
         signal_region.interval = elemental_mapping.signal_interval
         pick_display_specifier.display.add_graphic(signal_region)
         # TODO: CHANGES VIA CONNECTIONS DON'T GET WRITTEN TO METADATA
-        pick_computation = pick_data_item.maybe_data_source.computation
+        pick_computation = pick_data_item.computation
         pick_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
         pick_computation.expression = """from EELS import Functions as ea
 from nion.data import xdata_1_0 as xd
@@ -144,7 +144,7 @@ target.xdata = xd.vstack((pick, s - bg, bg))"""
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
         await document_controller.document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to scale display; so do this here. ugh.
-        pick_display_specifier.display.view_to_intervals(pick_data_item.maybe_data_source.data_and_metadata, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
+        pick_display_specifier.display.view_to_intervals(pick_data_item.xdata, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
         document_controller.display_data_item(pick_display_specifier)
     return pick_data_item
 
@@ -157,7 +157,6 @@ def map_new_edge(document_controller, model_data_item, elemental_mapping):
     map_data_item.category = model_data_item.category
     document_model.append_data_item(map_data_item)
     display_specifier = DataItem.DisplaySpecifier.from_data_item(map_data_item)
-    buffered_data_source = display_specifier.buffered_data_source
     script = "from EELS import Functions as ea\ntarget.xdata = ea.map_background_subtracted_signal(src.xdata, mapping.electron_shell, mapping.fit_interval, mapping.signal_interval)"
     computation = document_model.create_computation(script)
     computation.label = "EELS Map"
@@ -187,7 +186,7 @@ def build_multiprofile(document_controller, model_data_item):
                 multiprofile_computation.processing_id = "eels.multiprofile"
             indexes.append(index)
             legend_labels.append(dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:])
-            display = dependent_data_item.maybe_data_source.displays[0]
+            display = dependent_data_item.displays[0]
             line_profile_region = Graphics.LineProfileGraphic()
             line_profile_region.start = 0.5, 0.2
             line_profile_region.end = 0.5, 0.8
@@ -291,9 +290,8 @@ Symbolic.ComputationVariable.register_computation_variable_type(elemental_mappin
 
 def is_explorer(data_item):
     if isinstance(data_item, DataItem.DataItem):
-        buffered_data_source = data_item.maybe_data_source
-        if buffered_data_source and buffered_data_source.is_data_1d:
-            for graphic in buffered_data_source.displays[0].graphics:
+        if data_item.is_data_1d:
+            for graphic in data_item.displays[0].graphics:
                 if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
                     return True
     return False
@@ -301,24 +299,21 @@ def is_explorer(data_item):
 
 def is_model(data_item):
     if isinstance(data_item, DataItem.DataItem):
-        buffered_data_source = data_item.maybe_data_source
-        return buffered_data_source and buffered_data_source.is_data_3d
+        return data_item.is_data_3d
     return False
 
 
 def is_map(data_item):
     if isinstance(data_item, DataItem.DataItem):
-        buffered_data_source = data_item.maybe_data_source
-        if buffered_data_source and buffered_data_source.is_data_2d:
+        if data_item.is_data_2d:
             return data_item.title.startswith("Map")
     return False
 
 
 def is_calibrated_map(data_item):
     if isinstance(data_item, DataItem.DataItem):
-        buffered_data_source = data_item.maybe_data_source
-        if buffered_data_source and buffered_data_source.is_data_2d:
-            return data_item.title.startswith("Map") and buffered_data_source.intensity_calibration.units.startswith("~")
+        if data_item.is_data_2d:
+            return data_item.title.startswith("Map") and data_item.intensity_calibration.units.startswith("~")
     return False
 
 
@@ -340,19 +335,17 @@ class ElementalMappingController:
             if key == "data_item":
                 data_item = value
                 if is_model(data_item):  # TODO: improve handling of metadata in derived items so as to not have to skip this
-                    buffered_data_source = data_item.maybe_data_source
-                    if buffered_data_source:
-                        elemental_mappings = list()
-                        metadata = buffered_data_source.metadata
-                        elemental_mapping_dicts = metadata.get("elemental_mappings", list())
-                        for elemental_mapping_dict in elemental_mapping_dicts:
-                            elemental_mapping = ElementalMapping()
-                            elemental_mapping.read_from_dict(elemental_mapping_dict)
-                            elemental_mappings.append(elemental_mapping)
-                            elemental_mapping_computation_variable_type.register_object(elemental_mapping)
-                            data_item.persistent_object_context.register(elemental_mapping)  # TODO: check this again
-                            self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid] = elemental_mapping.property_changed_event.listen(lambda k: self.__write_metadata(data_item))
-                        setattr(data_item, "elemental_mappings", elemental_mappings)
+                    elemental_mappings = list()
+                    metadata = data_item.metadata
+                    elemental_mapping_dicts = metadata.get("elemental_mappings", list())
+                    for elemental_mapping_dict in elemental_mapping_dicts:
+                        elemental_mapping = ElementalMapping()
+                        elemental_mapping.read_from_dict(elemental_mapping_dict)
+                        elemental_mappings.append(elemental_mapping)
+                        elemental_mapping_computation_variable_type.register_object(elemental_mapping)
+                        data_item.persistent_object_context.register(elemental_mapping)  # TODO: check this again
+                        self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid] = elemental_mapping.property_changed_event.listen(lambda k: self.__write_metadata(data_item))
+                    setattr(data_item, "elemental_mappings", elemental_mappings)
                 if is_explorer(data_item):
                     self.connect_explorer_interval(data_item)
 
@@ -386,14 +379,12 @@ class ElementalMappingController:
         self.__item_removed_listener = None
 
     def __write_metadata(self, data_item):
-        buffered_data_source = data_item.maybe_data_source
-        if buffered_data_source:
-            metadata = buffered_data_source.metadata
-            elemental_mapping_dicts = list()
-            for elemental_mapping in getattr(data_item, "elemental_mappings", list()):
-                elemental_mapping_dicts.append(elemental_mapping.write_to_dict())
-            metadata["elemental_mappings"] = elemental_mapping_dicts
-            buffered_data_source.set_metadata(metadata)
+        metadata = data_item.metadata
+        elemental_mapping_dicts = list()
+        for elemental_mapping in getattr(data_item, "elemental_mappings", list()):
+            elemental_mapping_dicts.append(elemental_mapping.write_to_dict())
+        metadata["elemental_mappings"] = elemental_mapping_dicts
+        data_item.metadata = metadata
 
     def get_elemental_mappings(self, data_item):
         return getattr(data_item, "elemental_mappings", list())
@@ -434,12 +425,11 @@ class ElementalMappingController:
         return self.__energy_intervals.get(data_item.uuid) if data_item else None
 
     def connect_explorer_interval(self, data_item):
-        buffered_data_source = data_item.maybe_data_source
-        if buffered_data_source and buffered_data_source.is_data_1d:
-            for graphic in buffered_data_source.displays[0].graphics:
+        if data_item.is_data_1d:
+            for graphic in data_item.displays[0].graphics:
                 if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
-                    dimensional_shape = buffered_data_source.dimensional_shape
-                    dimensional_calibrations = buffered_data_source.dimensional_calibrations
+                    dimensional_shape = data_item.dimensional_shape
+                    dimensional_calibrations = data_item.dimensional_calibrations
                     self.__explore_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, graphic, data_item, dimensional_shape, dimensional_calibrations))
                     self.graphic_property_changed(graphic, data_item, dimensional_shape, dimensional_calibrations, "interval")
 
@@ -447,7 +437,7 @@ class ElementalMappingController:
 async def change_elemental_mapping(event_loop, document_model, model_data_item, data_item, elemental_mapping):
     mapping_computation_variable = None
     pick_region_specifier = None
-    computation = data_item.maybe_data_source.computation if data_item else None
+    computation = data_item.computation if data_item else None
     if computation:
         for computation_variable in computation.variables:
             if computation_variable.name == "mapping":
@@ -473,14 +463,14 @@ async def change_elemental_mapping(event_loop, document_model, model_data_item, 
         else:
                 data_item.title = "{} {} of {}".format(_("Map"), str(elemental_mapping.electron_shell), model_data_item.title)
         document_model.rebind_computations()
-    display = data_item.maybe_data_source.displays[0]
+    display = data_item.displays[0]
     if display.display_type == "line_plot":
         intervals = list()
         for graphic in display.graphics:
             if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id in ("fit", "signal"):
                 intervals.append(graphic.interval)
         await document_model.recompute_immediate(event_loop, data_item)  # need the data to scale display; so do this here. ugh.
-        display.view_to_intervals(data_item.maybe_data_source.data_and_metadata, intervals)
+        display.view_to_intervals(data_item.xdata, intervals)
 
 
 class ElementalMappingPanel(Panel.Panel):
@@ -557,23 +547,21 @@ class ElementalMappingPanel(Panel.Panel):
                 binding_energy_eV = PeriodicTable.PeriodicTable().nominal_binding_energy_ev(electron_shell)
                 signal_interval_eV = binding_energy_eV, binding_energy_eV * 1.10
                 fit_interval_eV = binding_energy_eV * 0.93, binding_energy_eV * 0.98
-                buffered_data_source = model_data_item.maybe_data_source
-                if buffered_data_source:
-                    dimensional_shape = buffered_data_source.dimensional_shape
-                    dimensional_calibrations = buffered_data_source.dimensional_calibrations
-                    if dimensional_shape is not None and dimensional_calibrations is not None and len(dimensional_calibrations) > 0:
-                        calibration = dimensional_calibrations[-1]
-                        if calibration.units == "eV":
-                            fit_region_start = calibration.convert_from_calibrated_value(fit_interval_eV[0]) / dimensional_shape[-1]
-                            fit_region_end = calibration.convert_from_calibrated_value(fit_interval_eV[1]) / dimensional_shape[-1]
-                            signal_region_start = calibration.convert_from_calibrated_value(signal_interval_eV[0]) / dimensional_shape[-1]
-                            signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[-1]
-                            fit_interval = fit_region_start, fit_region_end
-                            signal_interval = signal_region_start, signal_region_end
-                            elemental_mapping = ElementalMapping(electron_shell, fit_interval, signal_interval)
-                            self.__elemental_mapping_panel_controller.add_elemental_mapping(model_data_item, elemental_mapping)
-                            data_item_changed(model_data_item)
-                            data_item_changed(data_item)
+                dimensional_shape = data_item.dimensional_shape
+                dimensional_calibrations = data_item.dimensional_calibrations
+                if dimensional_shape is not None and dimensional_calibrations is not None and len(dimensional_calibrations) > 0:
+                    calibration = dimensional_calibrations[-1]
+                    if calibration.units == "eV":
+                        fit_region_start = calibration.convert_from_calibrated_value(fit_interval_eV[0]) / dimensional_shape[-1]
+                        fit_region_end = calibration.convert_from_calibrated_value(fit_interval_eV[1]) / dimensional_shape[-1]
+                        signal_region_start = calibration.convert_from_calibrated_value(signal_interval_eV[0]) / dimensional_shape[-1]
+                        signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[-1]
+                        fit_interval = fit_region_start, fit_region_end
+                        signal_interval = signal_region_start, signal_region_end
+                        elemental_mapping = ElementalMapping(electron_shell, fit_interval, signal_interval)
+                        self.__elemental_mapping_panel_controller.add_elemental_mapping(model_data_item, elemental_mapping)
+                        data_item_changed(model_data_item)
+                        data_item_changed(data_item)
 
         def data_item_changed(data_item) -> None:
             current_data_item_ref[0] = data_item
@@ -583,7 +571,7 @@ class ElementalMappingPanel(Panel.Panel):
             if is_model(data_item):
                 model_data_item = data_item
             else:
-                computation = data_item.maybe_data_source.computation if data_item else None
+                computation = data_item.computation if data_item else None
                 if computation:
                     for computation_variable in computation.variables:
                         if computation_variable.name == "src":
