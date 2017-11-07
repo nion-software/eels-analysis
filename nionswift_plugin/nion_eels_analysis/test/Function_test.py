@@ -17,8 +17,8 @@ from nion.data import DataAndMetadata
 sys.path.append(os.path.dirname(os.path.realpath(os.path.join(__file__, "..", ".."))))
 
 # Note: EELSAnalysis is only available in sys.path above is appended with its _parent_ directory.
-from EELSAnalysis import PeriodicTable
-from EELS import Functions
+from nion.eels_analysis import PeriodicTable
+from nionswift_plugin.nion_eels_analysis import Functions
 
 
 class TestFunctions(unittest.TestCase):

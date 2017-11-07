@@ -15,7 +15,7 @@ setuptools.setup(
     author_email="swift@nion.com",
     description="Library and UI for doing EELS analysis with Nion Swift.",
     url="https://github.com/nion-software/eels-analysis",
-    packages=["nion.eels_analysis"],
+    packages=["nion.eels_analysis", "nionswift_plugin.nion_eels_analysis"],
     install_requires=[],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

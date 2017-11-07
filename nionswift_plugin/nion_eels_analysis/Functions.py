@@ -10,10 +10,10 @@
 import copy
 
 import numpy
-from EELSAnalysis import CurveFitting
-from EELSAnalysis import EELS_CrossSections
-from EELSAnalysis import EELS_DataAnalysis
-from EELSAnalysis import PeriodicTable
+from nion.eels_analysis import CurveFitting
+from nion.eels_analysis import EELS_CrossSections
+from nion.eels_analysis import EELS_DataAnalysis
+from nion.eels_analysis import PeriodicTable
 from nion.data import DataAndMetadata
 
 

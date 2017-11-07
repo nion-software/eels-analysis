@@ -21,7 +21,7 @@ try:
     from nion.swift.model import DocumentModel
     from nion.swift.model import Graphics
     from nion.swift.model import Symbolic
-    from EELSAnalysis import PeriodicTable
+    from nion.eels_analysis import PeriodicTable
     import_ok = True
 except ImportError:
     pass
