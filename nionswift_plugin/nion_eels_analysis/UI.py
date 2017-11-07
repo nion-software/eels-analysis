@@ -31,7 +31,7 @@ _ = gettext.gettext
 
 processing_descriptions = {
     "eels.eels_extract_signal":
-        { 'script': 'from EELS import Functions as ea\nfrom nion.data import xdata_1_0 as xd\ntarget.xdata = xd.vstack((ea.extract_signal_from_polynomial_background({src}, signal.interval, (fit.interval, )), {src}))',
+        { 'script': 'from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\ntarget.xdata = xd.vstack((ea.extract_signal_from_polynomial_background({src}, signal.interval, (fit.interval, )), {src}))',
           'sources': [{'label': 'Source', 'name': 'src', 'regions': [
               {'name': 'fit', 'params': {'label': 'Fit', 'interval': (0.2, 0.3)}, 'type': 'interval'},
               {'name': 'signal', 'params': {'label': 'Signal', 'interval': (0.4, 0.5)}, 'type': 'interval'},
@@ -39,14 +39,14 @@ processing_descriptions = {
           'title': 'Background Subtracted',
         },
     "eels.subtract_linear_background":
-        { 'script': 'from EELS import Functions as ea\nfrom nion.data import xdata_1_0 as xd\ntarget.xdata = xd.vstack((ea.subtract_linear_background({src}, fit.interval, (0, 1)), {src}))',
+        { 'script': 'from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\ntarget.xdata = xd.vstack((ea.subtract_linear_background({src}, fit.interval, (0, 1)), {src}))',
           'sources': [{'label': 'Source', 'name': 'src', 'regions': [
               {'name': 'fit', 'params': {'label': 'Fit', 'interval': (0.2, 0.3)}, 'type': 'interval'},
           ]}],
           'title': 'Linear Background Subtracted',
         },
     "eels.subtract_background_signal":
-        { 'script': 'from EELS import Functions as ea\nfrom nion.data import xdata_1_0 as xd\nsignal_xdata = ea.extract_original_signal({src}, fit.interval, signal.interval)\nbackground = ea.subtract_background_signal({src}, fit.interval, signal.interval)\ntarget.xdata = xd.vstack((signal_xdata, background, signal_xdata - background))',
+        { 'script': 'from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\nsignal_xdata = ea.extract_original_signal({src}, fit.interval, signal.interval)\nbackground = ea.subtract_background_signal({src}, fit.interval, signal.interval)\ntarget.xdata = xd.vstack((signal_xdata, background, signal_xdata - background))',
           'sources': [{'label': 'Source', 'name': 'src', 'regions': [
               {'name': 'fit', 'params': {'label': 'Fit', 'interval': (0.2, 0.3)}, 'type': 'interval'},
               {'name': 'signal', 'params': {'label': 'Signal', 'interval': (0.4, 0.5)}, 'type': 'interval'},
@@ -135,7 +135,7 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
         # TODO: CHANGES VIA CONNECTIONS DON'T GET WRITTEN TO METADATA
         pick_computation = pick_data_item.computation
         pick_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
-        pick_computation.expression = """from EELS import Functions as ea
+        pick_computation.expression = """from nion.eels_analysis import eels_analysis as ea
 from nion.data import xdata_1_0 as xd
 pick = xd.sum_region(src.xdata, region.mask_xdata_with_shape(src.xdata.data_shape[0:2]))
 s = ea.make_signal_like(ea.extract_original_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
@@ -157,7 +157,7 @@ def map_new_edge(document_controller, model_data_item, elemental_mapping):
     map_data_item.category = model_data_item.category
     document_model.append_data_item(map_data_item)
     display_specifier = DataItem.DisplaySpecifier.from_data_item(map_data_item)
-    script = "from EELS import Functions as ea\ntarget.xdata = ea.map_background_subtracted_signal(src.xdata, mapping.electron_shell, mapping.fit_interval, mapping.signal_interval)"
+    script = "from nion.eels_analysis import eels_analysis as ea\ntarget.xdata = ea.map_background_subtracted_signal(src.xdata, mapping.electron_shell, mapping.fit_interval, mapping.signal_interval)"
     computation = document_model.create_computation(script)
     computation.label = "EELS Map"
     computation.processing_id = "eels.map"
@@ -195,7 +195,7 @@ def build_multiprofile(document_controller, model_data_item):
             multiprofile_computation.create_object("src" + str(index), document_model.get_object_specifier(dependent_data_item), label="Src" + str(index))
             multiprofile_computation.create_object("region" + str(index), document_model.get_object_specifier(line_profile_region), label="Region" + str(index))
     if multiprofile_data_item:
-        script = "from EELS import Functions as ea\nfrom nion.data import xdata_1_0 as xd\nimport numpy\n"
+        script = "from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\nimport numpy\n"
         for index in indexes:
             script += "d{0} = xd.line_profile(src{0}.display_xdata, region{0}.vector, region{0}.line_width)\n".format(index)
         profiles = ",".join(["d{0}".format(index) for index in indexes])

@@ -18,10 +18,10 @@ sys.path.append(os.path.dirname(os.path.realpath(os.path.join(__file__, "..", ".
 
 # Note: EELSAnalysis is only available in sys.path above is appended with its _parent_ directory.
 from nion.eels_analysis import PeriodicTable
-from nionswift_plugin.nion_eels_analysis import Functions
+from nion.eels_analysis import eels_analysis
 
 
-class TestFunctions(unittest.TestCase):
+class TestEELSAnalysisFunctions(unittest.TestCase):
 
     def setUp(self):
         """Common code for all tests can go here."""
@@ -39,7 +39,7 @@ class TestFunctions(unittest.TestCase):
                 r1 = random.randint(0, 100)
                 r2 = random.randint(0, 100)
                 data[row, column, :] = numpy.linspace(r1, r2, depth) + numpy.random.uniform(-1, 1, depth) / 2
-        linear_background = Functions.slow_linear_background(data, -1)
+        linear_background = eels_analysis.slow_linear_background(data, -1)
         linear_background_subtracted = data - linear_background
         self.assertEqual(linear_background_subtracted.shape, (height, width, depth))
         self.assertTrue(numpy.all(linear_background_subtracted < 1))
@@ -53,7 +53,7 @@ class TestFunctions(unittest.TestCase):
                 r1 = random.randint(0, 100)
                 r2 = random.randint(0, 100)
                 data[row, column, :] = numpy.linspace(r1, r2, depth) + numpy.random.uniform(-1, 1, depth) / 2
-        linear_background = Functions.stacked_linear_background(data, -1)
+        linear_background = eels_analysis.stacked_linear_background(data, -1)
         linear_background_subtracted = data - linear_background
         self.assertEqual(linear_background_subtracted.shape, (height, width, depth))
         self.assertTrue(numpy.all(linear_background_subtracted < 1))
@@ -68,7 +68,7 @@ class TestFunctions(unittest.TestCase):
                 r2 = random.randint(0, 100)
                 data[row, column, :] = numpy.linspace(r1, r2, depth) + numpy.random.uniform(-1, 1, depth) / 2
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(data)
-        background_subtracted = Functions.subtract_linear_background(data_and_metadata, (0.0, 1.0), (0.0, 1.0))
+        background_subtracted = eels_analysis.subtract_linear_background(data_and_metadata, (0.0, 1.0), (0.0, 1.0))
         self.assertEqual(background_subtracted.data_shape, (height, width, depth), -1)
         self.assertTrue(numpy.all(numpy.less(background_subtracted.data, 1)))
         self.assertTrue(numpy.all(numpy.greater(background_subtracted.data, -1)))
@@ -82,7 +82,7 @@ class TestFunctions(unittest.TestCase):
                 r2 = random.randint(0, 100)
                 data[row, column, :] = numpy.linspace(r1, r2, depth) + numpy.random.uniform(-1, 1, depth) / 2
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(data)
-        background_subtracted = Functions.subtract_linear_background(data_and_metadata, (0.1, 0.5), (0.6, 0.9))
+        background_subtracted = eels_analysis.subtract_linear_background(data_and_metadata, (0.1, 0.5), (0.6, 0.9))
         self.assertEqual(background_subtracted.data_shape, (height, width, int(depth * 0.3)))
         self.assertTrue(numpy.all(numpy.less(background_subtracted.data[..., 54:72], 1)))
         self.assertTrue(numpy.all(numpy.greater(background_subtracted.data[..., 54:72], -1)))
@@ -92,8 +92,8 @@ class TestFunctions(unittest.TestCase):
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((2048, ), numpy.float), dimensional_calibrations=[calibration])
         fit_range = 0.2, 0.3
         signal_range = 0.4, 0.5
-        signal = Functions.extract_original_signal(data_and_metadata, fit_range, signal_range)
-        background = Functions.subtract_background_signal(data_and_metadata, fit_range, signal_range)
+        signal = eels_analysis.extract_original_signal(data_and_metadata, fit_range, signal_range)
+        background = eels_analysis.subtract_background_signal(data_and_metadata, fit_range, signal_range)
         self.assertEqual(signal.data_shape, signal.data.shape)
         self.assertEqual(background.data_shape, background.data.shape)
 
@@ -101,7 +101,7 @@ class TestFunctions(unittest.TestCase):
         calibration = Calibration.Calibration(200.0, 2.0, 'eV')
         spectrum_length = 1000
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data((numpy.random.randn(spectrum_length) * 100).astype(numpy.int32), dimensional_calibrations=[calibration])
-        signal = Functions.extract_original_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        signal = eels_analysis.extract_original_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
         self.assertEqual(data_and_metadata.dimensional_calibrations[0], calibration)  # dummy check
         self.assertAlmostEqual(signal.dimensional_calibrations[0].offset, 0.2 * spectrum_length * calibration.scale + calibration.offset)
         self.assertAlmostEqual(signal.dimensional_calibrations[0].scale, calibration.scale)
@@ -112,7 +112,7 @@ class TestFunctions(unittest.TestCase):
         calibration = Calibration.Calibration(200.0, 2.0, 'eV')
         spectrum_length = 1000
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length,), numpy.float), dimensional_calibrations=[calibration])
-        background = Functions.subtract_background_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        background = eels_analysis.subtract_background_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
         self.assertEqual(data_and_metadata.dimensional_calibrations[0], calibration)  # dummy check
         self.assertAlmostEqual(background.dimensional_calibrations[0].offset, 0.2 * spectrum_length * calibration.scale + calibration.offset)
         self.assertAlmostEqual(background.dimensional_calibrations[0].scale, calibration.scale)
@@ -122,9 +122,9 @@ class TestFunctions(unittest.TestCase):
         calibration = Calibration.Calibration(200.0, 2.0, 'eV')
         spectrum_length = 1000
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length,), numpy.float), dimensional_calibrations=[calibration])
-        signal = Functions.extract_original_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        signal = eels_analysis.extract_original_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
         signal = DataAndMetadata.DataAndMetadata.from_data(numpy.ones(300, ), signal.intensity_calibration, signal.dimensional_calibrations)
-        expanded = Functions.make_signal_like(signal, data_and_metadata)
+        expanded = eels_analysis.make_signal_like(signal, data_and_metadata)
         self.assertEqual(expanded.dimensional_calibrations[0], calibration)
         self.assertTrue(numpy.array_equal(expanded.data[0:200], numpy.zeros((200, ))))
         self.assertTrue(numpy.array_equal(expanded.data[200:500], numpy.ones((300, ))))
@@ -138,7 +138,7 @@ class TestFunctions(unittest.TestCase):
         w, h = 20, 20
         electron_shell = PeriodicTable.ElectronShell(1, 1, 0)
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length, w, h), numpy.float), dimensional_calibrations=[calibration, calibration_y, calibration_x])
-        mapped = Functions.map_background_subtracted_signal(data_and_metadata, electron_shell, (0.2, 0.3), (0.4, 0.5))
+        mapped = eels_analysis.map_background_subtracted_signal(data_and_metadata, electron_shell, (0.2, 0.3), (0.4, 0.5))
         self.assertEqual(len(mapped.dimensional_shape), 2)
         self.assertEqual(len(mapped.dimensional_calibrations), 2)
         self.assertEqual(mapped.dimensional_calibrations[0], calibration_y)
