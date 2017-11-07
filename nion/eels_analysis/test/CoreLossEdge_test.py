@@ -11,7 +11,7 @@ import scipy.stats
 
 sys.path.append(os.path.dirname(os.path.realpath(os.path.join(__file__, "..", ".."))))
 
-from EELSAnalysis import EELS_DataAnalysis as analyzer
+from nion.eels_analysis import EELS_DataAnalysis as analyzer
 
 
 class TestLibrary(unittest.TestCase):
@@ -60,3 +60,6 @@ class TestLibrary(unittest.TestCase):
         self.assertAlmostEqual(numpy.amin(signal_slice), numpy.amin(edge_profile), 2)  # within 1/100
         self.assertAlmostEqual(numpy.amax(signal_slice), numpy.amax(edge_profile), 2)  # within 1/100
         self.assertAlmostEqual(numpy.average(signal_slice), numpy.average(edge_profile), 4)  # within 1/10000
+
+if __name__ == '__main__':
+    unittest.main()
