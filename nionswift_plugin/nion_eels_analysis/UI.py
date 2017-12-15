@@ -199,10 +199,10 @@ def build_multiprofile(document_controller, model_data_item):
         for index in indexes:
             script += "d{0} = xd.line_profile(src{0}.display_xdata, region{0}.vector, region{0}.line_width)\n".format(index)
         profiles = ",".join(["d{0}".format(index) for index in indexes])
-        script += "mx=numpy.amax(xd.vstack(({})).data)\n".format(profiles)
+        script += "mx=numpy.amax(xd.vstack([{}]).data)\n".format(profiles)
         for index in indexes:
             script += "d{0} /= mx\n".format(index)
-        script += "target.xdata = xd.vstack(({}))".format(profiles)
+        script += "target.xdata = xd.vstack([{}])".format(profiles)
         multiprofile_computation.expression = script
         multiprofile_display_specifier = DataItem.DisplaySpecifier.from_data_item(multiprofile_data_item)
         multiprofile_display_specifier.display.display_type = "line_plot"
