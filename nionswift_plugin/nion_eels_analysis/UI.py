@@ -46,7 +46,7 @@ processing_descriptions = {
           'title': 'Linear Background Subtracted',
         },
     "eels.subtract_background_signal":
-        { 'script': 'from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\nsignal_xdata = ea.extract_original_signal({src}, fit.interval, signal.interval)\nbackground = ea.subtract_background_signal({src}, fit.interval, signal.interval)\ntarget.xdata = xd.vstack((signal_xdata, background, signal_xdata - background))',
+        { 'script': 'from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\nsignal_xdata = ea.extract_original_signal({src}, fit.interval, signal.interval)\nbackground = ea.calculate_background_signal({src}, fit.interval, signal.interval)\ntarget.xdata = xd.vstack((signal_xdata, background, signal_xdata - background))',
           'sources': [{'label': 'Source', 'name': 'src', 'regions': [
               {'name': 'fit', 'params': {'label': 'Fit', 'interval': (0.2, 0.3)}, 'type': 'interval'},
               {'name': 'signal', 'params': {'label': 'Signal', 'interval': (0.4, 0.5)}, 'type': 'interval'},
@@ -139,7 +139,7 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
 from nion.data import xdata_1_0 as xd
 pick = xd.sum_region(src.xdata, region.mask_xdata_with_shape(src.xdata.data_shape[0:2]))
 s = ea.make_signal_like(ea.extract_original_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
-bg = ea.make_signal_like(ea.subtract_background_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
+bg = ea.make_signal_like(ea.calculate_background_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
 target.xdata = xd.vstack((pick, s - bg, bg))"""
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))

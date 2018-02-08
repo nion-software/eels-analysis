@@ -260,8 +260,8 @@ def subtract_linear_background(data_and_metadata: DataAndMetadata.DataAndMetadat
     return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
-def subtract_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
-    """Subtract si_k background from data and metadata with signal in first index."""
+def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
+    """Calculate background from data and metadata with signal in first index."""
     signal_index = -1
 
     signal_length = data_and_metadata.dimensional_shape[signal_index]

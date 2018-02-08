@@ -93,7 +93,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         fit_range = 0.2, 0.3
         signal_range = 0.4, 0.5
         signal = eels_analysis.extract_original_signal(data_and_metadata, fit_range, signal_range)
-        background = eels_analysis.subtract_background_signal(data_and_metadata, fit_range, signal_range)
+        background = eels_analysis.calculate_background_signal(data_and_metadata, fit_range, signal_range)
         self.assertEqual(signal.data_shape, signal.data.shape)
         self.assertEqual(background.data_shape, background.data.shape)
 
@@ -112,7 +112,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         calibration = Calibration.Calibration(200.0, 2.0, 'eV')
         spectrum_length = 1000
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length,), numpy.float), dimensional_calibrations=[calibration])
-        background = eels_analysis.subtract_background_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        background = eels_analysis.calculate_background_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
         self.assertEqual(data_and_metadata.dimensional_calibrations[0], calibration)  # dummy check
         self.assertAlmostEqual(background.dimensional_calibrations[0].offset, 0.2 * spectrum_length * calibration.scale + calibration.offset)
         self.assertAlmostEqual(background.dimensional_calibrations[0].scale, calibration.scale)
