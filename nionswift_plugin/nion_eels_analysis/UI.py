@@ -7,7 +7,7 @@ import typing
 import uuid
 
 # third party libraries
-# None
+import numpy
 
 # local libraries
 import_ok = False
@@ -18,6 +18,7 @@ try:
     from nion.swift import Workspace
     from nion.swift.model import Connection
     from nion.swift.model import DataItem
+    from nion.swift.model import Display
     from nion.swift.model import DocumentModel
     from nion.swift.model import Graphics
     from nion.swift.model import Symbolic
@@ -116,12 +117,12 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
     pick_region.size = 16 / model_data_item.dimensional_shape[0], 16 / model_data_item.dimensional_shape[1]
     pick_region.label = "{} {}".format(_("Pick"), str(elemental_mapping.electron_shell))
     model_data_item.displays[0].add_graphic(pick_region)
+
     pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
     if pick_data_item:
-        pick_data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
+        pick_data_item.title = "{} Data of {}".format(pick_region.label, model_data_item.title)
         pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
         pick_display_specifier.display.display_type = "line_plot"
-        pick_display_specifier.display.legend_labels = ["Signal", "Subtracted", "Background"]
         fit_region = Graphics.IntervalGraphic()
         fit_region.label = _("Fit")
         fit_region.graphic_id = "fit"
@@ -132,20 +133,90 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
         signal_region.graphic_id = "signal"
         signal_region.interval = elemental_mapping.signal_interval
         pick_display_specifier.display.add_graphic(signal_region)
-        # TODO: CHANGES VIA CONNECTIONS DON'T GET WRITTEN TO METADATA
-        pick_computation = pick_data_item.computation
-        pick_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
-        pick_computation.expression = """from nion.eels_analysis import eels_analysis as ea
-from nion.data import xdata_1_0 as xd
-pick = xd.sum_region(src.xdata, region.mask_xdata_with_shape(src.xdata.data_shape[0:2]))
-s = ea.make_signal_like(ea.extract_original_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
-bg = ea.make_signal_like(ea.calculate_background_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
-target.xdata = xd.vstack((pick, s - bg, bg))"""
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
         await document_controller.document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to scale display; so do this here. ugh.
-        pick_display_specifier.display.view_to_intervals(pick_data_item.xdata, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
-        document_controller.display_data_item(pick_display_specifier)
+
+        background_data_item = DataItem.DataItem(numpy.zeros(1, ))
+        background_data_item.title = "{} Background of {}".format(pick_region.label, model_data_item.title)
+        background_display_specifier = DataItem.DisplaySpecifier.from_data_item(background_data_item)
+        background_display_specifier.display.display_type = "line_plot"
+        background_script = "from nion.eels_analysis import eels_analysis as ea\ntarget.xdata = ea.calculate_background_signal(pick.xdata, mapping.fit_interval, mapping.signal_interval)"
+        background_computation = document_model.create_computation(background_script)
+        background_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
+        background_computation.create_object("pick", document_model.get_object_specifier(pick_data_item))
+        document_model.append_data_item(background_data_item)
+        document_model.set_data_item_computation(background_data_item, background_computation)
+        await document_controller.document_model.recompute_immediate(document_controller.event_loop, background_data_item)  # need the data to scale display; so do this here. ugh.
+
+        subtracted_data_item = DataItem.DataItem(numpy.zeros(1, ))
+        subtracted_data_item.title = "{} Subtracted of {}".format(pick_region.label, model_data_item.title)
+        subtracted_display_specifier = DataItem.DisplaySpecifier.from_data_item(subtracted_data_item)
+        subtracted_display_specifier.display.display_type = "line_plot"
+        subtracted_script = "from nion.eels_analysis import eels_analysis as ea\nsignal = ea.extract_original_signal(pick.xdata, mapping.fit_interval, mapping.signal_interval)\nbackground = ea.calculate_background_signal(pick.xdata, mapping.fit_interval, mapping.signal_interval)\ntarget.xdata = signal - background"
+        subtracted_computation = document_model.create_computation(subtracted_script)
+        subtracted_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
+        subtracted_computation.create_object("pick", document_model.get_object_specifier(pick_data_item))
+        document_model.append_data_item(subtracted_data_item)
+        document_model.set_data_item_computation(subtracted_data_item, subtracted_computation)
+        await document_controller.document_model.recompute_immediate(document_controller.event_loop, subtracted_data_item)  # need the data to scale display; so do this here. ugh.
+
+        composite_data_item = DataItem.CompositeLibraryItem()
+        composite_data_item.append_data_item(pick_data_item)
+        composite_data_item.append_data_item(background_data_item)
+        composite_data_item.append_data_item(subtracted_data_item)
+        composite_display_specifier = DataItem.DisplaySpecifier.from_data_item(composite_data_item)
+        composite_display_specifier.display.display_type = "line_plot"
+        composite_display_specifier.display.dimensional_scales = (model_data_item.dimensional_shape[-1], )
+        composite_display_specifier.display.dimensional_calibrations = (model_data_item.dimensional_calibrations[-1], )
+        composite_display_specifier.display.intensity_calibration = model_data_item.intensity_calibration
+        document_model.append_data_item(composite_data_item)
+        fit_region = Graphics.IntervalGraphic()
+        fit_region.label = _("Fit")
+        fit_region.graphic_id = "fit"
+        fit_region.interval = elemental_mapping.fit_interval
+        composite_display_specifier.display.add_graphic(fit_region)
+        signal_region = Graphics.IntervalGraphic()
+        signal_region.label = _("Signal")
+        signal_region.graphic_id = "signal"
+        signal_region.interval = elemental_mapping.signal_interval
+        composite_display_specifier.display.add_graphic(signal_region)
+        composite_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
+        composite_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
+        composite_display_specifier.display.view_to_intervals(pick_data_item.xdata, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
+        document_controller.display_data_item(composite_display_specifier)
+
+#     pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
+#     if pick_data_item:
+#         pick_data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
+#         pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
+#         pick_display_specifier.display.display_type = "line_plot"
+#         pick_display_specifier.display.legend_labels = ["Signal", "Subtracted", "Background"]
+#         fit_region = Graphics.IntervalGraphic()
+#         fit_region.label = _("Fit")
+#         fit_region.graphic_id = "fit"
+#         fit_region.interval = elemental_mapping.fit_interval
+#         pick_display_specifier.display.add_graphic(fit_region)
+#         signal_region = Graphics.IntervalGraphic()
+#         signal_region.label = _("Signal")
+#         signal_region.graphic_id = "signal"
+#         signal_region.interval = elemental_mapping.signal_interval
+#         pick_display_specifier.display.add_graphic(signal_region)
+#         # TODO: CHANGES VIA CONNECTIONS DON'T GET WRITTEN TO METADATA
+#         pick_computation = pick_data_item.computation
+#         pick_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
+#         pick_computation.expression = """from nion.eels_analysis import eels_analysis as ea
+# from nion.data import xdata_1_0 as xd
+# pick = xd.sum_region(src.xdata, region.mask_xdata_with_shape(src.xdata.data_shape[0:2]))
+# s = ea.make_signal_like(ea.extract_original_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
+# bg = ea.make_signal_like(ea.calculate_background_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
+# target.xdata = xd.vstack((pick, s - bg, bg))"""
+#         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
+#         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
+#         await document_controller.document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to scale display; so do this here. ugh.
+#         pick_display_specifier.display.view_to_intervals(pick_data_item.xdata, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
+#         document_controller.display_data_item(pick_display_specifier)
+
     return pick_data_item
 
 
@@ -371,6 +442,8 @@ class ElementalMappingController:
             item_inserted("data_item", data_item, index)
 
         document_model.rebind_computations()
+
+        document_model.update_computation_dependencies()
 
     def close(self):
         self.__item_inserted_listener.close()
