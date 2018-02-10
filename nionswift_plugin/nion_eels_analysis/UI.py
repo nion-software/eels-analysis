@@ -133,17 +133,17 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
         signal_region.graphic_id = "signal"
         signal_region.interval = elemental_mapping.signal_interval
         pick_display_specifier.display.add_graphic(signal_region)
-        pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
-        pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
+        pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping.data_structure, "fit_interval", fit_region, "interval"))
+        pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping.data_structure, "signal_interval", signal_region, "interval"))
         await document_controller.document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to scale display; so do this here. ugh.
 
         background_data_item = DataItem.DataItem(numpy.zeros(1, ))
         background_data_item.title = "{} Background of {}".format(pick_region.label, model_data_item.title)
         background_display_specifier = DataItem.DisplaySpecifier.from_data_item(background_data_item)
         background_display_specifier.display.display_type = "line_plot"
-        background_script = "from nion.eels_analysis import eels_analysis as ea\ntarget.xdata = ea.calculate_background_signal(pick.xdata, mapping.fit_interval, mapping.signal_interval)"
+        background_script = "from nion.eels_analysis import eels_analysis as ea\ntarget.xdata = ea.calculate_background_signal(pick.xdata, mapping.get_property('fit_interval'), mapping.get_property('signal_interval'))"
         background_computation = document_model.create_computation(background_script)
-        background_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
+        background_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping.data_structure), label="Mapping")
         background_computation.create_object("pick", document_model.get_object_specifier(pick_data_item))
         document_model.append_data_item(background_data_item)
         document_model.set_data_item_computation(background_data_item, background_computation)
@@ -153,9 +153,9 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
         subtracted_data_item.title = "{} Subtracted of {}".format(pick_region.label, model_data_item.title)
         subtracted_display_specifier = DataItem.DisplaySpecifier.from_data_item(subtracted_data_item)
         subtracted_display_specifier.display.display_type = "line_plot"
-        subtracted_script = "from nion.eels_analysis import eels_analysis as ea\nsignal = ea.extract_original_signal(pick.xdata, mapping.fit_interval, mapping.signal_interval)\nbackground = ea.calculate_background_signal(pick.xdata, mapping.fit_interval, mapping.signal_interval)\ntarget.xdata = signal - background"
+        subtracted_script = "from nion.eels_analysis import eels_analysis as ea\nsignal = ea.extract_original_signal(pick.xdata, mapping.get_property('fit_interval'), mapping.get_property('signal_interval'))\nbackground = ea.calculate_background_signal(pick.xdata, mapping.get_property('fit_interval'), mapping.get_property('signal_interval'))\ntarget.xdata = signal - background"
         subtracted_computation = document_model.create_computation(subtracted_script)
-        subtracted_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
+        subtracted_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping.data_structure), label="Mapping")
         subtracted_computation.create_object("pick", document_model.get_object_specifier(pick_data_item))
         document_model.append_data_item(subtracted_data_item)
         document_model.set_data_item_computation(subtracted_data_item, subtracted_computation)
@@ -181,41 +181,10 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
         signal_region.graphic_id = "signal"
         signal_region.interval = elemental_mapping.signal_interval
         composite_display_specifier.display.add_graphic(signal_region)
-        composite_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
-        composite_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
+        composite_data_item.add_connection(Connection.PropertyConnection(elemental_mapping.data_structure, "fit_interval", fit_region, "interval"))
+        composite_data_item.add_connection(Connection.PropertyConnection(elemental_mapping.data_structure, "signal_interval", signal_region, "interval"))
         composite_display_specifier.display.view_to_intervals(pick_data_item.xdata, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
         document_controller.display_data_item(composite_display_specifier)
-
-#     pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
-#     if pick_data_item:
-#         pick_data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
-#         pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
-#         pick_display_specifier.display.display_type = "line_plot"
-#         pick_display_specifier.display.legend_labels = ["Signal", "Subtracted", "Background"]
-#         fit_region = Graphics.IntervalGraphic()
-#         fit_region.label = _("Fit")
-#         fit_region.graphic_id = "fit"
-#         fit_region.interval = elemental_mapping.fit_interval
-#         pick_display_specifier.display.add_graphic(fit_region)
-#         signal_region = Graphics.IntervalGraphic()
-#         signal_region.label = _("Signal")
-#         signal_region.graphic_id = "signal"
-#         signal_region.interval = elemental_mapping.signal_interval
-#         pick_display_specifier.display.add_graphic(signal_region)
-#         # TODO: CHANGES VIA CONNECTIONS DON'T GET WRITTEN TO METADATA
-#         pick_computation = pick_data_item.computation
-#         pick_computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
-#         pick_computation.expression = """from nion.eels_analysis import eels_analysis as ea
-# from nion.data import xdata_1_0 as xd
-# pick = xd.sum_region(src.xdata, region.mask_xdata_with_shape(src.xdata.data_shape[0:2]))
-# s = ea.make_signal_like(ea.extract_original_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
-# bg = ea.make_signal_like(ea.calculate_background_signal(pick, mapping.fit_interval, mapping.signal_interval), pick)
-# target.xdata = xd.vstack((pick, s - bg, bg))"""
-#         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "fit_interval", fit_region, "interval"))
-#         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping, "signal_interval", signal_region, "interval"))
-#         await document_controller.document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to scale display; so do this here. ugh.
-#         pick_display_specifier.display.view_to_intervals(pick_data_item.xdata, [elemental_mapping.fit_interval, elemental_mapping.signal_interval])
-#         document_controller.display_data_item(pick_display_specifier)
 
     return pick_data_item
 
@@ -228,12 +197,15 @@ def map_new_edge(document_controller, model_data_item, elemental_mapping):
     map_data_item.category = model_data_item.category
     document_model.append_data_item(map_data_item)
     display_specifier = DataItem.DisplaySpecifier.from_data_item(map_data_item)
-    script = "from nion.eels_analysis import eels_analysis as ea\ntarget.xdata = ea.map_background_subtracted_signal(src.xdata, mapping.electron_shell, mapping.fit_interval, mapping.signal_interval)"
+    script = """from nion.eels_analysis import eels_analysis as ea
+from nion.eels_analysis import PeriodicTable as pt
+electron_shell = pt.ElectronShell(mapping.get_property('atomic_number'), mapping.get_property('shell_number'), mapping.get_property('subshell_index'))
+target.xdata = ea.map_background_subtracted_signal(src.xdata, electron_shell, mapping.get_property('fit_interval'), mapping.get_property('signal_interval'))
+"""
     computation = document_model.create_computation(script)
     computation.label = "EELS Map"
-    computation.processing_id = "eels.map"
     computation.create_object("src", document_model.get_object_specifier(model_data_item), label="Source")
-    computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping), label="Mapping")
+    computation.create_object("mapping", document_model.get_object_specifier(elemental_mapping.data_structure), label="Mapping")
     document_model.set_data_item_computation(display_specifier.data_item, computation)
 
     document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map_data_item))
@@ -254,7 +226,6 @@ def build_multiprofile(document_controller, model_data_item):
                 multiprofile_data_item = DataItem.new_data_item()
                 multiprofile_computation = document_model.create_computation("")
                 multiprofile_computation.label = "EELS Multiprofile"
-                multiprofile_computation.processing_id = "eels.multiprofile"
             indexes.append(index)
             legend_labels.append(dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:])
             display = dependent_data_item.displays[0]
@@ -288,40 +259,55 @@ def build_multiprofile(document_controller, model_data_item):
 
 
 class ElementalMapping:
-    def __init__(self, electron_shell: PeriodicTable.ElectronShell=None, fit_interval=None, signal_interval=None):
-        self.uuid = uuid.uuid4()
+    def __init__(self, *, data_structure: DocumentModel.DataStructure=None, electron_shell: PeriodicTable.ElectronShell=None, fit_interval=None, signal_interval=None):
+        self.__data_structure = data_structure
         self.__fit_interval = fit_interval
         self.__signal_interval = signal_interval
         self.__electron_shell = electron_shell
-        self.property_changed_event = Event.Event()
+        if self.__data_structure:
+            self.read(self.__data_structure)
 
-    def close(self):
-        pass
+    @property
+    def data_structure(self) -> DocumentModel.DataStructure:
+        return self.__data_structure
 
-    def read_from_dict(self, properties):
-        self.uuid = uuid.UUID(properties["uuid"])
-        atomic_number = properties.get("atomic_number")
-        shell_number = properties.get("shell_number")
-        subshell_index = properties.get("subshell_index")
+    def read(self, data_structure: DocumentModel.DataStructure) -> None:
+        atomic_number = data_structure.get_property_value("atomic_number")
+        shell_number = data_structure.get_property_value("shell_number")
+        subshell_index = data_structure.get_property_value("subshell_index")
         self.__electron_shell = PeriodicTable.ElectronShell(atomic_number, shell_number, subshell_index)
-        self.__fit_interval = properties.get("fit_interval", (0.4, 0.5))
-        self.__signal_interval = properties.get("signal_interval", (0.5, 0.6))
+        self.__fit_interval = data_structure.get_property_value("fit_interval", (0.4, 0.5))
+        self.__signal_interval = data_structure.get_property_value("signal_interval", (0.5, 0.6))
 
-    def write_to_dict(self):
-        properties = dict()
-        properties["type"] = "elemental-mapping"
-        properties["uuid"] = str(self.uuid)
-        properties["atomic_number"] = self.__electron_shell.atomic_number
-        properties["shell_number"] = self.__electron_shell.shell_number
-        properties["subshell_index"] = self.__electron_shell.subshell_index
-        properties["fit_interval"] = copy.copy(self.__fit_interval)
-        properties["signal_interval"] = copy.copy(self.__signal_interval)
-        return properties
+    def write(self, data_structure: DocumentModel.DataStructure) -> None:
+        self.__write_electron_shell(data_structure)
+        self.__write_fit_interval(data_structure)
+        self.__write_signal_interval(data_structure)
 
-    def copy_from(self, other):
-        self.electron_shell = copy.deepcopy(other.electron_shell)
-        self.fit_interval = other.fit_interval
-        self.signal_interval = other.signal_interval
+    def matches(self, data_structure: DocumentModel.DataStructure) -> bool:
+        return self.__data_structure is not None and self.__data_structure.uuid == data_structure.uuid
+
+    def __write_electron_shell(self, data_structure):
+        if self.__electron_shell:
+            data_structure.set_property_value("atomic_number", self.__electron_shell.atomic_number)
+            data_structure.set_property_value("shell_number", self.__electron_shell.shell_number)
+            data_structure.set_property_value("subshell_index", self.__electron_shell.subshell_index)
+        else:
+            data_structure.remove_property_value("atomic_number")
+            data_structure.remove_property_value("shell_number")
+            data_structure.remove_property_value("subshell_index")
+
+    def __write_signal_interval(self, data_structure):
+        if self.__signal_interval is not None:
+            data_structure.set_property_value("signal_interval", copy.copy(self.__signal_interval))
+        else:
+            data_structure.remove_property_value("signal_interval")
+
+    def __write_fit_interval(self, data_structure):
+        if self.__fit_interval is not None:
+            data_structure.set_property_value("fit_interval", copy.copy(self.__fit_interval))
+        else:
+            data_structure.remove_property_value("fit_interval")
 
     @property
     def electron_shell(self):
@@ -331,7 +317,7 @@ class ElementalMapping:
     def electron_shell(self, value):
         if self.__electron_shell != value:
             self.__electron_shell = value
-            self.property_changed_event.fire("electron_shell")
+            self.__write_electron_shell(self.__data_structure)
 
     @property
     def fit_interval(self):
@@ -341,7 +327,7 @@ class ElementalMapping:
     def fit_interval(self, value):
         if self.__fit_interval != value:
             self.__fit_interval = value
-            self.property_changed_event.fire("fit_interval")
+            self.__write_fit_interval(self.__data_structure)
 
     @property
     def signal_interval(self):
@@ -351,12 +337,7 @@ class ElementalMapping:
     def signal_interval(self, value):
         if self.__signal_interval != value:
             self.__signal_interval = value
-            self.property_changed_event.fire("signal_interval")
-
-
-elemental_mapping_computation_variable_type = Symbolic.ComputationVariableType('elemental_mapping', "ElementalMapping", ElementalMapping)
-
-Symbolic.ComputationVariable.register_computation_variable_type(elemental_mapping_computation_variable_type)
+            self.__write_signal_interval(self.__data_structure)
 
 
 def is_explorer(data_item):
@@ -392,48 +373,24 @@ class ElementalMappingController:
     # only supports properties of elemental_mappings; no more complex structure allowed
 
     def __init__(self, document_model: DocumentModel.DocumentModel):
+        self.__document_model = document_model
 
         self.explore_interval_changed = Event.Event()
 
-        self.__elemental_mapping_property_changed_listeners = dict()  # typing.Dict[uuid.UUID, Any]
         self.__explore_property_changed_listeners = dict()  # typing.Dict[uuid.UUID, Any]
 
         self.__energy_intervals = dict()  # typing.Dict[uuid.UUID, typing.Tuple[float, float]]
 
         def item_inserted(key, value, before_index):
-            # when a data item is inserted, construct ElementalMapping objects from the metadata
-            # and store the element_mapping list on the data item.
             if key == "data_item":
                 data_item = value
-                if is_model(data_item):  # TODO: improve handling of metadata in derived items so as to not have to skip this
-                    elemental_mappings = list()
-                    metadata = data_item.metadata
-                    elemental_mapping_dicts = metadata.get("elemental_mappings", list())
-                    for elemental_mapping_dict in elemental_mapping_dicts:
-                        elemental_mapping = ElementalMapping()
-                        elemental_mapping.read_from_dict(elemental_mapping_dict)
-                        elemental_mappings.append(elemental_mapping)
-                        elemental_mapping_computation_variable_type.register_object(elemental_mapping)
-                        data_item.persistent_object_context.register(elemental_mapping)  # TODO: check this again
-                        self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid] = elemental_mapping.property_changed_event.listen(lambda k: self.__write_metadata(data_item))
-                    setattr(data_item, "elemental_mappings", elemental_mappings)
                 if is_explorer(data_item):
                     self.connect_explorer_interval(data_item)
 
         def item_removed(key, value, index):
             if key == "data_item":
                 data_item = value
-                if is_model(data_item):  # TODO: improve handling of metadata in derived items so as to not have to skip this
-                    for elemental_mapping in getattr(data_item, "elemental_mappings", list()):
-                        elemental_mapping.close()
-                        elemental_mapping_computation_variable_type.unregister_object(elemental_mapping)
-                        self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid].close()
-                        del self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid]
-                    delattr(value, "elemental_mappings")
-                listener = self.__explore_property_changed_listeners.get(data_item.uuid)
-                if listener:
-                    listener.close()
-                    del self.__explore_property_changed_listeners[data_item.uuid]
+                self.disconnect_explorer_interval(data_item)
 
         self.__item_inserted_listener = document_model.item_inserted_event.listen(item_inserted)
         self.__item_removed_listener = document_model.item_removed_event.listen(item_removed)
@@ -441,48 +398,30 @@ class ElementalMappingController:
         for index, data_item in enumerate(document_model.data_items):
             item_inserted("data_item", data_item, index)
 
-        document_model.rebind_computations()
-
-        document_model.update_computation_dependencies()
-
     def close(self):
         self.__item_inserted_listener.close()
         self.__item_inserted_listener = None
         self.__item_removed_listener.close()
         self.__item_removed_listener = None
 
-    def __write_metadata(self, data_item):
-        metadata = data_item.metadata
-        elemental_mapping_dicts = list()
-        for elemental_mapping in getattr(data_item, "elemental_mappings", list()):
-            elemental_mapping_dicts.append(elemental_mapping.write_to_dict())
-        metadata["elemental_mappings"] = elemental_mapping_dicts
-        data_item.metadata = metadata
-
     def get_elemental_mappings(self, data_item):
-        return getattr(data_item, "elemental_mappings", list())
+        elemental_mappings = list()
+        for data_structure in copy.copy(self.__document_model.data_structures):
+            if data_structure.source == data_item and data_structure.structure_type == "elemental_mapping":
+                elemental_mapping = ElementalMapping(data_structure=data_structure)
+                elemental_mappings.append(elemental_mapping)
+        return elemental_mappings
 
-    def add_elemental_mapping(self, data_item, elemental_mapping):
-        # add the elemental_mapping to the list on the data item.
-        # then update the metadata to reflect the new list.
-        elemental_mappings = self.get_elemental_mappings(data_item)
-        assert all(em.uuid != elemental_mapping.uuid for em in elemental_mappings)
-        elemental_mappings.append(elemental_mapping)
-        elemental_mapping_computation_variable_type.register_object(elemental_mapping)
-        self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid] = elemental_mapping.property_changed_event.listen(lambda k: self.__write_metadata(data_item))
-        data_item.persistent_object_context.register(elemental_mapping)  # TODO: check this again
-        self.__write_metadata(data_item)
+    def add_elemental_mapping(self, data_item, electron_shell, fit_interval, signal_interval):
+        data_structure = self.__document_model.create_data_structure(structure_type="elemental_mapping", source=data_item)
+        self.__document_model.append_data_structure(data_structure)
+        elemental_mapping = ElementalMapping(electron_shell=electron_shell, fit_interval=fit_interval, signal_interval=signal_interval)
+        elemental_mapping.write(data_structure)
 
-    def remove_elemental_mapping(self, data_item, elemental_mapping):
-        # remove element_mapping with matching uuid.
-        # then update the metadata to reflect the new list.
-        elemental_mappings = self.get_elemental_mappings(data_item)
-        assert any(em.uuid == elemental_mapping.uuid for em in elemental_mappings)
-        elemental_mappings.remove(elemental_mapping)
-        elemental_mapping_computation_variable_type.unregister_object(elemental_mapping)
-        self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid].close()
-        del self.__elemental_mapping_property_changed_listeners[elemental_mapping.uuid]
-        self.__write_metadata(data_item)
+    def remove_elemental_mapping(self, data_item, elemental_mapping: ElementalMapping) -> None:
+        for data_structure in copy.copy(self.__document_model.data_structures):
+            if data_structure.source == data_item and elemental_mapping.matches(data_structure):
+                self.__document_model.remove_data_structure(data_structure)
 
     def graphic_property_changed(self, graphic, data_item, dimensional_shape, dimensional_calibrations, key):
         if key == "interval":
@@ -506,6 +445,12 @@ class ElementalMappingController:
                     self.__explore_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, graphic, data_item, dimensional_shape, dimensional_calibrations))
                     self.graphic_property_changed(graphic, data_item, dimensional_shape, dimensional_calibrations, "interval")
 
+    def disconnect_explorer_interval(self, data_item):
+        listener = self.__explore_property_changed_listeners.get(data_item.uuid)
+        if listener:
+            listener.close()
+            del self.__explore_property_changed_listeners[data_item.uuid]
+
 
 async def change_elemental_mapping(event_loop, document_model, model_data_item, data_item, elemental_mapping):
     mapping_computation_variable = None
@@ -518,14 +463,14 @@ async def change_elemental_mapping(event_loop, document_model, model_data_item, 
             if computation_variable.name == "region":
                 pick_region_specifier = computation_variable.specifier
     if mapping_computation_variable:
-        mapping_computation_variable.specifier = document_model.get_object_specifier(elemental_mapping)
+        mapping_computation_variable.specifier = document_model.get_object_specifier(elemental_mapping.data_structure)
         for connection in copy.copy(data_item.connections):
             if connection.source_property in ("fit_interval", "signal_interval"):
                 source_property = connection.source_property
                 target_property = connection.target_property
                 target = connection._target
                 data_item.remove_connection(connection)
-                new_connection = Connection.PropertyConnection(elemental_mapping, source_property, target, target_property)
+                new_connection = Connection.PropertyConnection(elemental_mapping.data_structure, source_property, target, target_property)
                 data_item.add_connection(new_connection)
         if pick_region_specifier:
             pick_region_value = document_model.resolve_object_specifier(pick_region_specifier)
@@ -631,8 +576,7 @@ class ElementalMappingPanel(Panel.Panel):
                         signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[-1]
                         fit_interval = fit_region_start, fit_region_end
                         signal_interval = signal_region_start, signal_region_end
-                        elemental_mapping = ElementalMapping(electron_shell, fit_interval, signal_interval)
-                        self.__elemental_mapping_panel_controller.add_elemental_mapping(model_data_item, elemental_mapping)
+                        self.__elemental_mapping_panel_controller.add_elemental_mapping(model_data_item, electron_shell, fit_interval, signal_interval)
                         data_item_changed(model_data_item)
                         data_item_changed(data_item)
 
