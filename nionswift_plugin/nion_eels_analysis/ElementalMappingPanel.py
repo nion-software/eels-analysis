@@ -23,7 +23,7 @@ class ElementalMappingPanel(Panel.Panel):
 
         document_model = document_controller.document_model
 
-        self.__elemental_mapping_panel_controller = ElementalMappingController.ElementalMappingController(document_model)
+        self.__elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
 
         ui = document_controller.ui
 
@@ -73,9 +73,9 @@ class ElementalMappingPanel(Panel.Panel):
         explore_column.add(explore_row)
 
         def data_item_changed(data_item) -> None:
-            self.__elemental_mapping_panel_controller.set_current_data_item(data_item)
+            self.__elemental_mapping_controller.set_current_data_item(data_item)
             current_data_item = data_item
-            model_data_item = self.__elemental_mapping_panel_controller.model_data_item
+            model_data_item = self.__elemental_mapping_controller.model_data_item
             edge_column.remove_all()
             add_edge_column.remove_all()
             if self.__button_group:
@@ -83,12 +83,12 @@ class ElementalMappingPanel(Panel.Panel):
                 self.__button_group = None
             if model_data_item:
                 def explore_pressed():
-                    document_controller.event_loop.create_task(self.__elemental_mapping_panel_controller.explore_edges(document_controller))
+                    document_controller.event_loop.create_task(self.__elemental_mapping_controller.explore_edges(document_controller))
 
                 explore_button_widget.on_clicked = explore_pressed
-                multiprofile_button_widget.on_clicked = functools.partial(self.__elemental_mapping_panel_controller.build_multiprofile, document_controller)
+                multiprofile_button_widget.on_clicked = functools.partial(self.__elemental_mapping_controller.build_multiprofile, document_controller)
                 self.__button_group = ui.create_button_group()
-                for index, edge_bundle in enumerate(self.__elemental_mapping_panel_controller.build_edge_bundles(document_controller)):
+                for index, edge_bundle in enumerate(self.__elemental_mapping_controller.build_edge_bundles(document_controller)):
                     def delete_pressed():
                         edge_bundle.delete_action()
                         data_item_changed(current_data_item)  # TODO: this should be automatic
@@ -160,7 +160,7 @@ class ElementalMappingPanel(Panel.Panel):
                     add_edge_column.add(add_button_row)
 
                     def add_edge_current():
-                        self.__elemental_mapping_panel_controller.add_edge(model_data_item, edge_widget.current_item[0], data_item)
+                        self.__elemental_mapping_controller.add_edge(edge_widget.current_item[0])
                         data_item_changed(model_data_item)
                         data_item_changed(data_item)
 
@@ -187,13 +187,13 @@ class ElementalMappingPanel(Panel.Panel):
                 def update_add_buttons():
                     col1.remove_all()
                     col2.remove_all()
-                    explore_interval = self.__elemental_mapping_panel_controller.explorer_interval
+                    explore_interval = self.__elemental_mapping_controller.explorer_interval
                     if explore_interval is not None:
                         edges = PeriodicTable.PeriodicTable().find_edges_in_energy_interval(explore_interval)
                         for i, edge in enumerate(edges[0:4]):
                             button = ui.create_push_button_widget(edge.to_long_str())
                             def add_edge(model_data_item, edge, data_item):
-                                self.__elemental_mapping_panel_controller.add_edge(model_data_item, edge, data_item)
+                                self.__elemental_mapping_controller.add_edge(edge)
                                 data_item_changed(model_data_item)
                                 data_item_changed(data_item)
                             button.on_clicked = functools.partial(add_edge, model_data_item, edge, data_item)
@@ -228,9 +228,9 @@ class ElementalMappingPanel(Panel.Panel):
         self.__listener = None
         self.__target_data_item_stream.remove_ref()
         self.__target_data_item_stream = None
-        if self.__elemental_mapping_panel_controller:
-            self.__elemental_mapping_panel_controller.close()
-            self.__elemental_mapping_panel_controller = None
+        if self.__elemental_mapping_controller:
+            self.__elemental_mapping_controller.close()
+            self.__elemental_mapping_controller = None
         if self.__button_group:
             self.__button_group.close()
             self.__button_group = None

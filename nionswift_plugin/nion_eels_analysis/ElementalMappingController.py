@@ -3,6 +3,7 @@ import collections
 import copy
 import functools
 import gettext
+import typing
 
 # third party libraries
 import numpy
@@ -140,9 +141,10 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         composite_data_item.append_data_item(pick_data_item)
         composite_data_item.append_data_item(background_data_item)
         composite_data_item.append_data_item(subtracted_data_item)
+        composite_data_item.source = model_data_item
         pick_data_item.source = composite_data_item
         subtracted_data_item.source = composite_data_item
-        pick_data_item.source = composite_data_item
+        background_data_item.source = composite_data_item
         composite_display_specifier = DataItem.DisplaySpecifier.from_data_item(composite_data_item)
         composite_display_specifier.display.display_type = "line_plot"
         composite_display_specifier.display.dimensional_scales = (model_data_item.dimensional_shape[-1], )
@@ -291,12 +293,12 @@ class ElementalMappingController:
             if key == "data_item":
                 data_item = value
                 if self.__is_explorer(data_item):
-                    self.connect_explorer_interval(data_item)
+                    self.__connect_explorer_interval(data_item)
 
         def item_removed(key, value, index):
             if key == "data_item":
                 data_item = value
-                self.disconnect_explorer_interval(data_item)
+                self.__disconnect_explorer_interval(data_item)
 
         self.__item_inserted_listener = document_model.item_inserted_event.listen(item_inserted)
         self.__item_removed_listener = document_model.item_removed_event.listen(item_removed)
@@ -382,7 +384,7 @@ class ElementalMappingController:
             new_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
             document_controller.display_data_item(new_display_specifier)
             await self.__document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to make connect_explorer_interval work; so do this here. ugh.
-            self.connect_explorer_interval(pick_data_item)
+            self.__connect_explorer_interval(pick_data_item)
 
     def __get_edges(self, data_item):
         edges = list()
@@ -392,15 +394,16 @@ class ElementalMappingController:
                 edges.append(edge)
         return edges
 
-    def __add_edge(self, data_item, electron_shell, fit_interval, signal_interval):
+    def __add_edge(self, data_item, electron_shell, fit_interval, signal_interval) -> ElementalMappingEdge:
         data_structure = self.__document_model.create_data_structure(structure_type="elemental_mapping_edge", source=data_item)
         self.__document_model.append_data_structure(data_structure)
         edge = ElementalMappingEdge(electron_shell=electron_shell, fit_interval=fit_interval, signal_interval=signal_interval)
         edge.write(data_structure)
+        return ElementalMappingEdge(data_structure=data_structure)
 
-    def __remove_edge(self, data_item, edge: ElementalMappingEdge) -> None:
+    def __remove_edge(self, edge: ElementalMappingEdge) -> None:
         for data_structure in copy.copy(self.__document_model.data_structures):
-            if data_structure.source == data_item and edge.matches(data_structure):
+            if data_structure.source == self.__model_data_item and edge.matches(data_structure):
                 self.__document_model.remove_data_structure(data_structure)
 
     def graphic_property_changed(self, graphic, data_item, dimensional_shape, dimensional_calibrations, key):
@@ -413,7 +416,7 @@ class ElementalMappingController:
             self.__energy_intervals[data_item.uuid] = s, e
             self.__explorer_interval_changed(data_item, (s, e))
 
-    def connect_explorer_interval(self, data_item):
+    def __connect_explorer_interval(self, data_item):
         if data_item.is_data_1d:
             for graphic in data_item.displays[0].graphics:
                 if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
@@ -422,18 +425,19 @@ class ElementalMappingController:
                     self.__explorer_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, graphic, data_item, dimensional_shape, dimensional_calibrations))
                     self.graphic_property_changed(graphic, data_item, dimensional_shape, dimensional_calibrations, "interval")
 
-    def disconnect_explorer_interval(self, data_item):
+    def __disconnect_explorer_interval(self, data_item):
         listener = self.__explorer_property_changed_listeners.get(data_item.uuid)
         if listener:
             listener.close()
             del self.__explorer_property_changed_listeners[data_item.uuid]
 
-    def add_edge(self, model_data_item: DataItem.DataItem, electron_shell: PeriodicTable.ElectronShell, data_item: DataItem.DataItem) -> None:
+    def add_edge(self, electron_shell: PeriodicTable.ElectronShell) -> typing.Optional[ElementalMappingEdge]:
+        model_data_item = self.__model_data_item
         binding_energy_eV = PeriodicTable.PeriodicTable().nominal_binding_energy_ev(electron_shell)
         signal_interval_eV = binding_energy_eV, binding_energy_eV * 1.10
         fit_interval_eV = binding_energy_eV * 0.93, binding_energy_eV * 0.98
-        dimensional_shape = data_item.dimensional_shape
-        dimensional_calibrations = data_item.dimensional_calibrations
+        dimensional_shape = model_data_item.dimensional_shape
+        dimensional_calibrations = model_data_item.dimensional_calibrations
         if dimensional_shape is not None and dimensional_calibrations is not None and len(dimensional_calibrations) > 0:
             calibration = dimensional_calibrations[-1]
             if calibration.units == "eV":
@@ -443,7 +447,11 @@ class ElementalMappingController:
                 signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[-1]
                 fit_interval = fit_region_start, fit_region_end
                 signal_interval = signal_region_start, signal_region_end
-                self.__add_edge(model_data_item, electron_shell, fit_interval, signal_interval)
+                return self.__add_edge(model_data_item, electron_shell, fit_interval, signal_interval)
+        return None
+
+    def remove_edge(self, edge: ElementalMappingEdge) -> None:
+        self.__remove_edge(edge)
 
     def build_edge_bundles(self, document_controller):
         document_model = self.__document_model
@@ -467,7 +475,7 @@ class ElementalMappingController:
                 map_new_edge(document_controller, model_data_item, edge)
 
             def delete_edge_action(edge):
-                self.__remove_edge(model_data_item, edge)
+                self.__remove_edge(edge)
 
             edge_bundle = EdgeBundle(electron_shell_str=edge.electron_shell.to_long_str(),
                                      selected=edge.data_structure == edge_data_structure,
