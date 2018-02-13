@@ -162,6 +162,7 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
         await document_controller.document_model.recompute_immediate(document_controller.event_loop, subtracted_data_item)  # need the data to scale display; so do this here. ugh.
 
         composite_data_item = DataItem.CompositeLibraryItem()
+        composite_data_item.title = "{} Picked from {}".format(pick_region.label, model_data_item.title)
         composite_data_item.append_data_item(pick_data_item)
         composite_data_item.append_data_item(background_data_item)
         composite_data_item.append_data_item(subtracted_data_item)
@@ -375,9 +376,11 @@ class ElementalMappingController:
     def __init__(self, document_model: DocumentModel.DocumentModel):
         self.__document_model = document_model
 
-        self.explore_interval_changed = Event.Event()
+        self.__current_data_item = None
 
-        self.__explore_property_changed_listeners = dict()  # typing.Dict[uuid.UUID, Any]
+        self.__explorer_interval = None
+
+        self.__explorer_property_changed_listeners = dict()  # typing.Dict[uuid.UUID, Any]
 
         self.__energy_intervals = dict()  # typing.Dict[uuid.UUID, typing.Tuple[float, float]]
 
@@ -403,6 +406,26 @@ class ElementalMappingController:
         self.__item_inserted_listener = None
         self.__item_removed_listener.close()
         self.__item_removed_listener = None
+
+    def set_current_data_item(self, data_item):
+        """Set the current data item.
+
+        If the data item is an explorer, update the explorer interval, otherwise cleaar it.
+        """
+        self.__current_data_item = data_item
+
+        if is_explorer(data_item):
+            self.__explorer_interval = self.__energy_intervals.get(data_item.uuid)
+        else:
+            self.__explorer_interval = None
+
+    def __explorer_interval_changed(self, data_item, interval) -> None:
+        if data_item == self.__current_data_item:
+            self.__explorer_interval = interval
+
+    @property
+    def explorer_interval(self):
+        return self.__explorer_interval
 
     def get_elemental_mappings(self, data_item):
         elemental_mappings = list()
@@ -431,10 +454,7 @@ class ElementalMappingController:
             s = dimensional_calibrations[-1].convert_to_calibrated_value(ss)
             e = dimensional_calibrations[-1].convert_to_calibrated_value(ee)
             self.__energy_intervals[data_item.uuid] = s, e
-            self.explore_interval_changed.fire(data_item, (s, e))
-
-    def get_explorer_interval(self, data_item):
-        return self.__energy_intervals.get(data_item.uuid) if data_item else None
+            self.__explorer_interval_changed(data_item, (s, e))
 
     def connect_explorer_interval(self, data_item):
         if data_item.is_data_1d:
@@ -442,14 +462,31 @@ class ElementalMappingController:
                 if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
                     dimensional_shape = data_item.dimensional_shape
                     dimensional_calibrations = data_item.dimensional_calibrations
-                    self.__explore_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, graphic, data_item, dimensional_shape, dimensional_calibrations))
+                    self.__explorer_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, graphic, data_item, dimensional_shape, dimensional_calibrations))
                     self.graphic_property_changed(graphic, data_item, dimensional_shape, dimensional_calibrations, "interval")
 
     def disconnect_explorer_interval(self, data_item):
-        listener = self.__explore_property_changed_listeners.get(data_item.uuid)
+        listener = self.__explorer_property_changed_listeners.get(data_item.uuid)
         if listener:
             listener.close()
-            del self.__explore_property_changed_listeners[data_item.uuid]
+            del self.__explorer_property_changed_listeners[data_item.uuid]
+
+    def add_edge(self, model_data_item: DataItem.DataItem, electron_shell: PeriodicTable.ElectronShell, data_item: DataItem.DataItem) -> None:
+        binding_energy_eV = PeriodicTable.PeriodicTable().nominal_binding_energy_ev(electron_shell)
+        signal_interval_eV = binding_energy_eV, binding_energy_eV * 1.10
+        fit_interval_eV = binding_energy_eV * 0.93, binding_energy_eV * 0.98
+        dimensional_shape = data_item.dimensional_shape
+        dimensional_calibrations = data_item.dimensional_calibrations
+        if dimensional_shape is not None and dimensional_calibrations is not None and len(dimensional_calibrations) > 0:
+            calibration = dimensional_calibrations[-1]
+            if calibration.units == "eV":
+                fit_region_start = calibration.convert_from_calibrated_value(fit_interval_eV[0]) / dimensional_shape[-1]
+                fit_region_end = calibration.convert_from_calibrated_value(fit_interval_eV[1]) / dimensional_shape[-1]
+                signal_region_start = calibration.convert_from_calibrated_value(signal_interval_eV[0]) / dimensional_shape[-1]
+                signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[-1]
+                fit_interval = fit_region_start, fit_region_end
+                signal_interval = signal_region_start, signal_region_end
+                self.add_elemental_mapping(model_data_item, electron_shell, fit_interval, signal_interval)
 
 
 async def change_elemental_mapping(event_loop, document_model, model_data_item, data_item, elemental_mapping):
@@ -549,42 +586,12 @@ class ElementalMappingPanel(Panel.Panel):
 
         model_data_item_ref = [None]  # type: typing.List[DataItem]
         current_data_item_ref = [None]  # type: typing.List[DataItem]
-        explore_interval_ref = [None]  # type: typing.List[typing.Tuple[float, float]]
-
-        def explore_interval_changed(data_item, interval) -> None:
-            if data_item and data_item == current_data_item_ref[0] and interval is not None:
-                explore_interval_ref[0] = interval
-            else:
-                explore_interval_ref[0] = None
-
-        self.__explore_interval_changed_listener = self.__elemental_mapping_panel_controller.explore_interval_changed.listen(explore_interval_changed)
-
-        def add_edge(electron_shell: PeriodicTable.ElectronShell, data_item: DataItem.DataItem) -> None:
-            model_data_item = model_data_item_ref[0]
-            if model_data_item:
-                binding_energy_eV = PeriodicTable.PeriodicTable().nominal_binding_energy_ev(electron_shell)
-                signal_interval_eV = binding_energy_eV, binding_energy_eV * 1.10
-                fit_interval_eV = binding_energy_eV * 0.93, binding_energy_eV * 0.98
-                dimensional_shape = data_item.dimensional_shape
-                dimensional_calibrations = data_item.dimensional_calibrations
-                if dimensional_shape is not None and dimensional_calibrations is not None and len(dimensional_calibrations) > 0:
-                    calibration = dimensional_calibrations[-1]
-                    if calibration.units == "eV":
-                        fit_region_start = calibration.convert_from_calibrated_value(fit_interval_eV[0]) / dimensional_shape[-1]
-                        fit_region_end = calibration.convert_from_calibrated_value(fit_interval_eV[1]) / dimensional_shape[-1]
-                        signal_region_start = calibration.convert_from_calibrated_value(signal_interval_eV[0]) / dimensional_shape[-1]
-                        signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[-1]
-                        fit_interval = fit_region_start, fit_region_end
-                        signal_interval = signal_region_start, signal_region_end
-                        self.__elemental_mapping_panel_controller.add_elemental_mapping(model_data_item, electron_shell, fit_interval, signal_interval)
-                        data_item_changed(model_data_item)
-                        data_item_changed(data_item)
 
         def data_item_changed(data_item) -> None:
             current_data_item_ref[0] = data_item
             model_data_item = None
-            current_elemental_mapping = None
-            explore_interval_changed(data_item, self.__elemental_mapping_panel_controller.get_explorer_interval(data_item))
+            elemental_mapping_data_structure = None
+            self.__elemental_mapping_panel_controller.set_current_data_item(data_item)
             if is_model(data_item):
                 model_data_item = data_item
             else:
@@ -598,7 +605,7 @@ class ElementalMappingPanel(Panel.Panel):
                                 model_data_item = src_data_item
                         if computation_variable.name == "mapping":
                             current_elemental_mapping_value = document_model.resolve_object_specifier(computation_variable.specifier)
-                            current_elemental_mapping = current_elemental_mapping_value.value if current_elemental_mapping_value else None
+                            elemental_mapping_data_structure = current_elemental_mapping_value.value if current_elemental_mapping_value else None
             model_data_item_ref[0] = model_data_item
             elemental_mapping_column.remove_all()
             add_edge_column.remove_all()
@@ -625,7 +632,7 @@ class ElementalMappingPanel(Panel.Panel):
                     if not is_model(current_data_item_ref[0]):
                         radio_button = ui.create_radio_button_widget(text)
                         self.__button_group.add_button(radio_button, index)
-                        if elemental_mapping == current_elemental_mapping:
+                        if elemental_mapping.data_structure == elemental_mapping_data_structure:
                             radio_button.checked = True
                         def change_elemental_mapping_clicked(elemental_mapping):
                             document_controller.event_loop.create_task(change_elemental_mapping(document_controller.event_loop, document_model, model_data_item, current_data_item_ref[0], elemental_mapping))
@@ -698,7 +705,9 @@ class ElementalMappingPanel(Panel.Panel):
                     add_edge_column.add(add_button_row)
 
                     def add_edge_current():
-                        add_edge(edge_widget.current_item[0], data_item)
+                        self.__elemental_mapping_panel_controller.add_edge(current_data_item_ref[0], edge_widget.current_item[0], data_item)
+                        data_item_changed(current_data_item_ref[0])
+                        data_item_changed(data_item)
 
                     add_button_widget.on_clicked = add_edge_current
 
@@ -723,11 +732,16 @@ class ElementalMappingPanel(Panel.Panel):
                 def update_add_buttons():
                     col1.remove_all()
                     col2.remove_all()
-                    if explore_interval_ref[0] is not None:
-                        edges = PeriodicTable.PeriodicTable().find_edges_in_energy_interval(explore_interval_ref[0])
+                    explore_interval = self.__elemental_mapping_panel_controller.explorer_interval
+                    if explore_interval is not None:
+                        edges = PeriodicTable.PeriodicTable().find_edges_in_energy_interval(explore_interval)
                         for i, edge in enumerate(edges[0:4]):
                             button = ui.create_push_button_widget(edge.to_long_str())
-                            button.on_clicked = functools.partial(add_edge, edge, data_item)
+                            def add_edge(model_data_item, edge, data_item):
+                                self.__elemental_mapping_panel_controller.add_edge(model_data_item, edge, data_item)
+                                data_item_changed(model_data_item)
+                                data_item_changed(data_item)
+                            button.on_clicked = functools.partial(add_edge, model_data_item, edge, data_item)
                             col = col1 if i % 2 == 0 else col2
                             col.add(button)
                         col1.add_stretch()
@@ -759,10 +773,9 @@ class ElementalMappingPanel(Panel.Panel):
         self.__listener = None
         self.__target_data_item_stream.remove_ref()
         self.__target_data_item_stream = None
-        self.__elemental_mapping_panel_controller.close()
-        self.__elemental_mapping_panel_controller = None
-        self.__explore_interval_changed_listener.close()
-        self.__explore_interval_changed_listener = None
+        if self.__elemental_mapping_panel_controller:
+            self.__elemental_mapping_panel_controller.close()
+            self.__elemental_mapping_panel_controller = None
         if self.__button_group:
             self.__button_group.close()
             self.__button_group = None
