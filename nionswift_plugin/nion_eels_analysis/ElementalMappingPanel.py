@@ -31,7 +31,7 @@ class ElementalMappingPanel(Panel.Panel):
 
         column = ui.create_column_widget()
 
-        elemental_mapping_column = ui.create_column_widget()
+        edge_column = ui.create_column_widget()
 
         explore_column = ui.create_column_widget()
 
@@ -39,7 +39,7 @@ class ElementalMappingPanel(Panel.Panel):
 
         auto_edge_column = ui.create_column_widget()
 
-        column.add(elemental_mapping_column)
+        column.add(edge_column)
 
         column.add_spacing(12)
 
@@ -76,7 +76,7 @@ class ElementalMappingPanel(Panel.Panel):
             self.__elemental_mapping_panel_controller.set_current_data_item(data_item)
             current_data_item = data_item
             model_data_item = self.__elemental_mapping_panel_controller.model_data_item
-            elemental_mapping_column.remove_all()
+            edge_column.remove_all()
             add_edge_column.remove_all()
             if self.__button_group:
                 self.__button_group.close()
@@ -123,7 +123,7 @@ class ElementalMappingPanel(Panel.Panel):
                     row.add_stretch()
                     row.add(delete_button)
                     row.add_spacing(12)
-                    elemental_mapping_column.add(row)
+                    edge_column.add(row)
 
                 if model_data_item:
 
