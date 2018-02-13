@@ -1,10 +1,9 @@
 # standard libraries
+import collections
 import copy
 import functools
 import gettext
 import operator
-import typing
-import uuid
 
 # third party libraries
 import numpy
@@ -98,19 +97,6 @@ def processing_subtract_background_signal(document_controller):
     return None
 
 
-def explore_edges(document_controller, model_data_item):
-    pick_region = Graphics.RectangleGraphic()
-    pick_region.size = 16 / model_data_item.dimensional_shape[0], 16 / model_data_item.dimensional_shape[1]
-    pick_region.label = _("Explore")
-    model_data_item.displays[0].add_graphic(pick_region)
-    pick_data_item = document_controller.document_model.make_data_item_with_computation("eels.explore", [(model_data_item, None)], {"src": [pick_region]})
-    if pick_data_item:
-        new_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
-        document_controller.display_data_item(new_display_specifier)
-        return pick_data_item
-    return None
-
-
 async def pick_new_edge(document_controller, model_data_item, elemental_mapping) -> None:
     document_model = document_controller.document_model
     pick_region = Graphics.RectangleGraphic()
@@ -135,7 +121,7 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
         pick_display_specifier.display.add_graphic(signal_region)
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping.data_structure, "fit_interval", fit_region, "interval"))
         pick_data_item.add_connection(Connection.PropertyConnection(elemental_mapping.data_structure, "signal_interval", signal_region, "interval"))
-        await document_controller.document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to scale display; so do this here. ugh.
+        await document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to scale display; so do this here. ugh.
 
         background_data_item = DataItem.DataItem(numpy.zeros(1, ))
         background_data_item.title = "{} Background of {}".format(pick_region.label, model_data_item.title)
@@ -147,7 +133,7 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
         background_computation.create_object("pick", document_model.get_object_specifier(pick_data_item))
         document_model.append_data_item(background_data_item)
         document_model.set_data_item_computation(background_data_item, background_computation)
-        await document_controller.document_model.recompute_immediate(document_controller.event_loop, background_data_item)  # need the data to scale display; so do this here. ugh.
+        await document_model.recompute_immediate(document_controller.event_loop, background_data_item)  # need the data to scale display; so do this here. ugh.
 
         subtracted_data_item = DataItem.DataItem(numpy.zeros(1, ))
         subtracted_data_item.title = "{} Subtracted of {}".format(pick_region.label, model_data_item.title)
@@ -159,13 +145,16 @@ async def pick_new_edge(document_controller, model_data_item, elemental_mapping)
         subtracted_computation.create_object("pick", document_model.get_object_specifier(pick_data_item))
         document_model.append_data_item(subtracted_data_item)
         document_model.set_data_item_computation(subtracted_data_item, subtracted_computation)
-        await document_controller.document_model.recompute_immediate(document_controller.event_loop, subtracted_data_item)  # need the data to scale display; so do this here. ugh.
+        await document_model.recompute_immediate(document_controller.event_loop, subtracted_data_item)  # need the data to scale display; so do this here. ugh.
 
         composite_data_item = DataItem.CompositeLibraryItem()
-        composite_data_item.title = "{} Picked from {}".format(pick_region.label, model_data_item.title)
+        composite_data_item.title = "{} from {}".format(pick_region.label, model_data_item.title)
         composite_data_item.append_data_item(pick_data_item)
         composite_data_item.append_data_item(background_data_item)
         composite_data_item.append_data_item(subtracted_data_item)
+        pick_data_item.source = composite_data_item
+        subtracted_data_item.source = composite_data_item
+        pick_data_item.source = composite_data_item
         composite_display_specifier = DataItem.DisplaySpecifier.from_data_item(composite_data_item)
         composite_display_specifier.display.display_type = "line_plot"
         composite_display_specifier.display.dimensional_scales = (model_data_item.dimensional_shape[-1], )
@@ -212,51 +201,6 @@ target.xdata = ea.map_background_subtracted_signal(src.xdata, electron_shell, ma
     document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map_data_item))
 
     return map_data_item
-
-
-def build_multiprofile(document_controller, model_data_item):
-    document_model = document_controller.document_model
-    multiprofile_data_item = None
-    multiprofile_computation = None
-    indexes = list()
-    legend_labels = list()
-    line_profile_regions = list()
-    for index, dependent_data_item in enumerate(document_model.get_dependent_data_items(model_data_item)):
-        if is_calibrated_map(dependent_data_item):
-            if not multiprofile_data_item:
-                multiprofile_data_item = DataItem.new_data_item()
-                multiprofile_computation = document_model.create_computation("")
-                multiprofile_computation.label = "EELS Multiprofile"
-            indexes.append(index)
-            legend_labels.append(dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:])
-            display = dependent_data_item.displays[0]
-            line_profile_region = Graphics.LineProfileGraphic()
-            line_profile_region.start = 0.5, 0.2
-            line_profile_region.end = 0.5, 0.8
-            display.add_graphic(line_profile_region)
-            line_profile_regions.append(line_profile_region)
-            multiprofile_computation.create_object("src" + str(index), document_model.get_object_specifier(dependent_data_item), label="Src" + str(index))
-            multiprofile_computation.create_object("region" + str(index), document_model.get_object_specifier(line_profile_region), label="Region" + str(index))
-    if multiprofile_data_item:
-        script = "from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\nimport numpy\n"
-        for index in indexes:
-            script += "d{0} = xd.line_profile(src{0}.display_xdata, region{0}.vector, region{0}.line_width)\n".format(index)
-        profiles = ",".join(["d{0}".format(index) for index in indexes])
-        script += "mx=numpy.amax(xd.vstack([{}]).data)\n".format(profiles)
-        for index in indexes:
-            script += "d{0} /= mx\n".format(index)
-        script += "target.xdata = xd.vstack([{}])".format(profiles)
-        multiprofile_computation.expression = script
-        multiprofile_display_specifier = DataItem.DisplaySpecifier.from_data_item(multiprofile_data_item)
-        multiprofile_display_specifier.display.display_type = "line_plot"
-        multiprofile_display_specifier.display.legend_labels = legend_labels
-        document_model.append_data_item(multiprofile_data_item)
-        document_model.set_data_item_computation(multiprofile_data_item, multiprofile_computation)
-        for line_profile_region in line_profile_regions[1:]:
-            multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector"))
-            multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width"))
-        multiprofile_data_item.title = _("Profiles of ") + ", ".join(legend_labels)
-        document_controller.display_data_item(multiprofile_display_specifier)
 
 
 class ElementalMapping:
@@ -341,35 +285,6 @@ class ElementalMapping:
             self.__write_signal_interval(self.__data_structure)
 
 
-def is_explorer(data_item):
-    if isinstance(data_item, DataItem.DataItem):
-        if data_item.is_data_1d:
-            for graphic in data_item.displays[0].graphics:
-                if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
-                    return True
-    return False
-
-
-def is_model(data_item):
-    if isinstance(data_item, DataItem.DataItem):
-        return data_item.is_data_3d
-    return False
-
-
-def is_map(data_item):
-    if isinstance(data_item, DataItem.DataItem):
-        if data_item.is_data_2d:
-            return data_item.title.startswith("Map")
-    return False
-
-
-def is_calibrated_map(data_item):
-    if isinstance(data_item, DataItem.DataItem):
-        if data_item.is_data_2d:
-            return data_item.title.startswith("Map") and data_item.intensity_calibration.units.startswith("~")
-    return False
-
-
 class ElementalMappingController:
     # only supports properties of elemental_mappings; no more complex structure allowed
 
@@ -377,6 +292,8 @@ class ElementalMappingController:
         self.__document_model = document_model
 
         self.__current_data_item = None
+        self.__model_data_item = None
+        self.__elemental_mapping_data_structure = None
 
         self.__explorer_interval = None
 
@@ -387,7 +304,7 @@ class ElementalMappingController:
         def item_inserted(key, value, before_index):
             if key == "data_item":
                 data_item = value
-                if is_explorer(data_item):
+                if self.__is_explorer(data_item):
                     self.connect_explorer_interval(data_item)
 
         def item_removed(key, value, index):
@@ -414,10 +331,32 @@ class ElementalMappingController:
         """
         self.__current_data_item = data_item
 
-        if is_explorer(data_item):
+        if self.__is_explorer(data_item):
             self.__explorer_interval = self.__energy_intervals.get(data_item.uuid)
         else:
             self.__explorer_interval = None
+
+        self.__model_data_item = None
+        self.__elemental_mapping_data_structure = None
+
+        if self.__is_model(data_item):
+            self.__model_data_item = data_item
+        else:
+            computation = data_item.computation if data_item else None
+            if computation:
+                for computation_variable in computation.variables:
+                    if computation_variable.name == "src":
+                        src_data_item_value = self.__document_model.resolve_object_specifier(computation_variable.specifier)
+                        src_data_item = src_data_item_value.value.data_item if src_data_item_value else None
+                        if self.__is_model(src_data_item):
+                            self.__model_data_item = src_data_item
+                    if computation_variable.name == "mapping":
+                        current_elemental_mapping_value = self.__document_model.resolve_object_specifier(computation_variable.specifier)
+                        self.__elemental_mapping_data_structure = current_elemental_mapping_value.value if current_elemental_mapping_value else None
+
+    @property
+    def model_data_item(self):
+        return self.__model_data_item
 
     def __explorer_interval_changed(self, data_item, interval) -> None:
         if data_item == self.__current_data_item:
@@ -427,7 +366,39 @@ class ElementalMappingController:
     def explorer_interval(self):
         return self.__explorer_interval
 
-    def get_elemental_mappings(self, data_item):
+    def __is_model(self, data_item) -> bool:
+        if isinstance(data_item, DataItem.DataItem):
+            return data_item.is_data_3d
+        return False
+
+    def __is_explorer(self, data_item) -> bool:
+        if isinstance(data_item, DataItem.DataItem):
+            if data_item.is_data_1d:
+                for graphic in data_item.displays[0].graphics:
+                    if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
+                        return True
+        return False
+
+    def __is_calibrated_map(self, data_item) -> bool:
+        if isinstance(data_item, DataItem.DataItem):
+            if data_item.is_data_2d:
+                return data_item.title.startswith("Map") and data_item.intensity_calibration.units.startswith("~")
+        return False
+
+    async def explore_edges(self, document_controller):
+        model_data_item = self.__model_data_item
+        pick_region = Graphics.RectangleGraphic()
+        pick_region.size = 16 / model_data_item.dimensional_shape[0], 16 / model_data_item.dimensional_shape[1]
+        pick_region.label = _("Explore")
+        model_data_item.displays[0].add_graphic(pick_region)
+        pick_data_item = self.__document_model.make_data_item_with_computation("eels.explore", [(model_data_item, None)], {"src": [pick_region]})
+        if pick_data_item:
+            new_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
+            document_controller.display_data_item(new_display_specifier)
+            await self.__document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to make connect_explorer_interval work; so do this here. ugh.
+            self.connect_explorer_interval(pick_data_item)
+
+    def __get_elemental_mappings(self, data_item):
         elemental_mappings = list()
         for data_structure in copy.copy(self.__document_model.data_structures):
             if data_structure.source == data_item and data_structure.structure_type == "elemental_mapping":
@@ -488,44 +459,123 @@ class ElementalMappingController:
                 signal_interval = signal_region_start, signal_region_end
                 self.add_elemental_mapping(model_data_item, electron_shell, fit_interval, signal_interval)
 
+    def build_edge_bundles(self, document_controller):
+        document_model = self.__document_model
+        model_data_item = self.__model_data_item
+        current_data_item = self.__current_data_item
+        elemental_mapping_data_structure = self.__elemental_mapping_data_structure
 
-async def change_elemental_mapping(event_loop, document_model, model_data_item, data_item, elemental_mapping):
-    mapping_computation_variable = None
-    pick_region_specifier = None
-    computation = data_item.computation if data_item else None
-    if computation:
-        for computation_variable in computation.variables:
-            if computation_variable.name == "mapping":
-                mapping_computation_variable = computation_variable
-            if computation_variable.name == "region":
-                pick_region_specifier = computation_variable.specifier
-    if mapping_computation_variable:
-        mapping_computation_variable.specifier = document_model.get_object_specifier(elemental_mapping.data_structure)
-        for connection in copy.copy(data_item.connections):
-            if connection.source_property in ("fit_interval", "signal_interval"):
-                source_property = connection.source_property
-                target_property = connection.target_property
-                target = connection._target
-                data_item.remove_connection(connection)
-                new_connection = Connection.PropertyConnection(elemental_mapping.data_structure, source_property, target, target_property)
-                data_item.add_connection(new_connection)
-        if pick_region_specifier:
-            pick_region_value = document_model.resolve_object_specifier(pick_region_specifier)
-            if pick_region_value:
-                pick_region = pick_region_value.value
-                pick_region.label = "{} {}".format(_("Pick"), str(elemental_mapping.electron_shell))
-                data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
-        else:
-                data_item.title = "{} {} of {}".format(_("Map"), str(elemental_mapping.electron_shell), model_data_item.title)
-        document_model.rebind_computations()
-    display = data_item.displays[0]
-    if display.display_type == "line_plot":
-        intervals = list()
-        for graphic in display.graphics:
-            if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id in ("fit", "signal"):
-                intervals.append(graphic.interval)
-        await document_model.recompute_immediate(event_loop, data_item)  # need the data to scale display; so do this here. ugh.
-        display.view_to_intervals(data_item.xdata, intervals)
+        EdgeBundle = collections.namedtuple("EdgeBundle", ["electron_shell_str", "selected", "select_action", "pick_action", "map_action", "delete_action"])
+
+        edge_bundles = list()
+
+        for index, elemental_mapping in enumerate(self.__get_elemental_mappings(model_data_item)):
+
+            def change_edge_action(elemental_mapping):
+                document_controller.event_loop.create_task(self.__change_elemental_mapping(document_controller.event_loop, document_model, model_data_item, current_data_item, elemental_mapping))
+
+            def pick_edge_action(elemental_mapping):
+                document_controller.event_loop.create_task(pick_new_edge(document_controller, model_data_item, elemental_mapping))
+
+            def map_edge_action(elemental_mapping):
+                map_new_edge(document_controller, model_data_item, elemental_mapping)
+
+            def delete_edge_action(elemental_mapping):
+                self.remove_elemental_mapping(model_data_item, elemental_mapping)
+
+            edge_bundle = EdgeBundle(electron_shell_str=elemental_mapping.electron_shell.to_long_str(),
+                                     selected=elemental_mapping.data_structure == elemental_mapping_data_structure,
+                                     select_action=functools.partial(change_edge_action, elemental_mapping),
+                                     pick_action=functools.partial(pick_edge_action, elemental_mapping),
+                                     map_action=functools.partial(map_edge_action, elemental_mapping),
+                                     delete_action=functools.partial(delete_edge_action, elemental_mapping))
+
+            edge_bundles.append(edge_bundle)
+
+        return edge_bundles
+
+    async def __change_elemental_mapping(self, event_loop, document_model, model_data_item, data_item, elemental_mapping):
+        mapping_computation_variable = None
+        pick_region_specifier = None
+        computation = data_item.computation if data_item else None
+        if computation:
+            for computation_variable in computation.variables:
+                if computation_variable.name == "mapping":
+                    mapping_computation_variable = computation_variable
+                if computation_variable.name == "region":
+                    pick_region_specifier = computation_variable.specifier
+        if mapping_computation_variable:
+            mapping_computation_variable.specifier = document_model.get_object_specifier(elemental_mapping.data_structure)
+            for connection in copy.copy(data_item.connections):
+                if connection.source_property in ("fit_interval", "signal_interval"):
+                    source_property = connection.source_property
+                    target_property = connection.target_property
+                    target = connection._target
+                    data_item.remove_connection(connection)
+                    new_connection = Connection.PropertyConnection(elemental_mapping.data_structure, source_property, target, target_property)
+                    data_item.add_connection(new_connection)
+            if pick_region_specifier:
+                pick_region_value = document_model.resolve_object_specifier(pick_region_specifier)
+                if pick_region_value:
+                    pick_region = pick_region_value.value
+                    pick_region.label = "{} {}".format(_("Pick"), str(elemental_mapping.electron_shell))
+                    data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
+            else:
+                    data_item.title = "{} {} of {}".format(_("Map"), str(elemental_mapping.electron_shell), model_data_item.title)
+            document_model.rebind_computations()
+        display = data_item.displays[0]
+        if display.display_type == "line_plot":
+            intervals = list()
+            for graphic in display.graphics:
+                if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id in ("fit", "signal"):
+                    intervals.append(graphic.interval)
+            await document_model.recompute_immediate(event_loop, data_item)  # need the data to scale display; so do this here. ugh.
+            display.view_to_intervals(data_item.xdata, intervals)
+
+    def build_multiprofile(self, document_controller):
+        model_data_item = self.__model_data_item
+        document_model = self.__document_model
+        multiprofile_data_item = None
+        multiprofile_computation = None
+        indexes = list()
+        legend_labels = list()
+        line_profile_regions = list()
+        for index, dependent_data_item in enumerate(document_model.get_dependent_data_items(model_data_item)):
+            if self.__is_calibrated_map(dependent_data_item):
+                if not multiprofile_data_item:
+                    multiprofile_data_item = DataItem.new_data_item()
+                    multiprofile_computation = document_model.create_computation("")
+                    multiprofile_computation.label = "EELS Multiprofile"
+                indexes.append(index)
+                legend_labels.append(dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:])
+                display = dependent_data_item.displays[0]
+                line_profile_region = Graphics.LineProfileGraphic()
+                line_profile_region.start = 0.5, 0.2
+                line_profile_region.end = 0.5, 0.8
+                display.add_graphic(line_profile_region)
+                line_profile_regions.append(line_profile_region)
+                multiprofile_computation.create_object("src" + str(index), document_model.get_object_specifier(dependent_data_item), label="Src" + str(index))
+                multiprofile_computation.create_object("region" + str(index), document_model.get_object_specifier(line_profile_region), label="Region" + str(index))
+        if multiprofile_data_item:
+            script = "from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\nimport numpy\n"
+            for index in indexes:
+                script += "d{0} = xd.line_profile(src{0}.display_xdata, region{0}.vector, region{0}.line_width)\n".format(index)
+            profiles = ",".join(["d{0}".format(index) for index in indexes])
+            script += "mx=numpy.amax(xd.vstack([{}]).data)\n".format(profiles)
+            for index in indexes:
+                script += "d{0} /= mx\n".format(index)
+            script += "target.xdata = xd.vstack([{}])".format(profiles)
+            multiprofile_computation.expression = script
+            multiprofile_display_specifier = DataItem.DisplaySpecifier.from_data_item(multiprofile_data_item)
+            multiprofile_display_specifier.display.display_type = "line_plot"
+            multiprofile_display_specifier.display.legend_labels = legend_labels
+            document_model.append_data_item(multiprofile_data_item)
+            document_model.set_data_item_computation(multiprofile_data_item, multiprofile_computation)
+            for line_profile_region in line_profile_regions[1:]:
+                multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector"))
+                multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width"))
+            multiprofile_data_item.title = _("Profiles of ") + ", ".join(legend_labels)
+            document_controller.display_data_item(multiprofile_display_specifier)
 
 
 class ElementalMappingPanel(Panel.Panel):
@@ -584,29 +634,10 @@ class ElementalMappingPanel(Panel.Panel):
 
         explore_column.add(explore_row)
 
-        model_data_item_ref = [None]  # type: typing.List[DataItem]
-        current_data_item_ref = [None]  # type: typing.List[DataItem]
-
         def data_item_changed(data_item) -> None:
-            current_data_item_ref[0] = data_item
-            model_data_item = None
-            elemental_mapping_data_structure = None
             self.__elemental_mapping_panel_controller.set_current_data_item(data_item)
-            if is_model(data_item):
-                model_data_item = data_item
-            else:
-                computation = data_item.computation if data_item else None
-                if computation:
-                    for computation_variable in computation.variables:
-                        if computation_variable.name == "src":
-                            src_data_item_value = document_model.resolve_object_specifier(computation_variable.specifier)
-                            src_data_item = src_data_item_value.value.data_item if src_data_item_value else None
-                            if is_model(src_data_item):
-                                model_data_item = src_data_item
-                        if computation_variable.name == "mapping":
-                            current_elemental_mapping_value = document_model.resolve_object_specifier(computation_variable.specifier)
-                            elemental_mapping_data_structure = current_elemental_mapping_value.value if current_elemental_mapping_value else None
-            model_data_item_ref[0] = model_data_item
+            current_data_item = data_item
+            model_data_item = self.__elemental_mapping_panel_controller.model_data_item
             elemental_mapping_column.remove_all()
             add_edge_column.remove_all()
             if self.__button_group:
@@ -614,53 +645,39 @@ class ElementalMappingPanel(Panel.Panel):
                 self.__button_group = None
             if model_data_item:
                 def explore_pressed():
-                    async def explore():
-                        explore_data_item = explore_edges(document_controller, model_data_item)
-                        await document_model.recompute_immediate(document_controller.event_loop, explore_data_item)  # need the data to make connect_explorer_interval work; so do this here. ugh.
-                        self.__elemental_mapping_panel_controller.connect_explorer_interval(explore_data_item)
-                    document_controller.event_loop.create_task(explore())
+                    document_controller.event_loop.create_task(self.__elemental_mapping_panel_controller.explore_edges(document_controller))
 
                 explore_button_widget.on_clicked = explore_pressed
-                multiprofile_button_widget.on_clicked = functools.partial(build_multiprofile, document_controller, model_data_item)
+                multiprofile_button_widget.on_clicked = functools.partial(self.__elemental_mapping_panel_controller.build_multiprofile, document_controller)
                 self.__button_group = ui.create_button_group()
-                for index, elemental_mapping in enumerate(self.__elemental_mapping_panel_controller.get_elemental_mappings(model_data_item)):
+                for index, edge_bundle in enumerate(self.__elemental_mapping_panel_controller.build_edge_bundles(document_controller)):
+                    def delete_pressed():
+                        edge_bundle.delete_action()
+                        data_item_changed(current_data_item)  # TODO: this should be automatic
+
                     row = ui.create_row_widget()
                     radio_button = None
                     label = None
-                    electron_shell = elemental_mapping.electron_shell
-                    text = electron_shell.to_long_str()
-                    if not is_model(current_data_item_ref[0]):
-                        radio_button = ui.create_radio_button_widget(text)
+                    if current_data_item != model_data_item:
+                        radio_button = ui.create_radio_button_widget(edge_bundle.electron_shell_str)
                         self.__button_group.add_button(radio_button, index)
-                        if elemental_mapping.data_structure == elemental_mapping_data_structure:
-                            radio_button.checked = True
-                        def change_elemental_mapping_clicked(elemental_mapping):
-                            document_controller.event_loop.create_task(change_elemental_mapping(document_controller.event_loop, document_model, model_data_item, current_data_item_ref[0], elemental_mapping))
-                        radio_button.on_clicked = functools.partial(change_elemental_mapping_clicked, elemental_mapping)  # elemental_mapping is in the loop
+                        radio_button.checked = edge_bundle.selected
+                        radio_button.on_clicked = edge_bundle.select_action
                     else:
-                        label = ui.create_label_widget(text)
+                        label = ui.create_label_widget(edge_bundle.electron_shell_str)
                     delete_button = ui.create_push_button_widget(_("Delete"))
                     pick_button = ui.create_push_button_widget(_("Pick"))
                     map_button = ui.create_push_button_widget(_("Map"))
-                    def pick_pressed(elemental_mapping):
-                        if current_data_item_ref[0] == model_data_item:
-                            document_controller.event_loop.create_task(pick_new_edge(document_controller, model_data_item, elemental_mapping))
-                    def map_pressed(elemental_mapping):
-                        if current_data_item_ref[0] == model_data_item:
-                            map_new_edge(document_controller, model_data_item, elemental_mapping)
-                    def delete_pressed(elemental_mapping):
-                        self.__elemental_mapping_panel_controller.remove_elemental_mapping(model_data_item, elemental_mapping)
-                        data_item_changed(current_data_item_ref[0])  # TODO: this should be automatic
-                    delete_button.on_clicked = functools.partial(delete_pressed, elemental_mapping)
-                    pick_button.on_clicked = functools.partial(pick_pressed, elemental_mapping)
-                    map_button.on_clicked = functools.partial(map_pressed, elemental_mapping)
+                    delete_button.on_clicked = delete_pressed
+                    pick_button.on_clicked = edge_bundle.pick_action
+                    map_button.on_clicked = edge_bundle.map_action
                     row.add_spacing(20)
                     if radio_button:
                         row.add(radio_button)
                         row.add_spacing(4)
                     elif label:
                         row.add(label)
-                    if is_model(current_data_item_ref[0]):
+                    if model_data_item:
                         row.add_spacing(12)
                         row.add(pick_button)
                         row.add_spacing(12)
@@ -670,7 +687,7 @@ class ElementalMappingPanel(Panel.Panel):
                     row.add_spacing(12)
                     elemental_mapping_column.add(row)
 
-                if is_model(current_data_item_ref[0]):
+                if model_data_item:
 
                     atomic_number_widget = ui.create_combo_box_widget(items=PeriodicTable.PeriodicTable().get_elements_list(), item_getter=operator.itemgetter(1))
 
@@ -705,8 +722,8 @@ class ElementalMappingPanel(Panel.Panel):
                     add_edge_column.add(add_button_row)
 
                     def add_edge_current():
-                        self.__elemental_mapping_panel_controller.add_edge(current_data_item_ref[0], edge_widget.current_item[0], data_item)
-                        data_item_changed(current_data_item_ref[0])
+                        self.__elemental_mapping_panel_controller.add_edge(model_data_item, edge_widget.current_item[0], data_item)
+                        data_item_changed(model_data_item)
                         data_item_changed(data_item)
 
                     add_button_widget.on_clicked = add_edge_current
@@ -748,7 +765,7 @@ class ElementalMappingPanel(Panel.Panel):
                         col2.add_stretch()
 
                 refresh_widget = ui.create_push_button_widget("\u21BB")
-                refresh_widget.on_clicked = lambda: data_item_changed(current_data_item_ref[0])  # TODO: re-layout in Qt is awful
+                refresh_widget.on_clicked = lambda: data_item_changed(current_data_item)  # TODO: re-layout in Qt is awful
 
                 update_add_buttons()
 
