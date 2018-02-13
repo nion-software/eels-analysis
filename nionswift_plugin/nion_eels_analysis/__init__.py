@@ -1,2 +1,1 @@
-from . import UI
-from . import LiveZLP
+from . import ElementalMappingPanel
