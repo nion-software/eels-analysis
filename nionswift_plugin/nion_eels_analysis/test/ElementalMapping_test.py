@@ -73,6 +73,7 @@ class TestElementalMappingController(unittest.TestCase):
             document_controller.periodic()  # finish tasks
             explorer_data_item = document_model.data_items[1]
             elemental_mapping_controller.set_current_data_item(explorer_data_item)
+            self.assertIsNotNone(elemental_mapping_controller.model_data_item)
             energy_calibration = explorer_data_item.dimensional_calibrations[-1]
             explorer_data_item.displays[0].graphics[-1].interval = energy_calibration.convert_from_calibrated_value(1200) / 1024, energy_calibration.convert_from_calibrated_value(1226) / 1024
             document_controller.periodic()  # update explorer interval
@@ -123,7 +124,7 @@ class TestElementalMappingController(unittest.TestCase):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
-            si_edge = elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
             edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
             edge_bundle[0].pick_action()
             self.__run_until_complete(document_controller)
@@ -136,3 +137,41 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(composite_data_item, data_item.source)
             self.assertEqual(composite_data_item, background_data_item.source)
             self.assertEqual(composite_data_item, subtracted_data_item.source)
+            self.assertEqual(composite_data_item, document_model.data_structures[1].source)
+            self.assertEqual("elemental_mapping_edge_ref", document_model.data_structures[1].structure_type)
+            self.assertEqual(document_model.data_structures[0], document_model.data_structures[1].get_referenced_object("edge"))
+
+    def test_controller_has_proper_edge_bundles_when_explorer_selected(self):
+        document_model = DocumentModel.DocumentModel()
+        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
+        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+            model_data_item = self.__create_spectrum_image()
+            document_model.append_data_item(model_data_item)
+            elemental_mapping_controller.set_current_data_item(model_data_item)
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
+            document_controller.event_loop.create_task(elemental_mapping_controller.explore_edges(document_controller))
+            self.__run_until_complete(document_controller)
+            explorer_data_item = document_model.data_items[1]
+            elemental_mapping_controller.set_current_data_item(explorer_data_item)
+            self.assertIsNotNone(elemental_mapping_controller.model_data_item)
+            edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
+            self.assertEqual(1, len(edge_bundle))
+
+    def test_selecting_composite_updates_edge_value(self):
+        document_model = DocumentModel.DocumentModel()
+        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
+        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+            model_data_item = self.__create_spectrum_image()
+            document_model.append_data_item(model_data_item)
+            elemental_mapping_controller.set_current_data_item(model_data_item)
+            si_edge = elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
+            edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
+            edge_bundle[0].pick_action()
+            self.__run_until_complete(document_controller)
+            self.assertIsNone(elemental_mapping_controller.edge)
+            composite_data_item = document_model.data_items[4]
+            elemental_mapping_controller.set_current_data_item(composite_data_item)
+            self.assertEqual(model_data_item, elemental_mapping_controller.model_data_item)
+            self.assertEqual(si_edge.data_structure, elemental_mapping_controller.edge.data_structure)

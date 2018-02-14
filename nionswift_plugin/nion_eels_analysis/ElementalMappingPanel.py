@@ -76,6 +76,7 @@ class ElementalMappingPanel(Panel.Panel):
             self.__elemental_mapping_controller.set_current_data_item(data_item)
             current_data_item = data_item
             model_data_item = self.__elemental_mapping_controller.model_data_item
+            edge = self.__elemental_mapping_controller.edge
             edge_column.remove_all()
             add_edge_column.remove_all()
             if self.__button_group:
@@ -96,7 +97,7 @@ class ElementalMappingPanel(Panel.Panel):
                     row = ui.create_row_widget()
                     radio_button = None
                     label = None
-                    if current_data_item != model_data_item:
+                    if edge:
                         radio_button = ui.create_radio_button_widget(edge_bundle.electron_shell_str)
                         self.__button_group.add_button(radio_button, index)
                         radio_button.checked = edge_bundle.selected
@@ -115,61 +116,58 @@ class ElementalMappingPanel(Panel.Panel):
                         row.add_spacing(4)
                     elif label:
                         row.add(label)
-                    if model_data_item:
-                        row.add_spacing(12)
-                        row.add(pick_button)
-                        row.add_spacing(12)
-                        row.add(map_button)
+                    row.add_spacing(12)
+                    row.add(pick_button)
+                    row.add_spacing(12)
+                    row.add(map_button)
                     row.add_stretch()
                     row.add(delete_button)
                     row.add_spacing(12)
                     edge_column.add(row)
 
-                if model_data_item:
+                atomic_number_widget = ui.create_combo_box_widget(items=PeriodicTable.PeriodicTable().get_elements_list(), item_getter=operator.itemgetter(1))
 
-                    atomic_number_widget = ui.create_combo_box_widget(items=PeriodicTable.PeriodicTable().get_elements_list(), item_getter=operator.itemgetter(1))
+                edge_widget = ui.create_combo_box_widget(items=PeriodicTable.PeriodicTable().get_edges_list(1), item_getter=operator.itemgetter(1))
 
-                    edge_widget = ui.create_combo_box_widget(items=PeriodicTable.PeriodicTable().get_edges_list(1), item_getter=operator.itemgetter(1))
+                add_button_widget = ui.create_push_button_widget(_("Add Edge"))
 
-                    add_button_widget = ui.create_push_button_widget(_("Add Edge"))
+                atomic_number_row = ui.create_row_widget()
+                atomic_number_row.add_spacing(20)
+                atomic_number_row.add(ui.create_label_widget(_("Element")))
+                atomic_number_row.add_spacing(8)
+                atomic_number_row.add(atomic_number_widget)
+                atomic_number_row.add_spacing(8)
+                atomic_number_row.add_stretch()
 
-                    atomic_number_row = ui.create_row_widget()
-                    atomic_number_row.add_spacing(20)
-                    atomic_number_row.add(ui.create_label_widget(_("Element")))
-                    atomic_number_row.add_spacing(8)
-                    atomic_number_row.add(atomic_number_widget)
-                    atomic_number_row.add_spacing(8)
-                    atomic_number_row.add_stretch()
+                edge_row = ui.create_row_widget()
+                edge_row.add_spacing(20)
+                edge_row.add(ui.create_label_widget(_("Edge")))
+                edge_row.add_spacing(8)
+                edge_row.add(edge_widget)
+                edge_row.add_spacing(8)
+                edge_row.add_stretch()
 
-                    edge_row = ui.create_row_widget()
-                    edge_row.add_spacing(20)
-                    edge_row.add(ui.create_label_widget(_("Edge")))
-                    edge_row.add_spacing(8)
-                    edge_row.add(edge_widget)
-                    edge_row.add_spacing(8)
-                    edge_row.add_stretch()
+                add_button_row = ui.create_row_widget()
+                add_button_row.add_spacing(20)
+                add_button_row.add(add_button_widget)
+                add_button_row.add_spacing(8)
+                add_button_row.add_stretch()
 
-                    add_button_row = ui.create_row_widget()
-                    add_button_row.add_spacing(20)
-                    add_button_row.add(add_button_widget)
-                    add_button_row.add_spacing(8)
-                    add_button_row.add_stretch()
+                add_edge_column.add(atomic_number_row)
+                add_edge_column.add(edge_row)
+                add_edge_column.add(add_button_row)
 
-                    add_edge_column.add(atomic_number_row)
-                    add_edge_column.add(edge_row)
-                    add_edge_column.add(add_button_row)
+                def add_edge_current():
+                    self.__elemental_mapping_controller.add_edge(edge_widget.current_item[0])
+                    data_item_changed(model_data_item)
+                    data_item_changed(data_item)
 
-                    def add_edge_current():
-                        self.__elemental_mapping_controller.add_edge(edge_widget.current_item[0])
-                        data_item_changed(model_data_item)
-                        data_item_changed(data_item)
+                add_button_widget.on_clicked = add_edge_current
 
-                    add_button_widget.on_clicked = add_edge_current
+                def atomic_number_changed(item):
+                    edge_widget.items = PeriodicTable.PeriodicTable().get_edges_list(item[0])
 
-                    def atomic_number_changed(item):
-                        edge_widget.items = PeriodicTable.PeriodicTable().get_edges_list(item[0])
-
-                    atomic_number_widget.on_current_item_changed = atomic_number_changed
+                atomic_number_widget.on_current_item_changed = atomic_number_changed
 
                 add_row = ui.create_row_widget()
 
@@ -219,15 +217,12 @@ class ElementalMappingPanel(Panel.Panel):
 
                 add_edge_column.add(add_row)
 
-        self.__target_data_item_stream = HistogramPanel.TargetDataItemStream(document_controller).add_ref()
-        self.__listener = self.__target_data_item_stream.value_stream.listen(data_item_changed)
-        data_item_changed(self.__target_data_item_stream.value)
+        self.__focused_data_item_changed_event_listener = document_controller.focused_library_item_changed_event.listen(data_item_changed)
+        data_item_changed(document_controller.selected_display_specifier.library_item)
 
     def close(self):
-        self.__listener.close()
-        self.__listener = None
-        self.__target_data_item_stream.remove_ref()
-        self.__target_data_item_stream = None
+        self.__focused_data_item_changed_event_listener.close()
+        self.__focused_data_item_changed_event_listener = None
         if self.__elemental_mapping_controller:
             self.__elemental_mapping_controller.close()
             self.__elemental_mapping_controller = None

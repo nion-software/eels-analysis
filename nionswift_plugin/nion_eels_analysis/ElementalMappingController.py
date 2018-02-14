@@ -166,6 +166,10 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         composite_display_specifier.display.view_to_intervals(pick_data_item.xdata, [edge.fit_interval, edge.signal_interval])
         document_controller.display_data_item(composite_display_specifier)
 
+        data_structure = document_model.create_data_structure(structure_type="elemental_mapping_edge_ref", source=composite_data_item)
+        data_structure.set_referenced_object("edge", edge.data_structure)
+        document_model.append_data_structure(data_structure)
+
     return pick_data_item
 
 
@@ -319,7 +323,8 @@ class ElementalMappingController:
         """
         self.__current_data_item = data_item
 
-        if self.__is_explorer(data_item):
+        is_explorer = self.__is_explorer(data_item)
+        if is_explorer:
             self.__explorer_interval = self.__energy_intervals.get(data_item.uuid)
         else:
             self.__explorer_interval = None
@@ -329,22 +334,21 @@ class ElementalMappingController:
 
         if self.__is_model(data_item):
             self.__model_data_item = data_item
-        else:
-            computation = data_item.computation if data_item else None
-            if computation:
-                for computation_variable in computation.variables:
-                    if computation_variable.name == "src":
-                        src_data_item_value = self.__document_model.resolve_object_specifier(computation_variable.specifier)
-                        src_data_item = src_data_item_value.value.data_item if src_data_item_value else None
-                        if self.__is_model(src_data_item):
-                            self.__model_data_item = src_data_item
-                    if computation_variable.name == "mapping":
-                        current_edge_value = self.__document_model.resolve_object_specifier(computation_variable.specifier)
-                        self.__edge_data_structure = current_edge_value.value if current_edge_value else None
+        elif data_item:
+            for data_structure in copy.copy(self.__document_model.data_structures):
+                if data_structure.source == data_item and data_structure.structure_type == "elemental_mapping_edge_ref":
+                    self.__edge_data_structure = data_structure.get_referenced_object("edge")
+                    self.__model_data_item = data_item.source
+            if is_explorer:
+                self.__model_data_item = data_item.source
 
     @property
     def model_data_item(self):
         return self.__model_data_item
+
+    @property
+    def edge(self):
+        return ElementalMappingEdge(data_structure=self.__edge_data_structure) if self.__edge_data_structure else None
 
     def __explorer_interval_changed(self, data_item, interval) -> None:
         if data_item == self.__current_data_item:
@@ -381,18 +385,11 @@ class ElementalMappingController:
         model_data_item.displays[0].add_graphic(pick_region)
         pick_data_item = self.__document_model.make_data_item_with_computation("eels.explore", [(model_data_item, None)], {"src": [pick_region]})
         if pick_data_item:
+            pick_data_item.source = model_data_item
             new_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
             document_controller.display_data_item(new_display_specifier)
             await self.__document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to make connect_explorer_interval work; so do this here. ugh.
             self.__connect_explorer_interval(pick_data_item)
-
-    def __get_edges(self, data_item):
-        edges = list()
-        for data_structure in copy.copy(self.__document_model.data_structures):
-            if data_structure.source == data_item and data_structure.structure_type == "elemental_mapping_edge":
-                edge = ElementalMappingEdge(data_structure=data_structure)
-                edges.append(edge)
-        return edges
 
     def __add_edge(self, data_item, electron_shell, fit_interval, signal_interval) -> ElementalMappingEdge:
         data_structure = self.__document_model.create_data_structure(structure_type="elemental_mapping_edge", source=data_item)
@@ -433,21 +430,22 @@ class ElementalMappingController:
 
     def add_edge(self, electron_shell: PeriodicTable.ElectronShell) -> typing.Optional[ElementalMappingEdge]:
         model_data_item = self.__model_data_item
-        binding_energy_eV = PeriodicTable.PeriodicTable().nominal_binding_energy_ev(electron_shell)
-        signal_interval_eV = binding_energy_eV, binding_energy_eV * 1.10
-        fit_interval_eV = binding_energy_eV * 0.93, binding_energy_eV * 0.98
-        dimensional_shape = model_data_item.dimensional_shape
-        dimensional_calibrations = model_data_item.dimensional_calibrations
-        if dimensional_shape is not None and dimensional_calibrations is not None and len(dimensional_calibrations) > 0:
-            calibration = dimensional_calibrations[-1]
-            if calibration.units == "eV":
-                fit_region_start = calibration.convert_from_calibrated_value(fit_interval_eV[0]) / dimensional_shape[-1]
-                fit_region_end = calibration.convert_from_calibrated_value(fit_interval_eV[1]) / dimensional_shape[-1]
-                signal_region_start = calibration.convert_from_calibrated_value(signal_interval_eV[0]) / dimensional_shape[-1]
-                signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[-1]
-                fit_interval = fit_region_start, fit_region_end
-                signal_interval = signal_region_start, signal_region_end
-                return self.__add_edge(model_data_item, electron_shell, fit_interval, signal_interval)
+        if model_data_item:
+            binding_energy_eV = PeriodicTable.PeriodicTable().nominal_binding_energy_ev(electron_shell)
+            signal_interval_eV = binding_energy_eV, binding_energy_eV * 1.10
+            fit_interval_eV = binding_energy_eV * 0.93, binding_energy_eV * 0.98
+            dimensional_shape = model_data_item.dimensional_shape
+            dimensional_calibrations = model_data_item.dimensional_calibrations
+            if dimensional_shape is not None and dimensional_calibrations is not None and len(dimensional_calibrations) > 0:
+                calibration = dimensional_calibrations[-1]
+                if calibration.units == "eV":
+                    fit_region_start = calibration.convert_from_calibrated_value(fit_interval_eV[0]) / dimensional_shape[-1]
+                    fit_region_end = calibration.convert_from_calibrated_value(fit_interval_eV[1]) / dimensional_shape[-1]
+                    signal_region_start = calibration.convert_from_calibrated_value(signal_interval_eV[0]) / dimensional_shape[-1]
+                    signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[-1]
+                    fit_interval = fit_region_start, fit_region_end
+                    signal_interval = signal_region_start, signal_region_end
+                    return self.__add_edge(model_data_item, electron_shell, fit_interval, signal_interval)
         return None
 
     def remove_edge(self, edge: ElementalMappingEdge) -> None:
@@ -463,7 +461,13 @@ class ElementalMappingController:
 
         edge_bundles = list()
 
-        for index, edge in enumerate(self.__get_edges(model_data_item)):
+        edges = list()
+        for data_structure in copy.copy(document_model.data_structures):
+            if data_structure.source == model_data_item and data_structure.structure_type == "elemental_mapping_edge":
+                edge = ElementalMappingEdge(data_structure=data_structure)
+                edges.append(edge)
+
+        for index, edge in enumerate(edges):
 
             def change_edge_action(edge):
                 document_controller.event_loop.create_task(self.__change_edge(document_controller.event_loop, document_model, model_data_item, current_data_item, edge))
