@@ -9,6 +9,7 @@ import typing
 import numpy
 
 # local libraries
+from nion.swift import DocumentController
 from nion.swift.model import Connection
 from nion.swift.model import DataItem
 from nion.swift.model import DocumentModel
@@ -102,6 +103,21 @@ class EELSBackgroundSubtraction:
 
 
 async def pick_new_edge(document_controller, model_data_item, edge) -> None:
+    """Set up a new edge pick from the model data item and the given edge.
+
+    The library will have the following new components and connections:
+        - a pick region on the model data item
+        - a pick data item with a fit/signal connected to the edge data structure
+        - a background subtraction computation with model data item, and edge intervals as inputs
+        - a background data item, computed by the background subtraction computation
+        - a subtracted data item, computed by the background subtraction computation
+        - a composite line plot with pick, background, and subtracted data items as components
+        - the composite line plot has fit/signal regions connected to edge data structure
+        - the composite line plot owns the pick, background, and subtracted data items
+        - the composite line plot owns the computation
+        - an edge reference, owned by composite line plot, with reference to edge
+        - the edge reference is used to recognize the composite line plot as associated with the referenced edge
+    """
     document_model = document_controller.document_model
     pick_region = Graphics.RectangleGraphic()
     pick_region.size = 16 / model_data_item.dimensional_shape[0], 16 / model_data_item.dimensional_shape[1]
@@ -147,6 +163,7 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         computation.create_result("subtracted", document_model.get_object_specifier(subtracted_data_item, "data_item"))
         document_model.append_computation(computation)
 
+        # the composite item will need the initial computation results to display properly (view to intervals)
         await document_model.compute_immediate(document_controller.event_loop, computation)
 
         composite_data_item = DataItem.CompositeLibraryItem()
@@ -186,7 +203,124 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         # object pointing to the edge. used for recognizing the composite data item as such.
         data_structure = document_model.create_data_structure(structure_type="elemental_mapping_edge_ref", source=composite_data_item)
         data_structure.set_referenced_object("edge", edge.data_structure)
+        data_structure.set_referenced_object("pick", pick_data_item)
+        data_structure.set_referenced_object("pick_region", pick_region)
+        data_structure.set_referenced_object("background", background_data_item)
+        data_structure.set_referenced_object("subtracted", subtracted_data_item)
         document_model.append_data_structure(data_structure)
+
+
+async def change_edge(document_controller: DocumentController.DocumentController, model_data_item: DataItem.DataItem, composite_data_item: DataItem.DataItem, edge: "ElementalMappingEdge") -> None:
+    """Change the composite data item and associated items to display new edge.
+
+    The library will be changed in the following way:
+        - the pick region will be renamed
+        - the pick data item will connect fit/signal regions to new edge data structure
+        - the background subtraction computation will use edge intervals from new edge
+        - the pick, background, subtracted, and composite line plot data items will be renamed
+        - the composite line plot will connect fit/signal regions to new edge data structure
+        - the edge reference will reference the new edge
+    """
+    document_model = document_controller.document_model
+
+    computation = None  # type: Symbolic.Computation
+    for computation_ in document_model.computations:
+        if computation_.source == composite_data_item and computation_.processing_id == "eels.background_subtraction":
+            computation = computation_
+            break
+
+    edge_ref_data_structure = None  # type: DocumentModel.DataStructure
+    old_edge_data_structure = None  # type: DocumentModel.DataStructure
+    for data_structure in document_model.data_structures:
+        if data_structure.source == composite_data_item and data_structure.structure_type == "elemental_mapping_edge_ref":
+            edge_ref_data_structure = data_structure
+            old_edge_data_structure = data_structure.get_referenced_object("edge")
+            break
+
+    if not computation or not edge_ref_data_structure or not old_edge_data_structure:
+        return
+
+    pick_data_item = edge_ref_data_structure.get_referenced_object("pick")
+    pick_region = edge_ref_data_structure.get_referenced_object("pick_region")
+    background_data_item = edge_ref_data_structure.get_referenced_object("background")
+    subtracted_data_item = edge_ref_data_structure.get_referenced_object("subtracted")
+
+    if not pick_data_item or not pick_region or not background_data_item or not subtracted_data_item:
+        return
+
+    pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
+
+    for connection in copy.copy(pick_data_item.connections):
+        if connection.source_property in ("fit_interval", "signal_interval"):
+            source_property = connection.source_property
+            target_property = connection.target_property
+            target = connection._target
+            pick_data_item.remove_connection(connection)
+            new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property)
+            pick_data_item.add_connection(new_connection)
+
+    for computation_variable in computation.variables:
+        if computation_variable.name in ("fit_interval", "signal_interval"):
+            computation_variable.specifier = document_model.get_object_specifier(edge.data_structure)
+
+    pick_data_item.title = "{} Data of {}".format(pick_region.label, model_data_item.title)
+    background_data_item.title = "{} Background of {}".format(pick_region.label, model_data_item.title)
+    subtracted_data_item.title = "{} Subtracted of {}".format(pick_region.label, model_data_item.title)
+    composite_data_item.title = "{} from {}".format(pick_region.label, model_data_item.title)
+
+    for connection in copy.copy(composite_data_item.connections):
+        if connection.source_property in ("fit_interval", "signal_interval"):
+            source_property = connection.source_property
+            target_property = connection.target_property
+            target = connection._target
+            composite_data_item.remove_connection(connection)
+            new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property)
+            composite_data_item.add_connection(new_connection)
+
+    edge_ref_data_structure.remove_referenced_object("edge")
+    edge_ref_data_structure.set_referenced_object("edge", edge.data_structure)
+
+    # the composite item will need the initial computation results to display properly (view to intervals)
+    await document_model.compute_immediate(document_controller.event_loop, computation)
+    composite_display_specifier = DataItem.DisplaySpecifier.from_data_item(composite_data_item)
+    composite_display_specifier.display.view_to_intervals(pick_data_item.xdata, [edge.fit_interval, edge.signal_interval])
+
+    # mapping_computation_variable = None
+    # pick_region_specifier = None
+    # computation = composite_data_item.computation if composite_data_item else None
+    # if computation:
+    #     for computation_variable in computation.variables:
+    #         if computation_variable.name == "mapping":
+    #             mapping_computation_variable = computation_variable
+    #         if computation_variable.name == "region":
+    #             pick_region_specifier = computation_variable.specifier
+    # if mapping_computation_variable:
+    #     mapping_computation_variable.specifier = document_model.get_object_specifier(edge.data_structure)
+    #     for connection in copy.copy(composite_data_item.connections):
+    #         if connection.source_property in ("fit_interval", "signal_interval"):
+    #             source_property = connection.source_property
+    #             target_property = connection.target_property
+    #             target = connection._target
+    #             composite_data_item.remove_connection(connection)
+    #             new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property)
+    #             composite_data_item.add_connection(new_connection)
+    #     if pick_region_specifier:
+    #         pick_region_value = document_model.resolve_object_specifier(pick_region_specifier)
+    #         if pick_region_value:
+    #             pick_region = pick_region_value.value
+    #             pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
+    #             composite_data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
+    #     else:
+    #             composite_data_item.title = "{} {} of {}".format(_("Map"), str(edge.electron_shell), model_data_item.title)
+    #     document_model.rebind_computations()
+    # display = composite_data_item.displays[0]
+    # if display.display_type == "line_plot":
+    #     intervals = list()
+    #     for graphic in display.graphics:
+    #         if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id in ("fit", "signal"):
+    #             intervals.append(graphic.interval)
+    #     # await document_model.compute_immediate(event_loop, composite_data_item.computation)  # need the data to scale display; so do this here. ugh.
+    #     display.view_to_intervals(composite_data_item.xdata, intervals)
 
 
 def map_new_edge(document_controller, model_data_item, edge):
@@ -488,7 +622,7 @@ class ElementalMappingController:
         for index, edge in enumerate(edges):
 
             def change_edge_action(edge):
-                document_controller.event_loop.create_task(self.__change_edge(document_controller.event_loop, current_data_item, edge))
+                document_controller.event_loop.create_task(change_edge(document_controller, model_data_item, current_data_item, edge))
 
             def pick_edge_action(edge):
                 document_controller.event_loop.create_task(pick_new_edge(document_controller, model_data_item, edge))
@@ -509,46 +643,6 @@ class ElementalMappingController:
             edge_bundles.append(edge_bundle)
 
         return edge_bundles
-
-    async def __change_edge(self, event_loop, composite_data_item, edge):
-        document_model = self.__document_model
-        model_data_item = self.__model_data_item
-        mapping_computation_variable = None
-        pick_region_specifier = None
-        computation = composite_data_item.computation if composite_data_item else None
-        if computation:
-            for computation_variable in computation.variables:
-                if computation_variable.name == "mapping":
-                    mapping_computation_variable = computation_variable
-                if computation_variable.name == "region":
-                    pick_region_specifier = computation_variable.specifier
-        if mapping_computation_variable:
-            mapping_computation_variable.specifier = document_model.get_object_specifier(edge.data_structure)
-            for connection in copy.copy(composite_data_item.connections):
-                if connection.source_property in ("fit_interval", "signal_interval"):
-                    source_property = connection.source_property
-                    target_property = connection.target_property
-                    target = connection._target
-                    composite_data_item.remove_connection(connection)
-                    new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property)
-                    composite_data_item.add_connection(new_connection)
-            if pick_region_specifier:
-                pick_region_value = document_model.resolve_object_specifier(pick_region_specifier)
-                if pick_region_value:
-                    pick_region = pick_region_value.value
-                    pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
-                    composite_data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
-            else:
-                    composite_data_item.title = "{} {} of {}".format(_("Map"), str(edge.electron_shell), model_data_item.title)
-            document_model.rebind_computations()
-        display = composite_data_item.displays[0]
-        if display.display_type == "line_plot":
-            intervals = list()
-            for graphic in display.graphics:
-                if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id in ("fit", "signal"):
-                    intervals.append(graphic.interval)
-            # await document_model.compute_immediate(event_loop, composite_data_item.computation)  # need the data to scale display; so do this here. ugh.
-            display.view_to_intervals(composite_data_item.xdata, intervals)
 
     def build_multiprofile(self, document_controller):
         model_data_item = self.__model_data_item

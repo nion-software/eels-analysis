@@ -50,6 +50,24 @@ class TestElementalMappingController(unittest.TestCase):
         xdata = DataAndMetadata.new_data_and_metadata(data, intensity_calibration=intensity_calibration, dimensional_calibrations=dimensional_calibrations, data_descriptor=data_descriptor)
         return DataItem.new_data_item(xdata)
 
+    def __create_edge(self, model_data_item: DataItem.DataItem, electron_shell: PeriodicTable.ElectronShell):
+        binding_energy_eV = PeriodicTable.PeriodicTable().nominal_binding_energy_ev(electron_shell)
+        signal_interval_eV = binding_energy_eV, binding_energy_eV * 1.10
+        fit_interval_eV = binding_energy_eV * 0.93, binding_energy_eV * 0.98
+        dimensional_shape = model_data_item.dimensional_shape
+        dimensional_calibrations = model_data_item.dimensional_calibrations
+        if dimensional_shape is not None and dimensional_calibrations is not None and len(dimensional_calibrations) > 0:
+            calibration = dimensional_calibrations[-1]
+            if calibration.units == "eV":
+                fit_region_start = calibration.convert_from_calibrated_value(fit_interval_eV[0]) / dimensional_shape[-1]
+                fit_region_end = calibration.convert_from_calibrated_value(fit_interval_eV[1]) / dimensional_shape[-1]
+                signal_region_start = calibration.convert_from_calibrated_value(signal_interval_eV[0]) / dimensional_shape[-1]
+                signal_region_end = calibration.convert_from_calibrated_value(signal_interval_eV[1]) / dimensional_shape[-1]
+                fit_interval = fit_region_start, fit_region_end
+                signal_interval = signal_region_start, signal_region_end
+                return ElementalMappingController.ElementalMappingEdge(electron_shell=electron_shell, fit_interval=fit_interval, signal_interval=signal_interval)
+        return None
+
     def __run_until_complete(self, document_controller):
         # run for 0.2s; recomputing and running periodic
         for _ in range(10):
@@ -233,3 +251,62 @@ class TestElementalMappingController(unittest.TestCase):
             document_model.recompute_all()
             document_controller.periodic()
             self.assertEqual(4, len(document_model.data_items))
+
+    def test_changing_edge_configures_other_items_correctly(self):
+        document_model = DocumentModel.DocumentModel()
+        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
+        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+            model_data_item = self.__create_spectrum_image()
+            document_model.append_data_item(model_data_item)
+            elemental_mapping_controller.set_current_data_item(model_data_item)
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(32, 2, 3))  # Ge-L
+            edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
+            edge_bundle[0].pick_action()
+            self.__run_until_complete(document_controller)
+            composite_data_item = document_model.data_items[4]
+            elemental_mapping_controller.set_current_data_item(composite_data_item)
+            edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
+            # apply the change to the other edge
+            edge_bundle[1].select_action()
+            self.__run_until_complete(document_controller)
+            computation = document_model.computations[0]
+            old_edge_data_structure = document_model.data_structures[0]
+            new_edge_data_structure = document_model.data_structures[1]
+            edge_ref_data_structure = document_model.data_structures[2]
+            pick_data_item = document_model.data_items[1]
+            background_data_item = document_model.data_items[2]
+            subtracted_data_item = document_model.data_items[3]
+            pick_region = model_data_item.displays[0].graphics[0]
+            # check the titles
+            self.assertEqual("Pick Ge-L3", pick_region.label)
+            self.assertEqual("Pick Ge-L3 Data of Untitled", pick_data_item.title)
+            self.assertEqual("Pick Ge-L3 Background of Untitled", background_data_item.title)
+            self.assertEqual("Pick Ge-L3 Subtracted of Untitled", subtracted_data_item.title)
+            self.assertEqual("Pick Ge-L3 from Untitled", composite_data_item.title)
+            # check the old intervals are disconnected and the new are connected
+            old_fit_interval = pick_data_item.displays[0].graphics[1].interval
+            old_signal_interval = pick_data_item.displays[0].graphics[2].interval
+            new_fit_interval = (0.6, 0.7)
+            new_signal_interval = (0.7, 0.8)
+            # ensure changing old edge doesn't affect any connections
+            old_edge_data_structure.set_property_value("fit_interval", new_fit_interval)
+            old_edge_data_structure.set_property_value("signal_interval", new_signal_interval)
+            self.assertEqual(old_fit_interval, pick_data_item.displays[0].graphics[1].interval)
+            self.assertEqual(old_signal_interval, pick_data_item.displays[0].graphics[2].interval)
+            self.assertEqual(old_fit_interval, computation._get_variable("fit_interval").bound_item.value)
+            self.assertEqual(old_signal_interval, computation._get_variable("signal_interval").bound_item.value)
+            self.assertEqual(old_fit_interval, composite_data_item.displays[0].graphics[0].interval)
+            self.assertEqual(old_signal_interval, composite_data_item.displays[0].graphics[1].interval)
+            # ensure changing new edge affects all connections
+            new_edge_data_structure.set_property_value("fit_interval", new_fit_interval)
+            new_edge_data_structure.set_property_value("signal_interval", new_signal_interval)
+            self.assertEqual(new_fit_interval, pick_data_item.displays[0].graphics[1].interval)
+            self.assertEqual(new_signal_interval, pick_data_item.displays[0].graphics[2].interval)
+            self.assertEqual(new_fit_interval, computation._get_variable("fit_interval").bound_item.value)
+            self.assertEqual(new_signal_interval, computation._get_variable("signal_interval").bound_item.value)
+            self.assertEqual(new_fit_interval, composite_data_item.displays[0].graphics[0].interval)
+            self.assertEqual(new_signal_interval, composite_data_item.displays[0].graphics[1].interval)
+            # and the edge reference
+            self.assertEqual(new_edge_data_structure, edge_ref_data_structure.get_referenced_object("edge"))
