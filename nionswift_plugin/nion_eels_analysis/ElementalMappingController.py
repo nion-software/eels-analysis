@@ -21,74 +21,6 @@ from nion.eels_analysis import PeriodicTable
 _ = gettext.gettext
 
 
-processing_descriptions = {
-    "eels.eels_extract_signal":
-        { 'script': 'from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\ntarget.xdata = xd.vstack((ea.extract_signal_from_polynomial_background({src}, signal.interval, (fit.interval, )), {src}))',
-          'sources': [{'label': 'Source', 'name': 'src', 'regions': [
-              {'name': 'fit', 'params': {'label': 'Fit', 'interval': (0.2, 0.3)}, 'type': 'interval'},
-              {'name': 'signal', 'params': {'label': 'Signal', 'interval': (0.4, 0.5)}, 'type': 'interval'},
-          ]}],
-          'title': 'Background Subtracted',
-        },
-    "eels.subtract_linear_background":
-        { 'script': 'from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\ntarget.xdata = xd.vstack((ea.subtract_linear_background({src}, fit.interval, (0, 1)), {src}))',
-          'sources': [{'label': 'Source', 'name': 'src', 'regions': [
-              {'name': 'fit', 'params': {'label': 'Fit', 'interval': (0.2, 0.3)}, 'type': 'interval'},
-          ]}],
-          'title': 'Linear Background Subtracted',
-        },
-    "eels.subtract_background_signal":
-        { 'script': 'from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\nsignal_xdata = ea.extract_original_signal({src}, fit.interval, signal.interval)\nbackground = ea.calculate_background_signal({src}, fit.interval, signal.interval)\ntarget.xdata = xd.vstack((signal_xdata, background, signal_xdata - background))',
-          'sources': [{'label': 'Source', 'name': 'src', 'regions': [
-              {'name': 'fit', 'params': {'label': 'Fit', 'interval': (0.2, 0.3)}, 'type': 'interval'},
-              {'name': 'signal', 'params': {'label': 'Signal', 'interval': (0.4, 0.5)}, 'type': 'interval'},
-          ]}],
-          'title': 'Background Subtracted',
-        },
-    "eels.explore":
-        { 'expression': 'xd.sum_region({src}, region.mask_xdata_with_shape({src}.data_shape[0:2]))',
-          'sources': [
-              {'name': 'src', 'label': 'Source', 'use_display_data': False, 'regions': [{'name': 'region', 'type': 'rectangle', 'params': {'label': 'Pick Region'}}], 'requirements': [{'type': 'dimensionality', 'min': 3, 'max': 3}]}
-          ],
-          'title': 'Explore',
-          'out_regions': [
-              {'name': 'interval_region', 'type': 'interval', 'params': {'label': 'Display Slice'}},
-              {'name': 'explore', 'type': 'interval', 'params': {'label': 'Explore', 'interval': (0.4, 0.6), 'graphic_id': 'explore'}},
-          ],
-          'connections': [{'type': 'property', 'src': 'display', 'src_prop': 'slice_interval', 'dst': 'interval_region', 'dst_prop': 'interval'}]},
-    }
-
-
-def processing_extract_signal(document_controller):
-    display_specifier = document_controller.selected_display_specifier
-    data_item = document_controller.document_model.make_data_item_with_computation("eels.eels_extract_signal", [(display_specifier.data_item, None)], {"src": [None, None]})
-    if data_item:
-        new_display_specifier = DataItem.DisplaySpecifier.from_data_item(data_item)
-        document_controller.display_data_item(new_display_specifier)
-        return data_item
-    return None
-
-
-def processing_subtract_linear_background(document_controller):
-    display_specifier = document_controller.selected_display_specifier
-    data_item = document_controller.document_model.make_data_item_with_computation("eels.subtract_linear_background", [(display_specifier.data_item, None)], {"src": [None]})
-    if data_item:
-        new_display_specifier = DataItem.DisplaySpecifier.from_data_item(data_item)
-        document_controller.display_data_item(new_display_specifier)
-        return data_item
-    return None
-
-
-def processing_subtract_background_signal(document_controller):
-    display_specifier = document_controller.selected_display_specifier
-    data_item = document_controller.document_model.make_data_item_with_computation("eels.subtract_background_signal", [(display_specifier.data_item, None)], {"src": [None, None]})
-    if data_item:
-        new_display_specifier = DataItem.DisplaySpecifier.from_data_item(data_item)
-        document_controller.display_data_item(new_display_specifier)
-        return data_item
-    return None
-
-
 class EELSBackgroundSubtraction:
     def __init__(self, computation, **kwargs):
         self.computation = computation
@@ -506,16 +438,22 @@ class ElementalMappingController:
         return False
 
     async def explore_edges(self, document_controller):
+        document_model = document_controller.document_model
         model_data_item = self.__model_data_item
         pick_region = Graphics.RectangleGraphic()
         pick_region.size = 16 / model_data_item.dimensional_shape[0], 16 / model_data_item.dimensional_shape[1]
         pick_region.label = _("Explore")
         model_data_item.displays[0].add_graphic(pick_region)
-        pick_data_item = self.__document_model.make_data_item_with_computation("eels.explore", [(model_data_item, None)], {"src": [pick_region]})
+        pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
         if pick_data_item:
+            explore_interval = Graphics.IntervalGraphic()
+            explore_interval.interval = 0.4, 0.6
+            explore_interval.label = _("Explore")
+            explore_interval.graphic_id = "explore"
             pick_data_item.source = model_data_item
-            new_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
-            document_controller.display_data_item(new_display_specifier)
+            pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
+            pick_display_specifier.display.add_graphic(explore_interval)
+            document_controller.display_data_item(pick_display_specifier)
             await self.__document_model.compute_immediate(document_controller.event_loop, pick_data_item.computation)  # need the data to make connect_explorer_interval work; so do this here. ugh.
             self.__connect_explorer_interval(pick_data_item)
 
@@ -652,6 +590,5 @@ class ElementalMappingController:
             multiprofile_data_item.title = _("Profiles of ") + ", ".join(legend_labels)
             document_controller.display_data_item(multiprofile_display_specifier)
 
-DocumentModel.DocumentModel.register_processing_descriptions(processing_descriptions)
 Symbolic.register_computation_type("eels.background_subtraction", EELSBackgroundSubtraction)
 Symbolic.register_computation_type("eels.mapping", EELSMapping)
