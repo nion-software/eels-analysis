@@ -310,3 +310,21 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(new_signal_interval, composite_data_item.displays[0].graphics[1].interval)
             # and the edge reference
             self.assertEqual(new_edge_data_structure, edge_ref_data_structure.get_referenced_object("edge"))
+
+    def test_mapping_edge_produces_properly_configured_map(self):
+        document_model = DocumentModel.DocumentModel()
+        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
+        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+            model_data_item = self.__create_spectrum_image()
+            document_model.append_data_item(model_data_item)
+            elemental_mapping_controller.set_current_data_item(model_data_item)
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
+            edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
+            edge_bundle[0].map_action()
+            self.__run_until_complete(document_controller)
+            self.assertEqual(2, len(document_model.data_items))
+            mapped_data_item = document_model.data_items[1]
+            self.assertEqual(model_data_item, mapped_data_item.source)
+            self.assertEqual(1, len(document_model.computations))
+            self.assertEqual("eels.mapping", document_model.computations[0].processing_id)

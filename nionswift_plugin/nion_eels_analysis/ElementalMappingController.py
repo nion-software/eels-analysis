@@ -88,6 +88,7 @@ def processing_subtract_background_signal(document_controller):
         return data_item
     return None
 
+
 class EELSBackgroundSubtraction:
     def __init__(self, computation, **kwargs):
         self.computation = computation
@@ -285,66 +286,39 @@ async def change_edge(document_controller: DocumentController.DocumentController
     composite_display_specifier = DataItem.DisplaySpecifier.from_data_item(composite_data_item)
     composite_display_specifier.display.view_to_intervals(pick_data_item.xdata, [edge.fit_interval, edge.signal_interval])
 
-    # mapping_computation_variable = None
-    # pick_region_specifier = None
-    # computation = composite_data_item.computation if composite_data_item else None
-    # if computation:
-    #     for computation_variable in computation.variables:
-    #         if computation_variable.name == "mapping":
-    #             mapping_computation_variable = computation_variable
-    #         if computation_variable.name == "region":
-    #             pick_region_specifier = computation_variable.specifier
-    # if mapping_computation_variable:
-    #     mapping_computation_variable.specifier = document_model.get_object_specifier(edge.data_structure)
-    #     for connection in copy.copy(composite_data_item.connections):
-    #         if connection.source_property in ("fit_interval", "signal_interval"):
-    #             source_property = connection.source_property
-    #             target_property = connection.target_property
-    #             target = connection._target
-    #             composite_data_item.remove_connection(connection)
-    #             new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property)
-    #             composite_data_item.add_connection(new_connection)
-    #     if pick_region_specifier:
-    #         pick_region_value = document_model.resolve_object_specifier(pick_region_specifier)
-    #         if pick_region_value:
-    #             pick_region = pick_region_value.value
-    #             pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
-    #             composite_data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
-    #     else:
-    #             composite_data_item.title = "{} {} of {}".format(_("Map"), str(edge.electron_shell), model_data_item.title)
-    #     document_model.rebind_computations()
-    # display = composite_data_item.displays[0]
-    # if display.display_type == "line_plot":
-    #     intervals = list()
-    #     for graphic in display.graphics:
-    #         if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id in ("fit", "signal"):
-    #             intervals.append(graphic.interval)
-    #     # await document_model.compute_immediate(event_loop, composite_data_item.computation)  # need the data to scale display; so do this here. ugh.
-    #     display.view_to_intervals(composite_data_item.xdata, intervals)
+
+class EELSMapping:
+    def __init__(self, computation, **kwargs):
+        self.computation = computation
+
+    def execute(self, spectrum_image_xdata, fit_interval, signal_interval):
+        self.__mapped_xdata = eels_analysis.map_background_subtracted_signal(spectrum_image_xdata, None, fit_interval, signal_interval)
+
+    def commit(self):
+        self.computation.set_referenced_xdata("map", self.__mapped_xdata)
 
 
-def map_new_edge(document_controller, model_data_item, edge):
+async def map_new_edge(document_controller, model_data_item, edge) -> None:
     document_model = document_controller.document_model
 
     map_data_item = DataItem.new_data_item()
     map_data_item.title = "{} of {}".format(_("Map"), str(edge.electron_shell))
     map_data_item.category = model_data_item.category
+    map_data_item.source = model_data_item
     document_model.append_data_item(map_data_item)
-    display_specifier = DataItem.DisplaySpecifier.from_data_item(map_data_item)
-    script = """from nion.eels_analysis import eels_analysis as ea
-from nion.eels_analysis import PeriodicTable as pt
-electron_shell = pt.ElectronShell(mapping.get_property('atomic_number'), mapping.get_property('shell_number'), mapping.get_property('subshell_index'))
-target.xdata = ea.map_background_subtracted_signal(src.xdata, electron_shell, mapping.get_property('fit_interval'), mapping.get_property('signal_interval'))
-"""
-    computation = document_model.create_computation(script)
-    computation.label = "EELS Map"
-    computation.create_object("src", document_model.get_object_specifier(model_data_item), label="Source")
-    computation.create_object("mapping", document_model.get_object_specifier(edge.data_structure), label="Mapping")
-    document_model.set_data_item_computation(display_specifier.data_item, computation)
+
+    computation = document_model.create_computation()
+    computation.source = map_data_item
+    computation.create_object("spectrum_image_xdata", document_model.get_object_specifier(model_data_item, "xdata"))
+    computation.create_input("fit_interval", document_model.get_object_specifier(edge.data_structure), "fit_interval")
+    computation.create_input("signal_interval", document_model.get_object_specifier(edge.data_structure), "signal_interval")
+    computation.processing_id = "eels.mapping"
+    computation.create_result("map", document_model.get_object_specifier(map_data_item, "data_item"))
+    document_model.append_computation(computation)
+
+    await document_model.compute_immediate(document_controller.event_loop, computation)
 
     document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map_data_item))
-
-    return map_data_item
 
 
 class ElementalMappingEdge:
@@ -628,7 +602,7 @@ class ElementalMappingController:
                 document_controller.event_loop.create_task(pick_new_edge(document_controller, model_data_item, edge))
 
             def map_edge_action(edge):
-                map_new_edge(document_controller, model_data_item, edge)
+                document_controller.event_loop.create_task(map_new_edge(document_controller, model_data_item, edge))
 
             def delete_edge_action(edge):
                 self.__remove_edge(edge)
@@ -691,3 +665,4 @@ class ElementalMappingController:
 
 DocumentModel.DocumentModel.register_processing_descriptions(processing_descriptions)
 Symbolic.register_computation_type("eels.background_subtraction", EELSBackgroundSubtraction)
+Symbolic.register_computation_type("eels.mapping", EELSMapping)

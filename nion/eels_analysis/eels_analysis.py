@@ -8,6 +8,7 @@
 
 # standard libraries
 import copy
+import typing
 
 import numpy
 from nion.eels_analysis import CurveFitting
@@ -343,7 +344,7 @@ def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, dat
     return DataAndMetadata.new_data_and_metadata(data, data_and_metadata_dst.intensity_calibration, data_and_metadata_dst.dimensional_calibrations)
 
 
-def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, electron_shell: PeriodicTable.ElectronShell, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
+def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, electron_shell: typing.Optional[PeriodicTable.ElectronShell], fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
     """Subtract si_k background from data and metadata with signal in first index."""
     signal_index = -1
 
@@ -358,26 +359,22 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
     edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
     bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0]), signal_calibration.convert_to_calibrated_value(fit_range[1])])
 
-    beam_energy_ev = data_and_metadata.metadata.get("beam_energy_eV")
-    beam_convergence_angle_rad = data_and_metadata.metadata.get("beam_convergence_angle_rad")
-    beam_collection_angle_rad = data_and_metadata.metadata.get("beam_collection_angle_rad")
+    cross_section = None
+    if electron_shell is not None:
+        beam_energy_ev = data_and_metadata.metadata.get("beam_energy_eV")
+        beam_convergence_angle_rad = data_and_metadata.metadata.get("beam_convergence_angle_rad")
+        beam_collection_angle_rad = data_and_metadata.metadata.get("beam_collection_angle_rad")
 
-    if beam_energy_ev is not None and beam_convergence_angle_rad is not None and beam_collection_angle_rad is not None:
-        if electron_shell.shell_number == 1 and electron_shell.subshell_index == 1:
-            cross_section = EELS_CrossSections.partial_cross_section_nm2(electron_shell.atomic_number, electron_shell.shell_number, electron_shell.subshell_index, edge_onset, edge_delta, beam_energy_ev, beam_convergence_angle_rad, beam_collection_angle_rad)
-        elif electron_shell.atomic_number == 32 and electron_shell.shell_number == 2 and electron_shell.subshell_index == 3:
-            if abs(edge_delta - 100) < 3:
-                cross_section = 7.31e-8
-            elif abs(edge_delta - 120) < 3:
-                cross_section = 8.79e-8
-            elif abs(edge_delta - 200) < 3:
-                cross_section = 1.40e-7
-            else:
-                cross_section = None
-        else:
-            cross_section = None
-    else:
-        cross_section = None
+        if beam_energy_ev is not None and beam_convergence_angle_rad is not None and beam_collection_angle_rad is not None:
+            if electron_shell.shell_number == 1 and electron_shell.subshell_index == 1:
+                cross_section = EELS_CrossSections.partial_cross_section_nm2(electron_shell.atomic_number, electron_shell.shell_number, electron_shell.subshell_index, edge_onset, edge_delta, beam_energy_ev, beam_convergence_angle_rad, beam_collection_angle_rad)
+            elif electron_shell.atomic_number == 32 and electron_shell.shell_number == 2 and electron_shell.subshell_index == 3:
+                if abs(edge_delta - 100) < 3:
+                    cross_section = 7.31e-8
+                elif abs(edge_delta - 120) < 3:
+                    cross_section = 8.79e-8
+                elif abs(edge_delta - 200) < 3:
+                    cross_section = 1.40e-7
 
     data = data_and_metadata.data
 
