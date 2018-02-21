@@ -13,6 +13,8 @@ from nion.swift.model import Connection
 from nion.swift.model import DataItem
 from nion.swift.model import DocumentModel
 from nion.swift.model import Graphics
+from nion.swift.model import Symbolic
+from nion.eels_analysis import eels_analysis
 from nion.eels_analysis import PeriodicTable
 
 _ = gettext.gettext
@@ -85,6 +87,19 @@ def processing_subtract_background_signal(document_controller):
         return data_item
     return None
 
+class EELSBackgroundSubtraction:
+    def __init__(self, computation, **kwargs):
+        self.computation = computation
+
+    def execute(self, eels_spectrum_xdata, fit_interval, signal_interval):
+        signal = eels_analysis.extract_original_signal(eels_spectrum_xdata, fit_interval, signal_interval)
+        self.__background_xdata = eels_analysis.calculate_background_signal(eels_spectrum_xdata, fit_interval, signal_interval)
+        self.__subtracted_xdata = signal - self.__background_xdata
+
+    def commit(self):
+        self.computation.set_referenced_xdata("background", self.__background_xdata)
+        self.computation.set_referenced_xdata("subtracted", self.__subtracted_xdata)
+
 
 async def pick_new_edge(document_controller, model_data_item, edge) -> None:
     document_model = document_controller.document_model
@@ -110,31 +125,29 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         pick_display_specifier.display.add_graphic(signal_region)
         pick_data_item.add_connection(Connection.PropertyConnection(edge.data_structure, "fit_interval", fit_region, "interval"))
         pick_data_item.add_connection(Connection.PropertyConnection(edge.data_structure, "signal_interval", signal_region, "interval"))
-        await document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to scale display; so do this here. ugh.
 
         background_data_item = DataItem.DataItem(numpy.zeros(1, ))
         background_data_item.title = "{} Background of {}".format(pick_region.label, model_data_item.title)
         background_display_specifier = DataItem.DisplaySpecifier.from_data_item(background_data_item)
         background_display_specifier.display.display_type = "line_plot"
-        background_script = "from nion.eels_analysis import eels_analysis as ea\ntarget.xdata = ea.calculate_background_signal(pick.xdata, mapping.get_property('fit_interval'), mapping.get_property('signal_interval'))"
-        background_computation = document_model.create_computation(background_script)
-        background_computation.create_object("mapping", document_model.get_object_specifier(edge.data_structure), label="Mapping")
-        background_computation.create_object("pick", document_model.get_object_specifier(pick_data_item))
         document_model.append_data_item(background_data_item)
-        document_model.set_data_item_computation(background_data_item, background_computation)
-        await document_model.recompute_immediate(document_controller.event_loop, background_data_item)  # need the data to scale display; so do this here. ugh.
 
         subtracted_data_item = DataItem.DataItem(numpy.zeros(1, ))
         subtracted_data_item.title = "{} Subtracted of {}".format(pick_region.label, model_data_item.title)
         subtracted_display_specifier = DataItem.DisplaySpecifier.from_data_item(subtracted_data_item)
         subtracted_display_specifier.display.display_type = "line_plot"
-        subtracted_script = "from nion.eels_analysis import eels_analysis as ea\nsignal = ea.extract_original_signal(pick.xdata, mapping.get_property('fit_interval'), mapping.get_property('signal_interval'))\nbackground = ea.calculate_background_signal(pick.xdata, mapping.get_property('fit_interval'), mapping.get_property('signal_interval'))\ntarget.xdata = signal - background"
-        subtracted_computation = document_model.create_computation(subtracted_script)
-        subtracted_computation.create_object("mapping", document_model.get_object_specifier(edge.data_structure), label="Mapping")
-        subtracted_computation.create_object("pick", document_model.get_object_specifier(pick_data_item))
         document_model.append_data_item(subtracted_data_item)
-        document_model.set_data_item_computation(subtracted_data_item, subtracted_computation)
-        await document_model.recompute_immediate(document_controller.event_loop, subtracted_data_item)  # need the data to scale display; so do this here. ugh.
+
+        computation = document_model.create_computation()
+        computation.create_object("eels_spectrum_xdata", document_model.get_object_specifier(pick_data_item, "display_xdata"))
+        computation.create_input("fit_interval", document_model.get_object_specifier(edge.data_structure), "fit_interval")
+        computation.create_input("signal_interval", document_model.get_object_specifier(edge.data_structure), "signal_interval")
+        computation.processing_id = "eels.background_subtraction"
+        computation.create_result("background", document_model.get_object_specifier(background_data_item, "data_item"))
+        computation.create_result("subtracted", document_model.get_object_specifier(subtracted_data_item, "data_item"))
+        document_model.append_computation(computation)
+
+        await document_model.compute_immediate(document_controller.event_loop, computation)
 
         composite_data_item = DataItem.CompositeLibraryItem()
         composite_data_item.title = "{} from {}".format(pick_region.label, model_data_item.title)
@@ -388,7 +401,7 @@ class ElementalMappingController:
             pick_data_item.source = model_data_item
             new_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
             document_controller.display_data_item(new_display_specifier)
-            await self.__document_model.recompute_immediate(document_controller.event_loop, pick_data_item)  # need the data to make connect_explorer_interval work; so do this here. ugh.
+            await self.__document_model.compute_immediate(document_controller.event_loop, pick_data_item.computation)  # need the data to make connect_explorer_interval work; so do this here. ugh.
             self.__connect_explorer_interval(pick_data_item)
 
     def __add_edge(self, data_item, electron_shell, fit_interval, signal_interval) -> ElementalMappingEdge:
@@ -470,7 +483,7 @@ class ElementalMappingController:
         for index, edge in enumerate(edges):
 
             def change_edge_action(edge):
-                document_controller.event_loop.create_task(self.__change_edge(document_controller.event_loop, document_model, model_data_item, current_data_item, edge))
+                document_controller.event_loop.create_task(self.__change_edge(document_controller.event_loop, current_data_item, edge))
 
             def pick_edge_action(edge):
                 document_controller.event_loop.create_task(pick_new_edge(document_controller, model_data_item, edge))
@@ -492,10 +505,12 @@ class ElementalMappingController:
 
         return edge_bundles
 
-    async def __change_edge(self, event_loop, document_model, model_data_item, data_item, edge):
+    async def __change_edge(self, event_loop, composite_data_item, edge):
+        document_model = self.__document_model
+        model_data_item = self.__model_data_item
         mapping_computation_variable = None
         pick_region_specifier = None
-        computation = data_item.computation if data_item else None
+        computation = composite_data_item.computation if composite_data_item else None
         if computation:
             for computation_variable in computation.variables:
                 if computation_variable.name == "mapping":
@@ -504,31 +519,31 @@ class ElementalMappingController:
                     pick_region_specifier = computation_variable.specifier
         if mapping_computation_variable:
             mapping_computation_variable.specifier = document_model.get_object_specifier(edge.data_structure)
-            for connection in copy.copy(data_item.connections):
+            for connection in copy.copy(composite_data_item.connections):
                 if connection.source_property in ("fit_interval", "signal_interval"):
                     source_property = connection.source_property
                     target_property = connection.target_property
                     target = connection._target
-                    data_item.remove_connection(connection)
+                    composite_data_item.remove_connection(connection)
                     new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property)
-                    data_item.add_connection(new_connection)
+                    composite_data_item.add_connection(new_connection)
             if pick_region_specifier:
                 pick_region_value = document_model.resolve_object_specifier(pick_region_specifier)
                 if pick_region_value:
                     pick_region = pick_region_value.value
                     pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
-                    data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
+                    composite_data_item.title = "{} of {}".format(pick_region.label, model_data_item.title)
             else:
-                    data_item.title = "{} {} of {}".format(_("Map"), str(edge.electron_shell), model_data_item.title)
+                    composite_data_item.title = "{} {} of {}".format(_("Map"), str(edge.electron_shell), model_data_item.title)
             document_model.rebind_computations()
-        display = data_item.displays[0]
+        display = composite_data_item.displays[0]
         if display.display_type == "line_plot":
             intervals = list()
             for graphic in display.graphics:
                 if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id in ("fit", "signal"):
                     intervals.append(graphic.interval)
-            await document_model.recompute_immediate(event_loop, data_item)  # need the data to scale display; so do this here. ugh.
-            display.view_to_intervals(data_item.xdata, intervals)
+            # await document_model.compute_immediate(event_loop, composite_data_item.computation)  # need the data to scale display; so do this here. ugh.
+            display.view_to_intervals(composite_data_item.xdata, intervals)
 
     def build_multiprofile(self, document_controller):
         model_data_item = self.__model_data_item
@@ -576,3 +591,4 @@ class ElementalMappingController:
             document_controller.display_data_item(multiprofile_display_specifier)
 
 DocumentModel.DocumentModel.register_processing_descriptions(processing_descriptions)
+Symbolic.register_computation_type("eels.background_subtraction", EELSBackgroundSubtraction)
