@@ -182,7 +182,7 @@ class TestElementalMappingController(unittest.TestCase):
             background_data_item = document_model.data_items[2]
             subtracted_data_item = document_model.data_items[3]
             composite_data_item = document_model.data_items[4]
-            self.assertEqual(model_data_item, composite_data_item.source)
+            self.assertEqual(model_data_item.displays[0].graphics[0], composite_data_item.source)
             self.assertEqual(composite_data_item, data_item.source)
             self.assertEqual(composite_data_item, background_data_item.source)
             self.assertEqual(composite_data_item, subtracted_data_item.source)
@@ -208,6 +208,29 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(5, len(document_model.data_items))
             self.assertEqual(2, len(document_model.data_structures))
             document_model.remove_data_item(composite_data_item)
+            self.assertEqual(0, len(document_model.computations))
+            self.assertEqual(1, len(document_model.data_items))
+            self.assertEqual(1, len(document_model.data_structures))
+
+    def test_deleting_pick_region_also_deletes_pick_composition(self):
+        document_model = DocumentModel.DocumentModel()
+        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
+        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+            model_data_item = self.__create_spectrum_image()
+            document_model.append_data_item(model_data_item)
+            elemental_mapping_controller.set_current_data_item(model_data_item)
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
+            edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
+            edge_bundle[0].pick_action()
+            self.__run_until_complete(document_controller)
+            pick_region = model_data_item.displays[0].graphics[0]
+            composite_data_item = document_model.data_items[4]
+            self.assertIsInstance(composite_data_item, DataItem.CompositeLibraryItem)
+            self.assertEqual(1, len(document_model.computations))
+            self.assertEqual(5, len(document_model.data_items))
+            self.assertEqual(2, len(document_model.data_structures))
+            model_data_item.displays[0].remove_graphic(pick_region)
             self.assertEqual(0, len(document_model.computations))
             self.assertEqual(1, len(document_model.data_items))
             self.assertEqual(1, len(document_model.data_structures))

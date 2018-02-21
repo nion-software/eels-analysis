@@ -172,7 +172,7 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         composite_data_item.append_data_item(pick_data_item)
         composite_data_item.append_data_item(background_data_item)
         composite_data_item.append_data_item(subtracted_data_item)
-        composite_data_item.source = model_data_item
+        composite_data_item.source = pick_region
         pick_data_item.source = composite_data_item
         subtracted_data_item.source = composite_data_item
         background_data_item.source = composite_data_item
@@ -204,6 +204,7 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         # create an elemental_mapping_edge_ref data structure, owned by the composite data item, with a referenced
         # object pointing to the edge. used for recognizing the composite data item as such.
         data_structure = document_model.create_data_structure(structure_type="elemental_mapping_edge_ref", source=composite_data_item)
+        data_structure.set_referenced_object("spectrum_image", model_data_item)
         data_structure.set_referenced_object("edge", edge.data_structure)
         data_structure.set_referenced_object("pick", pick_data_item)
         data_structure.set_referenced_object("pick_region", pick_region)
@@ -465,7 +466,7 @@ class ElementalMappingController:
                 # composite data item when there is an elemental_mapping_edge_ref with its source being the data item.
                 if data_structure.source == data_item and data_structure.structure_type == "elemental_mapping_edge_ref":
                     self.__edge_data_structure = data_structure.get_referenced_object("edge")
-                    self.__model_data_item = data_item.source
+                    self.__model_data_item = data_structure.get_referenced_object("spectrum_image")
             if is_explorer:
                 self.__model_data_item = data_item.source
 
