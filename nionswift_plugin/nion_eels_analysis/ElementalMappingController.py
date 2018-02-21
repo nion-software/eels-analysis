@@ -179,11 +179,14 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         composite_display_specifier.display.view_to_intervals(pick_data_item.xdata, [edge.fit_interval, edge.signal_interval])
         document_controller.display_data_item(composite_display_specifier)
 
+        # ensure computation is deleted when composite is deleted
+        computation.source = composite_data_item
+
+        # create an elemental_mapping_edge_ref data structure, owned by the composite data item, with a referenced
+        # object pointing to the edge. used for recognizing the composite data item as such.
         data_structure = document_model.create_data_structure(structure_type="elemental_mapping_edge_ref", source=composite_data_item)
         data_structure.set_referenced_object("edge", edge.data_structure)
         document_model.append_data_structure(data_structure)
-
-    return pick_data_item
 
 
 def map_new_edge(document_controller, model_data_item, edge):
@@ -349,6 +352,8 @@ class ElementalMappingController:
             self.__model_data_item = data_item
         elif data_item:
             for data_structure in copy.copy(self.__document_model.data_structures):
+                # check to see if the data item is a composite data item with an associated edge. the data item is a
+                # composite data item when there is an elemental_mapping_edge_ref with its source being the data item.
                 if data_structure.source == data_item and data_structure.structure_type == "elemental_mapping_edge_ref":
                     self.__edge_data_structure = data_structure.get_referenced_object("edge")
                     self.__model_data_item = data_item.source

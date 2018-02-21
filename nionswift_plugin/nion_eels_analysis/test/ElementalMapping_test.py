@@ -172,6 +172,28 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual("elemental_mapping_edge_ref", document_model.data_structures[1].structure_type)
             self.assertEqual(document_model.data_structures[0], document_model.data_structures[1].get_referenced_object("edge"))
 
+    def test_deleting_pick_also_deletes_computation(self):
+        document_model = DocumentModel.DocumentModel()
+        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
+        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+            model_data_item = self.__create_spectrum_image()
+            document_model.append_data_item(model_data_item)
+            elemental_mapping_controller.set_current_data_item(model_data_item)
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
+            edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
+            edge_bundle[0].pick_action()
+            self.__run_until_complete(document_controller)
+            composite_data_item = document_model.data_items[4]
+            self.assertIsInstance(composite_data_item, DataItem.CompositeLibraryItem)
+            self.assertEqual(1, len(document_model.computations))
+            self.assertEqual(5, len(document_model.data_items))
+            self.assertEqual(2, len(document_model.data_structures))
+            document_model.remove_data_item(composite_data_item)
+            self.assertEqual(0, len(document_model.computations))
+            self.assertEqual(1, len(document_model.data_items))
+            self.assertEqual(1, len(document_model.data_structures))
+
     def test_selecting_composite_updates_edge_value(self):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
