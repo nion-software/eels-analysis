@@ -181,6 +181,7 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         composite_display_specifier.display.dimensional_scales = (model_data_item.dimensional_shape[-1], )
         composite_display_specifier.display.dimensional_calibrations = (model_data_item.dimensional_calibrations[-1], )
         composite_display_specifier.display.intensity_calibration = model_data_item.intensity_calibration
+        composite_display_specifier.display.legend_labels = ["Data", "Background", "Signal"]
         document_model.append_data_item(composite_data_item)
         fit_region = Graphics.IntervalGraphic()
         fit_region.label = _("Fit")
