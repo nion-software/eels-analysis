@@ -621,44 +621,31 @@ class ElementalMappingController:
         return edge_bundles
 
     def build_multiprofile(self, document_controller):
+        document_model = document_controller.document_model
         model_data_item = self.__model_data_item
-        document_model = self.__document_model
+        if not model_data_item:
+            return
         multiprofile_data_item = None
-        multiprofile_computation = None
-        indexes = list()
         legend_labels = list()
         line_profile_regions = list()
         for index, dependent_data_item in enumerate(document_model.get_dependent_data_items(model_data_item)):
             if self.__is_calibrated_map(dependent_data_item):
                 if not multiprofile_data_item:
-                    multiprofile_data_item = DataItem.new_data_item()
-                    multiprofile_computation = document_model.create_computation("")
-                    multiprofile_computation.label = "EELS Multiprofile"
-                indexes.append(index)
+                    multiprofile_data_item = DataItem.CompositeLibraryItem()
+                    document_model.append_data_item(multiprofile_data_item)
                 legend_labels.append(dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:])
-                display = dependent_data_item.displays[0]
-                line_profile_region = Graphics.LineProfileGraphic()
-                line_profile_region.start = 0.5, 0.2
-                line_profile_region.end = 0.5, 0.8
-                display.add_graphic(line_profile_region)
+                line_profile_data_item = document_model.get_line_profile_new(dependent_data_item)
+                line_profile_region = dependent_data_item.displays[0].graphics[0]
+                line_profile_region.vector = (0.5, 0.2), (0.5, 0.8)
+                multiprofile_data_item.append_data_item(line_profile_data_item)
                 line_profile_regions.append(line_profile_region)
-                multiprofile_computation.create_object("src" + str(index), document_model.get_object_specifier(dependent_data_item), label="Src" + str(index))
-                multiprofile_computation.create_object("region" + str(index), document_model.get_object_specifier(line_profile_region), label="Region" + str(index))
         if multiprofile_data_item:
-            script = "from nion.eels_analysis import eels_analysis as ea\nfrom nion.data import xdata_1_0 as xd\nimport numpy\n"
-            for index in indexes:
-                script += "d{0} = xd.line_profile(src{0}.display_xdata, region{0}.vector, region{0}.line_width)\n".format(index)
-            profiles = ",".join(["d{0}".format(index) for index in indexes])
-            script += "mx=numpy.amax(xd.vstack([{}]).data)\n".format(profiles)
-            for index in indexes:
-                script += "d{0} /= mx\n".format(index)
-            script += "target.xdata = xd.vstack([{}])".format(profiles)
-            multiprofile_computation.expression = script
             multiprofile_display_specifier = DataItem.DisplaySpecifier.from_data_item(multiprofile_data_item)
             multiprofile_display_specifier.display.display_type = "line_plot"
+            multiprofile_display_specifier.display.dimensional_scales = (model_data_item.dimensional_shape[0], )
+            multiprofile_display_specifier.display.dimensional_calibrations = (model_data_item.dimensional_calibrations[0], )
+            multiprofile_display_specifier.display.intensity_calibration = model_data_item.intensity_calibration
             multiprofile_display_specifier.display.legend_labels = legend_labels
-            document_model.append_data_item(multiprofile_data_item)
-            document_model.set_data_item_computation(multiprofile_data_item, multiprofile_computation)
             for line_profile_region in line_profile_regions[1:]:
                 multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector"))
                 multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width"))

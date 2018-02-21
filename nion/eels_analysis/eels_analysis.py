@@ -383,7 +383,7 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
 
     result = edge_map if cross_section is None else edge_map / cross_section
 
-    dimensional_calibrations = data_and_metadata.dimensional_calibrations[1:]
+    dimensional_calibrations = data_and_metadata.dimensional_calibrations[0:-1]
     intensity_calibration = copy.deepcopy(data_and_metadata.intensity_calibration)
     if cross_section is not None:
         intensity_calibration.units = "~"

@@ -351,3 +351,82 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(model_data_item, mapped_data_item.source)
             self.assertEqual(1, len(document_model.computations))
             self.assertEqual("eels.mapping", document_model.computations[0].processing_id)
+            self.assertEqual(mapped_data_item.dimensional_calibrations, model_data_item.dimensional_calibrations[0:2])
+
+    def test_multiprofile_of_two_maps_builds_two_line_profiles(self):
+        document_model = DocumentModel.DocumentModel()
+        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
+        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+            model_data_item = self.__create_spectrum_image()
+            document_model.append_data_item(model_data_item)
+            elemental_mapping_controller.set_current_data_item(model_data_item)
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(32, 2, 3))  # Ge-L
+            edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
+            edge_bundle[0].map_action()
+            self.__run_until_complete(document_controller)
+            edge_bundle[1].map_action()
+            self.__run_until_complete(document_controller)
+            self.assertEqual(3, len(document_model.data_items))
+            elemental_mapping_controller.build_multiprofile(document_controller)
+            self.assertEqual(6, len(document_model.data_items))
+            composite_data_item = document_model.data_items[3]
+            line_profile1_data_item = document_model.data_items[4]
+            line_profile2_data_item = document_model.data_items[5]
+            self.assertIn(line_profile1_data_item, composite_data_item.data_items)
+            self.assertIn(line_profile2_data_item, composite_data_item.data_items)
+
+    def test_multiprofile_configures_composite_line_plot_calibration(self):
+        document_model = DocumentModel.DocumentModel()
+        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
+        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+            model_data_item = self.__create_spectrum_image()
+            document_model.append_data_item(model_data_item)
+            elemental_mapping_controller.set_current_data_item(model_data_item)
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(32, 2, 3))  # Ge-L
+            edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
+            edge_bundle[0].map_action()
+            self.__run_until_complete(document_controller)
+            edge_bundle[1].map_action()
+            self.__run_until_complete(document_controller)
+            elemental_mapping_controller.build_multiprofile(document_controller)
+            self.__run_until_complete(document_controller)
+            map1_data_item = document_model.data_items[1]
+            map2_data_item = document_model.data_items[2]
+            composite_data_item = document_model.data_items[3]
+            line_profile1_data_item = document_model.data_items[4]
+            line_profile2_data_item = document_model.data_items[5]
+            self.assertEqual(line_profile1_data_item.dimensional_calibrations[0], composite_data_item.displays[0].dimensional_calibrations[0])
+            self.assertEqual(line_profile2_data_item.dimensional_calibrations[0], composite_data_item.displays[0].dimensional_calibrations[0])
+
+    def test_multiprofile_of_two_maps_connects_line_profiles(self):
+        document_model = DocumentModel.DocumentModel()
+        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
+        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+            model_data_item = self.__create_spectrum_image()
+            document_model.append_data_item(model_data_item)
+            elemental_mapping_controller.set_current_data_item(model_data_item)
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
+            elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(32, 2, 3))  # Ge-L
+            edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
+            edge_bundle[0].map_action()
+            self.__run_until_complete(document_controller)
+            edge_bundle[1].map_action()
+            self.__run_until_complete(document_controller)
+            elemental_mapping_controller.build_multiprofile(document_controller)
+            map1_data_item = document_model.data_items[1]
+            map2_data_item = document_model.data_items[2]
+            # composite_data_item = document_model.data_items[3]
+            # line_profile1_data_item = document_model.data_items[4]
+            # line_profile2_data_item = document_model.data_items[5]
+            line_region1 = map1_data_item.displays[0].graphics[0]
+            line_region2 = map2_data_item.displays[0].graphics[0]
+            self.assertEqual(line_region1.vector, line_region2.vector)
+            self.assertEqual(line_region1.width, line_region2.width)
+            line_region1.vector = (0.11, 0.12), (0.21, 0.22)
+            self.assertEqual(line_region1.vector, line_region2.vector)
+            self.assertEqual(line_region1.width, line_region2.width)
