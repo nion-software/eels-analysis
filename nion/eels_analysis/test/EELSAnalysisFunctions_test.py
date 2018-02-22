@@ -137,7 +137,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         spectrum_length = 1000
         w, h = 20, 20
         electron_shell = PeriodicTable.ElectronShell(1, 1, 0)
-        data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length, w, h), numpy.float), dimensional_calibrations=[calibration, calibration_y, calibration_x])
+        data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length, w, h), numpy.float), dimensional_calibrations=[calibration_y, calibration_x, calibration])
         mapped = eels_analysis.map_background_subtracted_signal(data_and_metadata, electron_shell, (0.2, 0.3), (0.4, 0.5))
         self.assertEqual(len(mapped.dimensional_shape), 2)
         self.assertEqual(len(mapped.dimensional_calibrations), 2)
