@@ -215,7 +215,7 @@ def slow_fit_linear_background(data: numpy.ndarray, signal_index: int) -> numpy.
     A = numpy.vstack([linear, ones]).T
 
     # solve for p. p will have the shape (n, 2) where n is the dimensions of the non-signal indexes of the data.
-    p = numpy.array([numpy.linalg.lstsq(A, reshaped_data[k, ...], rcond=None)[0] for k in range(reshaped_data.shape[0])])
+    p = numpy.array([numpy.linalg.lstsq(A, reshaped_data[k, ...], rcond=-1)[0] for k in range(reshaped_data.shape[0])])
 
     # reshape and return
     return p.reshape(data.shape[:signal_index] + (2,))
