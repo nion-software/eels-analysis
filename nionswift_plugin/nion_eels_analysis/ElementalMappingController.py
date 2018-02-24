@@ -53,7 +53,7 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
     """
     document_model = document_controller.document_model
     pick_region = Graphics.RectangleGraphic()
-    pick_region.size = 16 / model_data_item.dimensional_shape[0], 16 / model_data_item.dimensional_shape[1]
+    pick_region.size = min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1])
     pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
     model_data_item.displays[0].add_graphic(pick_region)
 
@@ -441,7 +441,7 @@ class ElementalMappingController:
         document_model = document_controller.document_model
         model_data_item = self.__model_data_item
         pick_region = Graphics.RectangleGraphic()
-        pick_region.size = 16 / model_data_item.dimensional_shape[0], 16 / model_data_item.dimensional_shape[1]
+        pick_region.size = min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1])
         pick_region.label = _("Explore")
         model_data_item.displays[0].add_graphic(pick_region)
         pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
