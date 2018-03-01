@@ -454,7 +454,7 @@ class ElementalMappingController:
             pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
             pick_display_specifier.display.add_graphic(explore_interval)
             document_controller.display_data_item(pick_display_specifier)
-            await self.__document_model.compute_immediate(document_controller.event_loop, pick_data_item.computation)  # need the data to make connect_explorer_interval work; so do this here. ugh.
+            await self.__document_model.compute_immediate(document_controller.event_loop, document_model.get_data_item_computation(pick_data_item))  # need the data to make connect_explorer_interval work; so do this here. ugh.
             self.__connect_explorer_interval(pick_data_item)
 
     def __add_edge(self, data_item, electron_shell, fit_interval, signal_interval) -> ElementalMappingEdge:

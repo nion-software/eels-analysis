@@ -204,7 +204,7 @@ class TestElementalMappingController(unittest.TestCase):
             self.__run_until_complete(document_controller)
             composite_data_item = document_model.data_items[4]
             self.assertIsInstance(composite_data_item, DataItem.CompositeLibraryItem)
-            self.assertEqual(1, len(document_model.computations))
+            self.assertEqual(2, len(document_model.computations))
             self.assertEqual(5, len(document_model.data_items))
             self.assertEqual(2, len(document_model.data_structures))
             document_model.remove_data_item(composite_data_item)
@@ -227,7 +227,7 @@ class TestElementalMappingController(unittest.TestCase):
             pick_region = model_data_item.displays[0].graphics[0]
             composite_data_item = document_model.data_items[4]
             self.assertIsInstance(composite_data_item, DataItem.CompositeLibraryItem)
-            self.assertEqual(1, len(document_model.computations))
+            self.assertEqual(2, len(document_model.computations))
             self.assertEqual(5, len(document_model.data_items))
             self.assertEqual(2, len(document_model.data_structures))
             model_data_item.displays[0].remove_graphic(pick_region)
@@ -294,7 +294,7 @@ class TestElementalMappingController(unittest.TestCase):
             # apply the change to the other edge
             edge_bundle[1].select_action()
             self.__run_until_complete(document_controller)
-            computation = document_model.computations[0]
+            computation = document_model.computations[1]
             old_edge_data_structure = document_model.data_structures[0]
             new_edge_data_structure = document_model.data_structures[1]
             edge_ref_data_structure = document_model.data_structures[2]
