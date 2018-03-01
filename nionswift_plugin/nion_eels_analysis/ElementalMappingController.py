@@ -72,8 +72,8 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         signal_region.graphic_id = "signal"
         signal_region.interval = edge.signal_interval
         pick_display_specifier.display.add_graphic(signal_region)
-        pick_data_item.add_connection(Connection.PropertyConnection(edge.data_structure, "fit_interval", fit_region, "interval"))
-        pick_data_item.add_connection(Connection.PropertyConnection(edge.data_structure, "signal_interval", signal_region, "interval"))
+        document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "fit_interval", fit_region, "interval", parent=pick_data_item))
+        document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "signal_interval", signal_region, "interval", parent=pick_data_item))
 
         background_data_item = DataItem.DataItem(numpy.zeros(1, ))
         background_data_item.title = "{} Background of {}".format(pick_region.label, model_data_item.title)
@@ -125,8 +125,8 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         signal_region.graphic_id = "signal"
         signal_region.interval = edge.signal_interval
         composite_display_specifier.display.add_graphic(signal_region)
-        composite_data_item.add_connection(Connection.PropertyConnection(edge.data_structure, "fit_interval", fit_region, "interval"))
-        composite_data_item.add_connection(Connection.PropertyConnection(edge.data_structure, "signal_interval", signal_region, "interval"))
+        document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "fit_interval", fit_region, "interval", parent=composite_data_item))
+        document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "signal_interval", signal_region, "interval", parent=composite_data_item))
         composite_display_specifier.display.view_to_intervals(pick_data_item.xdata, [edge.fit_interval, edge.signal_interval])
         document_controller.display_data_item(composite_display_specifier)
 
@@ -185,14 +185,14 @@ async def change_edge(document_controller: DocumentController.DocumentController
 
     pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
 
-    for connection in copy.copy(pick_data_item.connections):
-        if connection.source_property in ("fit_interval", "signal_interval"):
+    for connection in copy.copy(document_model.connections):
+        if connection.parent == pick_data_item and connection.source_property in ("fit_interval", "signal_interval"):
             source_property = connection.source_property
             target_property = connection.target_property
             target = connection._target
-            pick_data_item.remove_connection(connection)
-            new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property)
-            pick_data_item.add_connection(new_connection)
+            document_model.remove_connection(connection)
+            new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property, parent=pick_data_item)
+            document_model.append_connection(new_connection)
 
     for computation_variable in computation.variables:
         if computation_variable.name in ("fit_interval", "signal_interval"):
@@ -203,14 +203,14 @@ async def change_edge(document_controller: DocumentController.DocumentController
     subtracted_data_item.title = "{} Subtracted of {}".format(pick_region.label, model_data_item.title)
     composite_data_item.title = "{} from {}".format(pick_region.label, model_data_item.title)
 
-    for connection in copy.copy(composite_data_item.connections):
-        if connection.source_property in ("fit_interval", "signal_interval"):
+    for connection in copy.copy(document_model.connections):
+        if connection.parent == composite_data_item and connection.source_property in ("fit_interval", "signal_interval"):
             source_property = connection.source_property
             target_property = connection.target_property
             target = connection._target
-            composite_data_item.remove_connection(connection)
-            new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property)
-            composite_data_item.add_connection(new_connection)
+            document_model.remove_connection(connection)
+            new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property, parent=composite_data_item)
+            document_model.append_connection(new_connection)
 
     edge_ref_data_structure.remove_referenced_object("edge")
     edge_ref_data_structure.set_referenced_object("edge", edge.data_structure)
@@ -585,8 +585,8 @@ class ElementalMappingController:
             multiprofile_display_specifier.display.intensity_calibration = model_data_item.intensity_calibration
             multiprofile_display_specifier.display.legend_labels = legend_labels
             for line_profile_region in line_profile_regions[1:]:
-                multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector"))
-                multiprofile_data_item.add_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width"))
+                document_model.append_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector", parent=multiprofile_data_item))
+                document_model.append_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width", parent=multiprofile_data_item))
             multiprofile_data_item.title = _("Profiles of ") + ", ".join(legend_labels)
             document_controller.display_data_item(multiprofile_display_specifier)
 
