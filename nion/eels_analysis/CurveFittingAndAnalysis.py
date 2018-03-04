@@ -246,11 +246,11 @@ def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: 
     x_values = numpy.arange(x_origin, data_x_range[1], x_step)
     next_slice = data_range_converter.get_slice(clean_fit_ranges[0])
     x_values_for_fit = x_values[next_slice]
-    data_values_for_fit = data_values[..., next_slice]
+    data_values_for_fit = numpy.maximum(data_values[..., next_slice], 1)
     for range_index in range(1, clean_fit_ranges.shape[0]):
         next_slice = data_range_converter.get_slice(clean_fit_ranges[range_index])
         numpy.append(x_values_for_fit, x_values[next_slice])
-        numpy.append(data_values_for_fit, data_values[..., next_slice])
+        numpy.append(data_values_for_fit, numpy.maximum(data_values[..., next_slice], 1))
 
     # Generate the requested polynomial fit for the specified fit ranges
     background_fit = PolynomialCurveFit(x_values_for_fit, polynomial_order, fit_log_x)

@@ -39,6 +39,19 @@ class TestLibrary(unittest.TestCase):
         self.assertLess(abs(numpy.amax(bkgd_model) - numpy.amax(signal_background)), numpy.ptp(signal_background) / 100.0)
         self.assertLess(numpy.average(bkgd_model - signal_background), 0.0001)
 
+    def test_power_law_background_1d_with_negative_values(self):
+        # tests only that it can handle negative values; not that it is accurate
+        shape = 1000
+        background = 10000 * numpy.power(numpy.linspace(1,10,shape), -4)  # 0 -> 10000
+        background = background + numpy.random.poisson(numpy.full((shape,), 100)) - 100
+        fit_range = range(400, 500)
+        self.assertLess(numpy.amin(background[fit_range]), 0)
+        spectral_range = numpy.array([0, shape])
+        edge_onset = fit_range.stop
+        edge_delta = 100.0
+        bkgd_range = numpy.array([fit_range.start, fit_range.stop])
+        analyzer.core_loss_edge(background, spectral_range, edge_onset, edge_delta, bkgd_range)
+
     def test_core_loss_edge_1d(self):
         # this edge in Swift:
         # 10 * pow(linspace(1,10,1000), -4) + 0.01 * rescale(gammapdf(linspace(0, 1, 1000), 1.3, 0.5, 0.01))
