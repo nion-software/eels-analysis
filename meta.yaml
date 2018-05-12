@@ -1,0 +1,36 @@
+package:
+  name: 'nionswift-eels-analysis'
+  version: '0.1.0'
+
+source:
+  git_rev: 0.1.0
+  git_url: https://github.com/nion-software/eels-analysis.git
+
+build:
+  noarch: python
+  number: 0
+  script: python -m pip install --no-deps --ignore-installed .
+  include_recipe: False
+
+requirements:
+  host:
+    - python
+    - setuptools
+  run:
+    - python >=3.5
+
+test:
+  imports:
+    - nion.eels_analysis
+    - nion.eels_analysis.test
+    - nionswift_plugin.nion_eels_analysis
+    - nionswift_plugin.nion_eels_analysis.test
+
+about:
+  home: https://github.com/nion-software/eels-analysis
+  summary: "Library and UI for doing EELS analysis with Nion Swift."
+  description: "Library and UI for doing EELS analysis with Nion Swift."
+
+extra:
+  recipe-maintainers:
+    cmeyer
