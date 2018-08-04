@@ -7,7 +7,6 @@ import operator
 # None
 
 # local libraries
-from nion.swift import HistogramPanel
 from nion.swift import Panel
 from nion.swift import Workspace
 from nion.eels_analysis import PeriodicTable

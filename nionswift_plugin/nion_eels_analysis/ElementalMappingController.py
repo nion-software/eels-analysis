@@ -26,8 +26,8 @@ class EELSBackgroundSubtraction:
         self.computation = computation
 
     def execute(self, eels_spectrum_xdata, fit_interval, signal_interval):
-        signal = eels_analysis.extract_original_signal(eels_spectrum_xdata, fit_interval, signal_interval)
-        self.__background_xdata = eels_analysis.calculate_background_signal(eels_spectrum_xdata, fit_interval, signal_interval)
+        signal = eels_analysis.extract_original_signal(eels_spectrum_xdata, [fit_interval], signal_interval)
+        self.__background_xdata = eels_analysis.calculate_background_signal(eels_spectrum_xdata, [fit_interval], signal_interval)
         self.__subtracted_xdata = signal - self.__background_xdata
 
     def commit(self):
@@ -59,6 +59,7 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
 
     pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
     if pick_data_item:
+        # set up the pick data item for this edge.
         pick_data_item.title = "{} Data of {}".format(pick_region.label, model_data_item.title)
         pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
         pick_display_specifier.display.display_type = "line_plot"
@@ -226,7 +227,7 @@ class EELSMapping:
         self.computation = computation
 
     def execute(self, spectrum_image_xdata, fit_interval, signal_interval):
-        self.__mapped_xdata = eels_analysis.map_background_subtracted_signal(spectrum_image_xdata, None, fit_interval, signal_interval)
+        self.__mapped_xdata = eels_analysis.map_background_subtracted_signal(spectrum_image_xdata, None, [fit_interval], signal_interval)
 
     def commit(self):
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)

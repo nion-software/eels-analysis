@@ -261,13 +261,12 @@ def subtract_linear_background(data_and_metadata: DataAndMetadata.DataAndMetadat
     return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
-def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
+def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_ranges, signal_range) -> DataAndMetadata.DataAndMetadata:
     """Calculate background from data and metadata with signal in first index."""
     signal_index = -1
 
     signal_length = data_and_metadata.dimensional_shape[signal_index]
 
-    fit_range = (numpy.asarray(fit_range) * signal_length).astype(numpy.float)
     signal_range = (numpy.asarray(signal_range) * signal_length).astype(numpy.float)
 
     data = data_and_metadata.data
@@ -280,16 +279,18 @@ def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetada
     spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(signal_length)])
     edge_onset = signal_calibration.convert_to_calibrated_value(signal_range[0])
     edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
-    bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0]), signal_calibration.convert_to_calibrated_value(fit_range[1])])
+    # bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range0[0]), signal_calibration.convert_to_calibrated_value(fit_range0[1])])
+    bkgd_ranges = numpy.array([numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0] * signal_length), signal_calibration.convert_to_calibrated_value(fit_range[1] * signal_length)]) for fit_range in fit_ranges])
     # print("d {} s {} e {} d {} b {}".format(data.shape if data is not None else None, spectral_range, edge_onset, edge_delta, bkgd_range))
-    edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)
+    edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_ranges)
 
     # Squeeze the result
     result = numpy.squeeze(bkgd_model)
 
+    max_channel = int(round(max([fit_range[1] * signal_length for fit_range in fit_ranges] + [signal_range[1]])))
+    min_channel = int(round(min([fit_range[0] * signal_length for fit_range in fit_ranges] + [signal_range[0]])))
+
     data_shape = list(data_and_metadata.data_shape)
-    max_channel = int(round(max(fit_range[1], signal_range[1])))
-    min_channel = int(round(min(fit_range[0], signal_range[0])))
     data_shape[signal_index] = max_channel - min_channel
     data_shape = tuple(data_shape)
     dimensional_calibrations = copy.deepcopy(data_and_metadata.dimensional_calibrations)
@@ -299,20 +300,19 @@ def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetada
     return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, dimensional_calibrations)
 
 
-def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
-    """Subtract si_k background from data and metadata with signal in first index."""
+def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_ranges, signal_range) -> DataAndMetadata.DataAndMetadata:
     signal_index = -1
 
     signal_length = data_and_metadata.dimensional_shape[signal_index]
 
-    fit_range = (numpy.asarray(fit_range) * signal_length).astype(numpy.float)
     signal_range = (numpy.asarray(signal_range) * signal_length).astype(numpy.float)
 
-    result = data_and_metadata.data[..., int(round(min(fit_range[0], signal_range[0]))):int(round(max(fit_range[1], signal_range[1])))]
+    max_channel = int(round(max([fit_range[1] * signal_length for fit_range in fit_ranges] + [signal_range[1]])))
+    min_channel = int(round(min([fit_range[0] * signal_length for fit_range in fit_ranges] + [signal_range[0]])))
+
+    result = data_and_metadata.data[..., min_channel:max_channel]
 
     data_shape = list(data_and_metadata.data_shape)
-    max_channel = int(round(max(fit_range[1], signal_range[1])))
-    min_channel = int(round(min(fit_range[0], signal_range[0])))
     data_shape[signal_index] = max_channel - min_channel
     data_shape = tuple(data_shape)
     dimensional_calibrations = copy.deepcopy(data_and_metadata.dimensional_calibrations)
@@ -344,20 +344,19 @@ def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, dat
     return DataAndMetadata.new_data_and_metadata(data, data_and_metadata_dst.intensity_calibration, data_and_metadata_dst.dimensional_calibrations)
 
 
-def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, electron_shell: typing.Optional[PeriodicTable.ElectronShell], fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
+def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, electron_shell: typing.Optional[PeriodicTable.ElectronShell], fit_ranges, signal_range) -> DataAndMetadata.DataAndMetadata:
     """Subtract si_k background from data and metadata with signal in first index."""
     signal_index = -1
 
     signal_length = data_and_metadata.dimensional_shape[signal_index]
 
-    fit_range = (numpy.asarray(fit_range) * signal_length).astype(numpy.float)
     signal_range = (numpy.asarray(signal_range) * signal_length).astype(numpy.float)
 
     signal_calibration = data_and_metadata.dimensional_calibrations[signal_index]
     spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(data_and_metadata.dimensional_shape[signal_index])])
     edge_onset = signal_calibration.convert_to_calibrated_value(signal_range[0])
     edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
-    bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0]), signal_calibration.convert_to_calibrated_value(fit_range[1])])
+    bkgd_ranges = numpy.array([numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0] * signal_length), signal_calibration.convert_to_calibrated_value(fit_range[1] * signal_length)]) for fit_range in fit_ranges])
 
     cross_section = None
     if electron_shell is not None:
@@ -379,7 +378,7 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
     data = data_and_metadata.data
 
     # Fit within fit_range; calculate background within signal_range; subtract from source signal range
-    edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_range)
+    edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_ranges)
 
     result = edge_map if cross_section is None else edge_map / cross_section
 

@@ -75,6 +75,7 @@ class MultipleCurveFit:
         fit_curves = numpy.einsum('ij, ...i', self._normalized_model_curves, self._normalized_fit_coefficients)
         return fit_curves
 
+
 class PolynomialCurveFit:
     """A class for fitting 1D polynomials to arrays of 1D data (i.e. curves or spectra).
 
@@ -153,6 +154,7 @@ class PolynomialCurveFit:
             evaluated_fit = numpy.exp(evaluated_fit)
         return evaluated_fit
 
+
 class RangeSliceConverter:
     """A class for converting between calibrated ranges and slices on equispaced 1D data arrays.
 
@@ -181,6 +183,7 @@ class RangeSliceConverter:
         range_start = self._origin + slice_for_range.start * self._step
         range_end = self._origin + slice_for_range.stop * self._step
         return numpy.array([range_start, range_end])
+
 
 def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: numpy.ndarray, signal_x_range: numpy.ndarray,
                                                 background_fit_x_ranges: numpy.ndarray, polynomial_order: int = 1,
@@ -238,6 +241,8 @@ def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: 
             clean_fit_ranges[-1, 1] = max(clean_fit_ranges[-1, 1], sorted_fit_ranges[range_index, 1])
         else:
             clean_fit_ranges = numpy.append(clean_fit_ranges, sorted_fit_ranges[range_index])
+    if clean_fit_ranges.shape[0] > 2:
+        clean_fit_ranges = clean_fit_ranges.reshape([clean_fit_ranges.shape[0] // 2, 2])
 
     # Compile data and x-value arrays over fit ranges for input to the polynomial background fit
     x_origin = data_x_range[0]
@@ -249,8 +254,8 @@ def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: 
     data_values_for_fit = numpy.maximum(data_values[..., next_slice], 1)
     for range_index in range(1, clean_fit_ranges.shape[0]):
         next_slice = data_range_converter.get_slice(clean_fit_ranges[range_index])
-        numpy.append(x_values_for_fit, x_values[next_slice])
-        numpy.append(data_values_for_fit, numpy.maximum(data_values[..., next_slice], 1))
+        x_values_for_fit = numpy.append(x_values_for_fit, x_values[next_slice])
+        data_values_for_fit = numpy.append(data_values_for_fit, numpy.maximum(data_values[..., next_slice], 1), axis=-1)
 
     # Generate the requested polynomial fit for the specified fit ranges
     background_fit = PolynomialCurveFit(x_values_for_fit, polynomial_order, fit_log_x)

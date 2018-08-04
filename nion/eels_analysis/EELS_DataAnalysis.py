@@ -31,7 +31,7 @@ def core_loss_edge(core_loss_spectra: numpy.ndarray, core_loss_range_eV: numpy.n
         edge_background - array of background models evaluated over the profile range (see below)
         profile_range - contiguous union of edge delta and background ranges
     """
-    edge_onset_margin_eV = 10
+    edge_onset_margin_eV = 0
     assert edge_onset_eV > core_loss_range_eV[0] + edge_onset_margin_eV
 
     edge_range = numpy.full_like(core_loss_range_eV, edge_onset_eV)

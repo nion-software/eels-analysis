@@ -92,8 +92,8 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((2048, ), numpy.float), dimensional_calibrations=[calibration])
         fit_range = 0.2, 0.3
         signal_range = 0.4, 0.5
-        signal = eels_analysis.extract_original_signal(data_and_metadata, fit_range, signal_range)
-        background = eels_analysis.calculate_background_signal(data_and_metadata, fit_range, signal_range)
+        signal = eels_analysis.extract_original_signal(data_and_metadata, [fit_range], signal_range)
+        background = eels_analysis.calculate_background_signal(data_and_metadata, [fit_range], signal_range)
         self.assertEqual(signal.data_shape, signal.data.shape)
         self.assertEqual(background.data_shape, background.data.shape)
 
@@ -101,7 +101,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         calibration = Calibration.Calibration(200.0, 2.0, 'eV')
         spectrum_length = 1000
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data((numpy.random.randn(spectrum_length) * 100).astype(numpy.int32), dimensional_calibrations=[calibration])
-        signal = eels_analysis.extract_original_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        signal = eels_analysis.extract_original_signal(data_and_metadata, [(0.2, 0.3)], (0.4, 0.5))
         self.assertEqual(data_and_metadata.dimensional_calibrations[0], calibration)  # dummy check
         self.assertAlmostEqual(signal.dimensional_calibrations[0].offset, 0.2 * spectrum_length * calibration.scale + calibration.offset)
         self.assertAlmostEqual(signal.dimensional_calibrations[0].scale, calibration.scale)
@@ -112,7 +112,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         calibration = Calibration.Calibration(200.0, 2.0, 'eV')
         spectrum_length = 1000
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length,), numpy.float), dimensional_calibrations=[calibration])
-        background = eels_analysis.calculate_background_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        background = eels_analysis.calculate_background_signal(data_and_metadata, [(0.2, 0.3)], (0.4, 0.5))
         self.assertEqual(data_and_metadata.dimensional_calibrations[0], calibration)  # dummy check
         self.assertAlmostEqual(background.dimensional_calibrations[0].offset, 0.2 * spectrum_length * calibration.scale + calibration.offset)
         self.assertAlmostEqual(background.dimensional_calibrations[0].scale, calibration.scale)
@@ -122,7 +122,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         calibration = Calibration.Calibration(200.0, 2.0, 'eV')
         spectrum_length = 1000
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length,), numpy.float), dimensional_calibrations=[calibration])
-        signal = eels_analysis.extract_original_signal(data_and_metadata, (0.2, 0.3), (0.4, 0.5))
+        signal = eels_analysis.extract_original_signal(data_and_metadata, [(0.2, 0.3)], (0.4, 0.5))
         signal = DataAndMetadata.DataAndMetadata.from_data(numpy.ones(300, ), signal.intensity_calibration, signal.dimensional_calibrations)
         expanded = eels_analysis.make_signal_like(signal, data_and_metadata)
         self.assertEqual(expanded.dimensional_calibrations[0], calibration)
@@ -138,7 +138,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         w, h = 20, 20
         electron_shell = PeriodicTable.ElectronShell(1, 1, 0)
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length, w, h), numpy.float), dimensional_calibrations=[calibration_y, calibration_x, calibration])
-        mapped = eels_analysis.map_background_subtracted_signal(data_and_metadata, electron_shell, (0.2, 0.3), (0.4, 0.5))
+        mapped = eels_analysis.map_background_subtracted_signal(data_and_metadata, electron_shell, [(0.2, 0.3)], (0.4, 0.5))
         self.assertEqual(len(mapped.dimensional_shape), 2)
         self.assertEqual(len(mapped.dimensional_calibrations), 2)
         self.assertEqual(mapped.dimensional_calibrations[0], calibration_y)
