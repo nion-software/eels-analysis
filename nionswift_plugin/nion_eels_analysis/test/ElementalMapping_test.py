@@ -177,16 +177,10 @@ class TestElementalMappingController(unittest.TestCase):
             edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
             edge_bundle[0].pick_action()
             self.__run_until_complete(document_controller)
-            self.assertEqual(5, len(document_model.data_items))
-            data_item = document_model.data_items[1]
-            background_data_item = document_model.data_items[2]
-            subtracted_data_item = document_model.data_items[3]
-            composite_data_item = document_model.data_items[4]
-            self.assertEqual(model_data_item.displays[0].graphics[0], composite_data_item.source)
-            self.assertEqual(composite_data_item, data_item.source)
-            self.assertEqual(composite_data_item, background_data_item.source)
-            self.assertEqual(composite_data_item, subtracted_data_item.source)
-            self.assertEqual(composite_data_item, document_model.data_structures[1].source)
+            self.assertEqual(2, len(document_model.data_items))
+            eels_data_item = document_model.data_items[1]
+            self.assertEqual(model_data_item.displays[0].graphics[0], eels_data_item.source)
+            self.assertEqual(eels_data_item, document_model.data_structures[1].source)
             self.assertEqual("elemental_mapping_edge_ref", document_model.data_structures[1].structure_type)
             self.assertEqual(document_model.data_structures[0], document_model.data_structures[1].get_referenced_object("edge"))
 
@@ -202,12 +196,11 @@ class TestElementalMappingController(unittest.TestCase):
             edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
             edge_bundle[0].pick_action()
             self.__run_until_complete(document_controller)
-            composite_data_item = document_model.data_items[4]
-            self.assertIsInstance(composite_data_item, DataItem.CompositeLibraryItem)
-            self.assertEqual(2, len(document_model.computations))
-            self.assertEqual(5, len(document_model.data_items))
+            eels_data_item = document_model.data_items[1]
+            self.assertEqual(1, len(document_model.computations))
+            self.assertEqual(2, len(document_model.data_items))
             self.assertEqual(2, len(document_model.data_structures))
-            document_model.remove_data_item(composite_data_item)
+            document_model.remove_data_item(eels_data_item)
             self.assertEqual(0, len(document_model.computations))
             self.assertEqual(1, len(document_model.data_items))
             self.assertEqual(1, len(document_model.data_structures))
@@ -225,10 +218,9 @@ class TestElementalMappingController(unittest.TestCase):
             edge_bundle[0].pick_action()
             self.__run_until_complete(document_controller)
             pick_region = model_data_item.displays[0].graphics[0]
-            composite_data_item = document_model.data_items[4]
-            self.assertIsInstance(composite_data_item, DataItem.CompositeLibraryItem)
-            self.assertEqual(2, len(document_model.computations))
-            self.assertEqual(5, len(document_model.data_items))
+            eels_data_item = document_model.data_items[1]
+            self.assertEqual(1, len(document_model.computations))
+            self.assertEqual(2, len(document_model.data_items))
             self.assertEqual(2, len(document_model.data_structures))
             model_data_item.displays[0].remove_graphic(pick_region)
             self.assertEqual(0, len(document_model.computations))
@@ -248,8 +240,8 @@ class TestElementalMappingController(unittest.TestCase):
             edge_bundle[0].pick_action()
             self.__run_until_complete(document_controller)
             self.assertIsNone(elemental_mapping_controller.edge)
-            composite_data_item = document_model.data_items[4]
-            elemental_mapping_controller.set_current_data_item(composite_data_item)
+            eels_data_item = document_model.data_items[1]
+            elemental_mapping_controller.set_current_data_item(eels_data_item)
             self.assertEqual(model_data_item, elemental_mapping_controller.model_data_item)
             self.assertEqual(si_edge.data_structure, elemental_mapping_controller.edge.data_structure)
 
@@ -273,7 +265,7 @@ class TestElementalMappingController(unittest.TestCase):
             document_model.append_computation(computation)
             document_model.recompute_all()
             document_controller.periodic()
-            self.assertEqual(4, len(document_model.data_items))
+            self.assertEqual(2, len(document_model.data_items))
 
     def test_changing_edge_configures_other_items_correctly(self):
         document_model = DocumentModel.DocumentModel()
@@ -288,49 +280,39 @@ class TestElementalMappingController(unittest.TestCase):
             edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
             edge_bundle[0].pick_action()
             self.__run_until_complete(document_controller)
-            composite_data_item = document_model.data_items[4]
-            elemental_mapping_controller.set_current_data_item(composite_data_item)
+            eels_data_item = document_model.data_items[1]
+            elemental_mapping_controller.set_current_data_item(eels_data_item)
             edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
             # apply the change to the other edge
             edge_bundle[1].select_action()
             self.__run_until_complete(document_controller)
-            computation = document_model.computations[1]
+            computation = document_model.computations[0]
             old_edge_data_structure = document_model.data_structures[0]
             new_edge_data_structure = document_model.data_structures[1]
             edge_ref_data_structure = document_model.data_structures[2]
-            pick_data_item = document_model.data_items[1]
-            background_data_item = document_model.data_items[2]
-            subtracted_data_item = document_model.data_items[3]
             pick_region = model_data_item.displays[0].graphics[0]
             # check the titles
             self.assertEqual("Pick Ge-L3", pick_region.label)
-            self.assertEqual("Pick Ge-L3 Data of Untitled", pick_data_item.title)
-            self.assertEqual("Pick Ge-L3 Background of Untitled", background_data_item.title)
-            self.assertEqual("Pick Ge-L3 Subtracted of Untitled", subtracted_data_item.title)
-            self.assertEqual("Pick Ge-L3 from Untitled", composite_data_item.title)
+            self.assertEqual("Pick Ge-L3 EELS Data of Untitled", eels_data_item.title)
             # check the old intervals are disconnected and the new are connected
-            old_fit_interval = pick_data_item.displays[0].graphics[1].interval
-            old_signal_interval = pick_data_item.displays[0].graphics[2].interval
+            old_fit_interval = eels_data_item.displays[0].graphics[0].interval
+            old_signal_interval = eels_data_item.displays[0].graphics[1].interval
             new_fit_interval = (0.6, 0.7)
             new_signal_interval = (0.7, 0.8)
             # ensure changing old edge doesn't affect any connections
             old_edge_data_structure.set_property_value("fit_interval", new_fit_interval)
             old_edge_data_structure.set_property_value("signal_interval", new_signal_interval)
-            self.assertEqual(old_fit_interval, pick_data_item.displays[0].graphics[1].interval)
-            self.assertEqual(old_signal_interval, pick_data_item.displays[0].graphics[2].interval)
+            self.assertEqual(old_fit_interval, eels_data_item.displays[0].graphics[0].interval)
+            self.assertEqual(old_signal_interval, eels_data_item.displays[0].graphics[1].interval)
             self.assertEqual(old_fit_interval, computation._get_variable("fit_interval").bound_item.value)
             self.assertEqual(old_signal_interval, computation._get_variable("signal_interval").bound_item.value)
-            self.assertEqual(old_fit_interval, composite_data_item.displays[0].graphics[0].interval)
-            self.assertEqual(old_signal_interval, composite_data_item.displays[0].graphics[1].interval)
             # ensure changing new edge affects all connections
             new_edge_data_structure.set_property_value("fit_interval", new_fit_interval)
             new_edge_data_structure.set_property_value("signal_interval", new_signal_interval)
-            self.assertEqual(new_fit_interval, pick_data_item.displays[0].graphics[1].interval)
-            self.assertEqual(new_signal_interval, pick_data_item.displays[0].graphics[2].interval)
+            self.assertEqual(new_fit_interval, eels_data_item.displays[0].graphics[0].interval)
+            self.assertEqual(new_signal_interval, eels_data_item.displays[0].graphics[1].interval)
             self.assertEqual(new_fit_interval, computation._get_variable("fit_interval").bound_item.value)
             self.assertEqual(new_signal_interval, computation._get_variable("signal_interval").bound_item.value)
-            self.assertEqual(new_fit_interval, composite_data_item.displays[0].graphics[0].interval)
-            self.assertEqual(new_signal_interval, composite_data_item.displays[0].graphics[1].interval)
             # and the edge reference
             self.assertEqual(new_edge_data_structure, edge_ref_data_structure.get_referenced_object("edge"))
 
@@ -374,8 +356,8 @@ class TestElementalMappingController(unittest.TestCase):
             composite_data_item = document_model.data_items[3]
             line_profile1_data_item = document_model.data_items[4]
             line_profile2_data_item = document_model.data_items[5]
-            self.assertIn(line_profile1_data_item, composite_data_item.data_items)
-            self.assertIn(line_profile2_data_item, composite_data_item.data_items)
+            # self.assertIn(line_profile1_data_item, composite_data_item.data_items)
+            # self.assertIn(line_profile2_data_item, composite_data_item.data_items)
 
     def test_multiprofile_configures_composite_line_plot_calibration(self):
         document_model = DocumentModel.DocumentModel()

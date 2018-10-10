@@ -9,6 +9,7 @@ import typing
 import numpy
 
 # local libraries
+from nion.data import xdata_1_0 as xd
 from nion.swift import DocumentController
 from nion.swift.model import Connection
 from nion.swift.model import DataItem
@@ -25,14 +26,15 @@ class EELSBackgroundSubtraction:
     def __init__(self, computation, **kwargs):
         self.computation = computation
 
-    def execute(self, eels_spectrum_xdata, fit_interval, signal_interval):
-        signal = eels_analysis.extract_original_signal(eels_spectrum_xdata, [fit_interval], signal_interval)
-        self.__background_xdata = eels_analysis.calculate_background_signal(eels_spectrum_xdata, [fit_interval], signal_interval)
-        self.__subtracted_xdata = signal - self.__background_xdata
+    def execute(self, eels_xdata, region, fit_interval, signal_interval):
+        eels_spectrum_xdata = xd.sum_region(eels_xdata, region.mask_xdata_with_shape(eels_xdata.data_shape[0:2]))
+        signal = eels_analysis.make_signal_like(eels_analysis.extract_original_signal(eels_spectrum_xdata, [fit_interval], signal_interval), eels_spectrum_xdata)
+        background_xdata = eels_analysis.make_signal_like(eels_analysis.calculate_background_signal(eels_spectrum_xdata, [fit_interval], signal_interval), eels_spectrum_xdata)
+        subtracted_xdata = signal - background_xdata
+        self.__xdata = xd.vstack((eels_spectrum_xdata, background_xdata, subtracted_xdata))
 
     def commit(self):
-        self.computation.set_referenced_xdata("background", self.__background_xdata)
-        self.computation.set_referenced_xdata("subtracted", self.__subtracted_xdata)
+        self.computation.set_referenced_xdata("data", self.__xdata)
 
 
 async def pick_new_edge(document_controller, model_data_item, edge) -> None:
@@ -44,12 +46,9 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         - a background subtraction computation with model data item, and edge intervals as inputs
         - a background data item, computed by the background subtraction computation
         - a subtracted data item, computed by the background subtraction computation
-        - a composite line plot with pick, background, and subtracted data items as components
-        - the composite line plot has fit/signal regions connected to edge data structure
-        - the composite line plot owns the pick, background, and subtracted data items
-        - the composite line plot owns the computation
-        - an edge reference, owned by composite line plot, with reference to edge
-        - the edge reference is used to recognize the composite line plot as associated with the referenced edge
+        - a eels line plot with pick, background, and subtracted data items as components
+        - an edge reference, owned by eels line plot, with reference to edge
+        - the edge reference is used to recognize the eels line plot as associated with the referenced edge
     """
     document_model = document_controller.document_model
     pick_region = Graphics.RectangleGraphic()
@@ -57,118 +56,79 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
     pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
     model_data_item.displays[0].add_graphic(pick_region)
 
-    pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
-    if pick_data_item:
-        # set up the pick data item for this edge.
-        pick_data_item.title = "{} Data of {}".format(pick_region.label, model_data_item.title)
-        pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
-        pick_display_specifier.display.display_type = "line_plot"
-        fit_region = Graphics.IntervalGraphic()
-        fit_region.label = _("Fit")
-        fit_region.graphic_id = "fit"
-        fit_region.interval = edge.fit_interval
-        pick_display_specifier.display.add_graphic(fit_region)
-        signal_region = Graphics.IntervalGraphic()
-        signal_region.label = _("Signal")
-        signal_region.graphic_id = "signal"
-        signal_region.interval = edge.signal_interval
-        pick_display_specifier.display.add_graphic(signal_region)
-        document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "fit_interval", fit_region, "interval", parent=pick_data_item))
-        document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "signal_interval", signal_region, "interval", parent=pick_data_item))
+    # set up the computation for this edge.
+    eels_data_item = DataItem.DataItem()
+    eels_data_item.title = "{} EELS Data of {}".format(pick_region.label, model_data_item.title)
+    eels_data_item.source = pick_region
+    eels_display_specifier = DataItem.DisplaySpecifier.from_data_item(eels_data_item)
+    eels_display_specifier.display.display_type = "line_plot"
+    eels_display_specifier.display.legend_labels = ["Signal", "Subtracted", "Background"]
+    fit_region = Graphics.IntervalGraphic()
+    fit_region.label = _("Fit")
+    fit_region.graphic_id = "fit"
+    fit_region.interval = edge.fit_interval
+    eels_display_specifier.display.add_graphic(fit_region)
+    signal_region = Graphics.IntervalGraphic()
+    signal_region.label = _("Signal")
+    signal_region.graphic_id = "signal"
+    signal_region.interval = edge.signal_interval
+    eels_display_specifier.display.add_graphic(signal_region)
+    document_model.append_data_item(eels_data_item)
+    document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "fit_interval", fit_region, "interval", parent=eels_data_item))
+    document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "signal_interval", signal_region, "interval", parent=eels_data_item))
 
-        background_data_item = DataItem.DataItem(numpy.zeros(1, ))
-        background_data_item.title = "{} Background of {}".format(pick_region.label, model_data_item.title)
-        background_display_specifier = DataItem.DisplaySpecifier.from_data_item(background_data_item)
-        background_display_specifier.display.display_type = "line_plot"
-        document_model.append_data_item(background_data_item)
+    computation = document_model.create_computation()
+    computation.create_object("eels_xdata", document_model.get_object_specifier(model_data_item, "xdata"))
+    computation.create_object("region", document_model.get_object_specifier(pick_region))
+    computation.create_input("fit_interval", document_model.get_object_specifier(edge.data_structure), "fit_interval")
+    computation.create_input("signal_interval", document_model.get_object_specifier(edge.data_structure), "signal_interval")
+    computation.processing_id = "eels.background_subtraction11"
+    computation.create_result("data", document_model.get_object_specifier(eels_data_item, "data_item"))
+    document_model.append_computation(computation)
 
-        subtracted_data_item = DataItem.DataItem(numpy.zeros(1, ))
-        subtracted_data_item.title = "{} Subtracted of {}".format(pick_region.label, model_data_item.title)
-        subtracted_display_specifier = DataItem.DisplaySpecifier.from_data_item(subtracted_data_item)
-        subtracted_display_specifier.display.display_type = "line_plot"
-        document_model.append_data_item(subtracted_data_item)
+    # the eels item will need the initial computation results to display properly (view to intervals)
+    await document_model.compute_immediate(document_controller.event_loop, computation)
 
-        computation = document_model.create_computation()
-        computation.create_object("eels_spectrum_xdata", document_model.get_object_specifier(pick_data_item, "display_xdata"))
-        computation.create_input("fit_interval", document_model.get_object_specifier(edge.data_structure), "fit_interval")
-        computation.create_input("signal_interval", document_model.get_object_specifier(edge.data_structure), "signal_interval")
-        computation.processing_id = "eels.background_subtraction"
-        computation.create_result("background", document_model.get_object_specifier(background_data_item, "data_item"))
-        computation.create_result("subtracted", document_model.get_object_specifier(subtracted_data_item, "data_item"))
-        document_model.append_computation(computation)
+    # ensure computation is deleted when eels is deleted
+    computation.source = eels_data_item
 
-        # the composite item will need the initial computation results to display properly (view to intervals)
-        await document_model.compute_immediate(document_controller.event_loop, computation)
+    # create an elemental_mapping_edge_ref data structure, owned by the eels data item, with a referenced
+    # object pointing to the edge. used for recognizing the eels data item as such.
+    data_structure = document_model.create_data_structure(structure_type="elemental_mapping_edge_ref", source=eels_data_item)
+    data_structure.set_referenced_object("spectrum_image", model_data_item)
+    data_structure.set_referenced_object("edge", edge.data_structure)
+    data_structure.set_referenced_object("data", eels_data_item)
+    data_structure.set_referenced_object("pick_region", pick_region)
+    document_model.append_data_structure(data_structure)
 
-        composite_data_item = DataItem.CompositeLibraryItem()
-        composite_data_item.title = "{} from {}".format(pick_region.label, model_data_item.title)
-        composite_data_item.append_data_item(pick_data_item)
-        composite_data_item.append_data_item(background_data_item)
-        composite_data_item.append_data_item(subtracted_data_item)
-        composite_data_item.source = pick_region
-        pick_data_item.source = composite_data_item
-        subtracted_data_item.source = composite_data_item
-        background_data_item.source = composite_data_item
-        composite_display_specifier = DataItem.DisplaySpecifier.from_data_item(composite_data_item)
-        composite_display_specifier.display.display_type = "line_plot"
-        composite_display_specifier.display.dimensional_scales = (model_data_item.dimensional_shape[-1], )
-        composite_display_specifier.display.dimensional_calibrations = (model_data_item.dimensional_calibrations[-1], )
-        composite_display_specifier.display.intensity_calibration = model_data_item.intensity_calibration
-        composite_display_specifier.display.legend_labels = ["Data", "Background", "Signal"]
-        document_model.append_data_item(composite_data_item)
-        fit_region = Graphics.IntervalGraphic()
-        fit_region.label = _("Fit")
-        fit_region.graphic_id = "fit"
-        fit_region.interval = edge.fit_interval
-        composite_display_specifier.display.add_graphic(fit_region)
-        signal_region = Graphics.IntervalGraphic()
-        signal_region.label = _("Signal")
-        signal_region.graphic_id = "signal"
-        signal_region.interval = edge.signal_interval
-        composite_display_specifier.display.add_graphic(signal_region)
-        document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "fit_interval", fit_region, "interval", parent=composite_data_item))
-        document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "signal_interval", signal_region, "interval", parent=composite_data_item))
-        composite_display_specifier.display.view_to_intervals(pick_data_item.xdata, [edge.fit_interval, edge.signal_interval])
-        document_controller.display_data_item(composite_display_specifier)
-
-        # ensure computation is deleted when composite is deleted
-        computation.source = composite_data_item
-
-        # create an elemental_mapping_edge_ref data structure, owned by the composite data item, with a referenced
-        # object pointing to the edge. used for recognizing the composite data item as such.
-        data_structure = document_model.create_data_structure(structure_type="elemental_mapping_edge_ref", source=composite_data_item)
-        data_structure.set_referenced_object("spectrum_image", model_data_item)
-        data_structure.set_referenced_object("edge", edge.data_structure)
-        data_structure.set_referenced_object("pick", pick_data_item)
-        data_structure.set_referenced_object("pick_region", pick_region)
-        data_structure.set_referenced_object("background", background_data_item)
-        data_structure.set_referenced_object("subtracted", subtracted_data_item)
-        document_model.append_data_structure(data_structure)
+    # display it
+    eels_display_specifier.display.view_to_intervals(eels_data_item.xdata, [edge.data_structure.fit_interval, edge.data_structure.signal_interval])
+    document_controller.display_data_item(eels_display_specifier)
 
 
-async def change_edge(document_controller: DocumentController.DocumentController, model_data_item: DataItem.DataItem, composite_data_item: DataItem.DataItem, edge: "ElementalMappingEdge") -> None:
-    """Change the composite data item and associated items to display new edge.
+async def change_edge(document_controller: DocumentController.DocumentController, model_data_item: DataItem.DataItem, eels_data_item: DataItem.DataItem, edge: "ElementalMappingEdge") -> None:
+    """Change the eels data item and associated items to display new edge.
 
     The library will be changed in the following way:
         - the pick region will be renamed
         - the pick data item will connect fit/signal regions to new edge data structure
         - the background subtraction computation will use edge intervals from new edge
-        - the pick, background, subtracted, and composite line plot data items will be renamed
-        - the composite line plot will connect fit/signal regions to new edge data structure
+        - the pick, background, subtracted, and eels line plot data items will be renamed
+        - the eels line plot will connect fit/signal regions to new edge data structure
         - the edge reference will reference the new edge
     """
     document_model = document_controller.document_model
 
     computation = None  # type: Symbolic.Computation
     for computation_ in document_model.computations:
-        if computation_.source == composite_data_item and computation_.processing_id == "eels.background_subtraction":
+        if computation_.source == eels_data_item and computation_.processing_id == "eels.background_subtraction11":
             computation = computation_
             break
 
     edge_ref_data_structure = None  # type: DocumentModel.DataStructure
     old_edge_data_structure = None  # type: DocumentModel.DataStructure
     for data_structure in document_model.data_structures:
-        if data_structure.source == composite_data_item and data_structure.structure_type == "elemental_mapping_edge_ref":
+        if data_structure.source == eels_data_item and data_structure.structure_type == "elemental_mapping_edge_ref":
             edge_ref_data_structure = data_structure
             old_edge_data_structure = data_structure.get_referenced_object("edge")
             break
@@ -176,50 +136,44 @@ async def change_edge(document_controller: DocumentController.DocumentController
     if not computation or not edge_ref_data_structure or not old_edge_data_structure:
         return
 
-    pick_data_item = edge_ref_data_structure.get_referenced_object("pick")
     pick_region = edge_ref_data_structure.get_referenced_object("pick_region")
-    background_data_item = edge_ref_data_structure.get_referenced_object("background")
-    subtracted_data_item = edge_ref_data_structure.get_referenced_object("subtracted")
 
-    if not pick_data_item or not pick_region or not background_data_item or not subtracted_data_item:
+    if not eels_data_item or not pick_region:
         return
 
     pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
 
     for connection in copy.copy(document_model.connections):
-        if connection.parent == pick_data_item and connection.source_property in ("fit_interval", "signal_interval"):
+        if connection.parent == eels_data_item and connection.source_property in ("fit_interval", "signal_interval"):
             source_property = connection.source_property
             target_property = connection.target_property
             target = connection._target
             document_model.remove_connection(connection)
-            new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property, parent=pick_data_item)
+            new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property, parent=eels_data_item)
             document_model.append_connection(new_connection)
 
     for computation_variable in computation.variables:
         if computation_variable.name in ("fit_interval", "signal_interval"):
             computation_variable.specifier = document_model.get_object_specifier(edge.data_structure)
 
-    pick_data_item.title = "{} Data of {}".format(pick_region.label, model_data_item.title)
-    background_data_item.title = "{} Background of {}".format(pick_region.label, model_data_item.title)
-    subtracted_data_item.title = "{} Subtracted of {}".format(pick_region.label, model_data_item.title)
-    composite_data_item.title = "{} from {}".format(pick_region.label, model_data_item.title)
+    eels_data_item.title = "{} EELS Data of {}".format(pick_region.label, model_data_item.title)
 
     for connection in copy.copy(document_model.connections):
-        if connection.parent == composite_data_item and connection.source_property in ("fit_interval", "signal_interval"):
+        if connection.parent == eels_data_item and connection.source_property in ("fit_interval", "signal_interval"):
             source_property = connection.source_property
             target_property = connection.target_property
             target = connection._target
             document_model.remove_connection(connection)
-            new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property, parent=composite_data_item)
+            new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property, parent=eels_data_item)
             document_model.append_connection(new_connection)
 
     edge_ref_data_structure.remove_referenced_object("edge")
     edge_ref_data_structure.set_referenced_object("edge", edge.data_structure)
 
-    # the composite item will need the initial computation results to display properly (view to intervals)
+    # the eels item will need the initial computation results to display properly (view to intervals)
     await document_model.compute_immediate(document_controller.event_loop, computation)
-    composite_display_specifier = DataItem.DisplaySpecifier.from_data_item(composite_data_item)
-    composite_display_specifier.display.view_to_intervals(pick_data_item.xdata, [edge.fit_interval, edge.signal_interval])
+    eels_display_specifier = DataItem.DisplaySpecifier.from_data_item(eels_data_item)
+    eels_display_specifier.display.view_to_intervals(eels_data_item.xdata, [edge.fit_interval, edge.signal_interval])
 
 
 class EELSMapping:
@@ -231,6 +185,17 @@ class EELSMapping:
 
     def commit(self):
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)
+
+
+class EELSVStack:
+    def __init__(self, computation, **kwargs):
+        self.computation = computation
+
+    def execute(self, src_list):
+        self.__xdata = xd.vstack(src_list)
+
+    def commit(self):
+        self.computation.set_referenced_xdata("dst", self.__xdata)
 
 
 async def map_new_edge(document_controller, model_data_item, edge) -> None:
@@ -395,8 +360,8 @@ class ElementalMappingController:
             self.__model_data_item = data_item
         elif data_item:
             for data_structure in copy.copy(self.__document_model.data_structures):
-                # check to see if the data item is a composite data item with an associated edge. the data item is a
-                # composite data item when there is an elemental_mapping_edge_ref with its source being the data item.
+                # check to see if the data item is a eels data item with an associated edge. the data item is a
+                # eels data item when there is an elemental_mapping_edge_ref with its source being the data item.
                 if data_structure.source == data_item and data_structure.structure_type == "elemental_mapping_edge_ref":
                     self.__edge_data_structure = data_structure.get_referenced_object("edge")
                     self.__model_data_item = data_structure.get_referenced_object("spectrum_image")
@@ -567,18 +532,26 @@ class ElementalMappingController:
         multiprofile_data_item = None
         legend_labels = list()
         line_profile_regions = list()
+        items = list()
         for index, dependent_data_item in enumerate(document_model.get_dependent_data_items(model_data_item)):
             if self.__is_calibrated_map(dependent_data_item):
                 if not multiprofile_data_item:
-                    multiprofile_data_item = DataItem.CompositeLibraryItem()
+                    multiprofile_data_item = DataItem.DataItem()
                     document_model.append_data_item(multiprofile_data_item)
                 legend_labels.append(dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:])
                 line_profile_data_item = document_model.get_line_profile_new(dependent_data_item)
                 line_profile_region = dependent_data_item.displays[0].graphics[0]
                 line_profile_region.vector = (0.5, 0.2), (0.5, 0.8)
-                multiprofile_data_item.append_data_item(line_profile_data_item)
+                items.append(document_model.get_object_specifier(line_profile_data_item, "display_xdata"))
+                # multiprofile_data_item.append_data_item(line_profile_data_item)
                 line_profile_regions.append(line_profile_region)
         if multiprofile_data_item:
+            computation = document_model.create_computation()
+            computation.create_objects("src_list", items)
+            computation.processing_id = "eels.vstack1"
+            computation.source = multiprofile_data_item
+            computation.create_result("dst", document_model.get_object_specifier(multiprofile_data_item, "data_item"))
+            document_model.append_computation(computation)
             multiprofile_display_specifier = DataItem.DisplaySpecifier.from_data_item(multiprofile_data_item)
             multiprofile_display_specifier.display.display_type = "line_plot"
             multiprofile_display_specifier.display.dimensional_scales = (model_data_item.dimensional_shape[0], )
@@ -591,5 +564,6 @@ class ElementalMappingController:
             multiprofile_data_item.title = _("Profiles of ") + ", ".join(legend_labels)
             document_controller.display_data_item(multiprofile_display_specifier)
 
-Symbolic.register_computation_type("eels.background_subtraction", EELSBackgroundSubtraction)
+Symbolic.register_computation_type("eels.background_subtraction11", EELSBackgroundSubtraction)
 Symbolic.register_computation_type("eels.mapping", EELSMapping)
+Symbolic.register_computation_type("eels.vstack1", EELSVStack)

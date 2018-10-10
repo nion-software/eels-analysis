@@ -205,7 +205,7 @@ def slow_fit_linear_background(data: numpy.ndarray, signal_index: int) -> numpy.
     assert signal_index == -1
     signal_length = data.shape[signal_index]
     if len(data.shape) > 1:
-        reshaped_data = data.reshape(numpy.product(data.shape[0:signal_index]), signal_length)
+        reshaped_data = data.reshape(numpy.product(data.shape[0:signal_index], dtype=numpy.uint64), signal_length)
     else:
         reshaped_data = data.reshape(1, signal_length)
 
