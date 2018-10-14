@@ -1,7 +1,7 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
-0.2.1 (UNRELEASED)
+0.2.1 (2018-10-14)
 ------------------
 
 - Update original background subtraction to not use deprecated composite library item.
