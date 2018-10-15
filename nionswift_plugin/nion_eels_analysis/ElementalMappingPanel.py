@@ -217,7 +217,8 @@ class ElementalMappingPanel(Panel.Panel):
                 add_edge_column.add(add_row)
 
         self.__focused_data_item_changed_event_listener = document_controller.focused_data_item_changed_event.listen(data_item_changed)
-        data_item_changed(document_controller.selected_display_specifier.data_item)
+        selected_data_item = document_controller.selected_data_item
+        data_item_changed(selected_data_item)
 
     def close(self):
         self.__focused_data_item_changed_event_listener.close()

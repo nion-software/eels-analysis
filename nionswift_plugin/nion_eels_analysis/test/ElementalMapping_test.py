@@ -88,8 +88,10 @@ class TestElementalMappingController(unittest.TestCase):
             document_model.recompute_all()
             document_controller.periodic()  # finish tasks
             self.assertEqual(2, len(document_model.data_items))
-            self.assertEqual(1, len(document_model.data_items[1].dimensional_shape))
-            self.assertEqual("explore", document_model.data_items[1].displays[0].graphics[-1].graphic_id)
+            explorer_data_item = document_model.data_items[1]
+            explorer_display_item = document_model.get_display_item_for_data_item(explorer_data_item)
+            self.assertEqual(1, len(explorer_data_item.dimensional_shape))
+            self.assertEqual("explore", explorer_display_item.graphics[-1].graphic_id)
 
     def test_explore_adds_edge(self):
         document_model = DocumentModel.DocumentModel()
@@ -104,10 +106,11 @@ class TestElementalMappingController(unittest.TestCase):
             document_model.recompute_all()
             document_controller.periodic()  # finish tasks
             explorer_data_item = document_model.data_items[1]
+            explorer_display_item = document_model.get_display_item_for_data_item(explorer_data_item)
             elemental_mapping_controller.set_current_data_item(explorer_data_item)
             self.assertIsNotNone(elemental_mapping_controller.model_data_item)
             energy_calibration = explorer_data_item.dimensional_calibrations[-1]
-            explorer_data_item.displays[0].graphics[-1].interval = energy_calibration.convert_from_calibrated_value(1200) / 1024, energy_calibration.convert_from_calibrated_value(1226) / 1024
+            explorer_display_item.graphics[-1].interval = energy_calibration.convert_from_calibrated_value(1200) / 1024, energy_calibration.convert_from_calibrated_value(1226) / 1024
             document_controller.periodic()  # update explorer interval
             edges = PeriodicTable.PeriodicTable().find_edges_in_energy_interval(elemental_mapping_controller.explorer_interval)
             elemental_mapping_controller.add_edge(edges[0])
@@ -172,6 +175,7 @@ class TestElementalMappingController(unittest.TestCase):
         with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
+            model_display_item = document_model.get_display_item_for_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
             elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
             edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
@@ -179,7 +183,7 @@ class TestElementalMappingController(unittest.TestCase):
             self.__run_until_complete(document_controller)
             self.assertEqual(2, len(document_model.data_items))
             eels_data_item = document_model.data_items[1]
-            self.assertEqual(model_data_item.displays[0].graphics[0], eels_data_item.source)
+            self.assertEqual(model_display_item.graphics[0], eels_data_item.source)
             self.assertEqual(eels_data_item, document_model.data_structures[1].source)
             self.assertEqual("elemental_mapping_edge_ref", document_model.data_structures[1].structure_type)
             self.assertEqual(document_model.data_structures[0], document_model.data_structures[1].get_referenced_object("edge"))
@@ -212,17 +216,18 @@ class TestElementalMappingController(unittest.TestCase):
         with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
+            model_display_item = document_model.get_display_item_for_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
             elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
             edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
             edge_bundle[0].pick_action()
             self.__run_until_complete(document_controller)
-            pick_region = model_data_item.displays[0].graphics[0]
+            pick_region = model_display_item.graphics[0]
             eels_data_item = document_model.data_items[1]
             self.assertEqual(1, len(document_model.computations))
             self.assertEqual(2, len(document_model.data_items))
             self.assertEqual(2, len(document_model.data_structures))
-            model_data_item.displays[0].remove_graphic(pick_region)
+            model_display_item.remove_graphic(pick_region)
             self.assertEqual(0, len(document_model.computations))
             self.assertEqual(1, len(document_model.data_items))
             self.assertEqual(1, len(document_model.data_structures))
@@ -274,6 +279,7 @@ class TestElementalMappingController(unittest.TestCase):
         with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
+            model_display_item = document_model.get_display_item_for_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
             elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
             elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(32, 2, 3))  # Ge-L
@@ -281,6 +287,7 @@ class TestElementalMappingController(unittest.TestCase):
             edge_bundle[0].pick_action()
             self.__run_until_complete(document_controller)
             eels_data_item = document_model.data_items[1]
+            eels_display_item = document_model.get_display_item_for_data_item(eels_data_item)
             elemental_mapping_controller.set_current_data_item(eels_data_item)
             edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
             # apply the change to the other edge
@@ -290,27 +297,27 @@ class TestElementalMappingController(unittest.TestCase):
             old_edge_data_structure = document_model.data_structures[0]
             new_edge_data_structure = document_model.data_structures[1]
             edge_ref_data_structure = document_model.data_structures[2]
-            pick_region = model_data_item.displays[0].graphics[0]
+            pick_region = model_display_item.graphics[0]
             # check the titles
             self.assertEqual("Pick Ge-L3", pick_region.label)
             self.assertEqual("Pick Ge-L3 EELS Data of Untitled", eels_data_item.title)
             # check the old intervals are disconnected and the new are connected
-            old_fit_interval = eels_data_item.displays[0].graphics[0].interval
-            old_signal_interval = eels_data_item.displays[0].graphics[1].interval
+            old_fit_interval = eels_display_item.graphics[0].interval
+            old_signal_interval = eels_display_item.graphics[1].interval
             new_fit_interval = (0.6, 0.7)
             new_signal_interval = (0.7, 0.8)
             # ensure changing old edge doesn't affect any connections
             old_edge_data_structure.set_property_value("fit_interval", new_fit_interval)
             old_edge_data_structure.set_property_value("signal_interval", new_signal_interval)
-            self.assertEqual(old_fit_interval, eels_data_item.displays[0].graphics[0].interval)
-            self.assertEqual(old_signal_interval, eels_data_item.displays[0].graphics[1].interval)
+            self.assertEqual(old_fit_interval, eels_display_item.graphics[0].interval)
+            self.assertEqual(old_signal_interval, eels_display_item.graphics[1].interval)
             self.assertEqual(old_fit_interval, computation._get_variable("fit_interval").bound_item.value)
             self.assertEqual(old_signal_interval, computation._get_variable("signal_interval").bound_item.value)
             # ensure changing new edge affects all connections
             new_edge_data_structure.set_property_value("fit_interval", new_fit_interval)
             new_edge_data_structure.set_property_value("signal_interval", new_signal_interval)
-            self.assertEqual(new_fit_interval, eels_data_item.displays[0].graphics[0].interval)
-            self.assertEqual(new_signal_interval, eels_data_item.displays[0].graphics[1].interval)
+            self.assertEqual(new_fit_interval, eels_display_item.graphics[0].interval)
+            self.assertEqual(new_signal_interval, eels_display_item.graphics[1].interval)
             self.assertEqual(new_fit_interval, computation._get_variable("fit_interval").bound_item.value)
             self.assertEqual(new_signal_interval, computation._get_variable("signal_interval").bound_item.value)
             # and the edge reference
@@ -376,13 +383,13 @@ class TestElementalMappingController(unittest.TestCase):
             self.__run_until_complete(document_controller)
             elemental_mapping_controller.build_multiprofile(document_controller)
             self.__run_until_complete(document_controller)
-            map1_data_item = document_model.data_items[1]
-            map2_data_item = document_model.data_items[2]
+            # map1_data_item = document_model.data_items[1]
+            # map2_data_item = document_model.data_items[2]
             composite_data_item = document_model.data_items[3]
             line_profile1_data_item = document_model.data_items[4]
             line_profile2_data_item = document_model.data_items[5]
-            self.assertEqual(line_profile1_data_item.dimensional_calibrations[0], composite_data_item.displays[0].dimensional_calibrations[0])
-            self.assertEqual(line_profile2_data_item.dimensional_calibrations[0], composite_data_item.displays[0].dimensional_calibrations[0])
+            self.assertEqual(line_profile1_data_item.dimensional_calibrations[0], composite_data_item.dimensional_calibrations[1])
+            self.assertEqual(line_profile2_data_item.dimensional_calibrations[0], composite_data_item.dimensional_calibrations[1])
 
     def test_multiprofile_of_two_maps_connects_line_profiles(self):
         document_model = DocumentModel.DocumentModel()
@@ -400,13 +407,13 @@ class TestElementalMappingController(unittest.TestCase):
             edge_bundle[1].map_action()
             self.__run_until_complete(document_controller)
             elemental_mapping_controller.build_multiprofile(document_controller)
-            map1_data_item = document_model.data_items[1]
-            map2_data_item = document_model.data_items[2]
+            map1_display_item = document_model.get_display_item_for_data_item(document_model.data_items[1])
+            map2_display_item = document_model.get_display_item_for_data_item(document_model.data_items[2])
             # composite_data_item = document_model.data_items[3]
             # line_profile1_data_item = document_model.data_items[4]
             # line_profile2_data_item = document_model.data_items[5]
-            line_region1 = map1_data_item.displays[0].graphics[0]
-            line_region2 = map2_data_item.displays[0].graphics[0]
+            line_region1 = map1_display_item.graphics[0]
+            line_region2 = map2_display_item.graphics[0]
             self.assertEqual(line_region1.vector, line_region2.vector)
             self.assertEqual(line_region1.width, line_region2.width)
             line_region1.vector = (0.11, 0.12), (0.21, 0.22)

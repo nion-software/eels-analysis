@@ -51,29 +51,30 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
         - the edge reference is used to recognize the eels line plot as associated with the referenced edge
     """
     document_model = document_controller.document_model
+    model_display_item = document_model.get_display_item_for_data_item(model_data_item)
     pick_region = Graphics.RectangleGraphic()
     pick_region.size = min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1])
     pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
-    model_data_item.displays[0].add_graphic(pick_region)
+    model_display_item.add_graphic(pick_region)
 
     # set up the computation for this edge.
     eels_data_item = DataItem.DataItem()
+    document_model.append_data_item(eels_data_item)
     eels_data_item.title = "{} EELS Data of {}".format(pick_region.label, model_data_item.title)
     eels_data_item.source = pick_region
-    eels_display_specifier = DataItem.DisplaySpecifier.from_data_item(eels_data_item)
-    eels_display_specifier.display.display_type = "line_plot"
-    eels_display_specifier.display.legend_labels = ["Signal", "Subtracted", "Background"]
+    eels_display_item = document_model.get_display_item_for_data_item(eels_data_item)
+    eels_display_item.display_type = "line_plot"
+    eels_display_item.legend_labels = ["Signal", "Subtracted", "Background"]
     fit_region = Graphics.IntervalGraphic()
     fit_region.label = _("Fit")
     fit_region.graphic_id = "fit"
     fit_region.interval = edge.fit_interval
-    eels_display_specifier.display.add_graphic(fit_region)
+    eels_display_item.add_graphic(fit_region)
     signal_region = Graphics.IntervalGraphic()
     signal_region.label = _("Signal")
     signal_region.graphic_id = "signal"
     signal_region.interval = edge.signal_interval
-    eels_display_specifier.display.add_graphic(signal_region)
-    document_model.append_data_item(eels_data_item)
+    eels_display_item.add_graphic(signal_region)
     document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "fit_interval", fit_region, "interval", parent=eels_data_item))
     document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "signal_interval", signal_region, "interval", parent=eels_data_item))
 
@@ -102,8 +103,8 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
     document_model.append_data_structure(data_structure)
 
     # display it
-    eels_display_specifier.display.view_to_intervals(eels_data_item.xdata, [edge.data_structure.fit_interval, edge.data_structure.signal_interval])
-    document_controller.display_data_item(eels_display_specifier)
+    eels_display_item.view_to_intervals(eels_data_item.xdata, [edge.data_structure.fit_interval, edge.data_structure.signal_interval])
+    document_controller.show_display_item(eels_display_item)
 
 
 async def change_edge(document_controller: DocumentController.DocumentController, model_data_item: DataItem.DataItem, eels_data_item: DataItem.DataItem, edge: "ElementalMappingEdge") -> None:
@@ -172,8 +173,8 @@ async def change_edge(document_controller: DocumentController.DocumentController
 
     # the eels item will need the initial computation results to display properly (view to intervals)
     await document_model.compute_immediate(document_controller.event_loop, computation)
-    eels_display_specifier = DataItem.DisplaySpecifier.from_data_item(eels_data_item)
-    eels_display_specifier.display.view_to_intervals(eels_data_item.xdata, [edge.fit_interval, edge.signal_interval])
+    eels_display_item = document_model.get_display_item_for_data_item(eels_data_item)
+    eels_display_item.view_to_intervals(eels_data_item.xdata, [edge.fit_interval, edge.signal_interval])
 
 
 class EELSMapping:
@@ -320,8 +321,8 @@ class ElementalMappingController:
         def item_inserted(key, value, before_index):
             if key == "data_item":
                 data_item = value
-                if self.__is_explorer(data_item):
-                    self.__connect_explorer_interval(data_item)
+                if self.__is_explorer(document_model, data_item):
+                    self.__connect_explorer_interval(document_model, data_item)
 
         def item_removed(key, value, index):
             if key == "data_item":
@@ -347,7 +348,7 @@ class ElementalMappingController:
         """
         self.__current_data_item = data_item
 
-        is_explorer = self.__is_explorer(data_item)
+        is_explorer = self.__is_explorer(self.__document_model, data_item)
         if is_explorer:
             self.__explorer_interval = self.__energy_intervals.get(data_item.uuid)
         else:
@@ -389,12 +390,13 @@ class ElementalMappingController:
             return data_item.is_data_3d
         return False
 
-    def __is_explorer(self, data_item) -> bool:
+    def __is_explorer(self, document_model, data_item) -> bool:
         if isinstance(data_item, DataItem.DataItem):
             if data_item.is_data_1d:
-                for graphic in data_item.displays[0].graphics:
-                    if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
-                        return True
+                for display_item in document_model.get_display_items_for_data_item(data_item):
+                    for graphic in display_item.graphics:
+                        if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
+                            return True
         return False
 
     def __is_calibrated_map(self, data_item) -> bool:
@@ -406,10 +408,11 @@ class ElementalMappingController:
     async def explore_edges(self, document_controller):
         document_model = document_controller.document_model
         model_data_item = self.__model_data_item
+        model_display_item = document_model.get_display_item_for_data_item(model_data_item)
         pick_region = Graphics.RectangleGraphic()
         pick_region.size = min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1])
         pick_region.label = _("Explore")
-        model_data_item.displays[0].add_graphic(pick_region)
+        model_display_item.add_graphic(pick_region)
         pick_data_item = document_model.get_pick_region_new(model_data_item, pick_region=pick_region)
         if pick_data_item:
             explore_interval = Graphics.IntervalGraphic()
@@ -417,11 +420,11 @@ class ElementalMappingController:
             explore_interval.label = _("Explore")
             explore_interval.graphic_id = "explore"
             pick_data_item.source = model_data_item
-            pick_display_specifier = DataItem.DisplaySpecifier.from_data_item(pick_data_item)
-            pick_display_specifier.display.add_graphic(explore_interval)
-            document_controller.display_data_item(pick_display_specifier)
+            pick_display_item = document_model.get_display_item_for_data_item(pick_data_item)
+            pick_display_item.add_graphic(explore_interval)
+            document_controller.show_display_item(pick_display_item)
             await self.__document_model.compute_immediate(document_controller.event_loop, document_model.get_data_item_computation(pick_data_item))  # need the data to make connect_explorer_interval work; so do this here. ugh.
-            self.__connect_explorer_interval(pick_data_item)
+            self.__connect_explorer_interval(document_model, pick_data_item)
 
     def __add_edge(self, data_item, electron_shell, fit_interval, signal_interval) -> ElementalMappingEdge:
         data_structure = self.__document_model.create_data_structure(structure_type="elemental_mapping_edge", source=data_item)
@@ -445,14 +448,15 @@ class ElementalMappingController:
             self.__energy_intervals[data_item.uuid] = s, e
             self.__explorer_interval_changed(data_item, (s, e))
 
-    def __connect_explorer_interval(self, data_item):
+    def __connect_explorer_interval(self, document_model, data_item):
         if data_item.is_data_1d:
-            for graphic in data_item.displays[0].graphics:
-                if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
-                    dimensional_shape = data_item.dimensional_shape
-                    dimensional_calibrations = data_item.dimensional_calibrations
-                    self.__explorer_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, graphic, data_item, dimensional_shape, dimensional_calibrations))
-                    self.graphic_property_changed(graphic, data_item, dimensional_shape, dimensional_calibrations, "interval")
+            for display_item in document_model.get_display_items_for_data_item(data_item):
+                for graphic in display_item.graphics:
+                    if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
+                        dimensional_shape = data_item.dimensional_shape
+                        dimensional_calibrations = data_item.dimensional_calibrations
+                        self.__explorer_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, graphic, data_item, dimensional_shape, dimensional_calibrations))
+                        self.graphic_property_changed(graphic, data_item, dimensional_shape, dimensional_calibrations, "interval")
 
     def __disconnect_explorer_interval(self, data_item):
         listener = self.__explorer_property_changed_listeners.get(data_item.uuid)
@@ -535,12 +539,13 @@ class ElementalMappingController:
         items = list()
         for index, dependent_data_item in enumerate(document_model.get_dependent_data_items(model_data_item)):
             if self.__is_calibrated_map(dependent_data_item):
+                dependent_display_item = document_model.get_display_item_for_data_item(dependent_data_item)
                 if not multiprofile_data_item:
                     multiprofile_data_item = DataItem.DataItem()
                     document_model.append_data_item(multiprofile_data_item)
                 legend_labels.append(dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:])
                 line_profile_data_item = document_model.get_line_profile_new(dependent_data_item)
-                line_profile_region = dependent_data_item.displays[0].graphics[0]
+                line_profile_region = dependent_display_item.graphics[0]
                 line_profile_region.vector = (0.5, 0.2), (0.5, 0.8)
                 items.append(document_model.get_object_specifier(line_profile_data_item, "display_xdata"))
                 # multiprofile_data_item.append_data_item(line_profile_data_item)
@@ -552,17 +557,14 @@ class ElementalMappingController:
             computation.source = multiprofile_data_item
             computation.create_result("dst", document_model.get_object_specifier(multiprofile_data_item, "data_item"))
             document_model.append_computation(computation)
-            multiprofile_display_specifier = DataItem.DisplaySpecifier.from_data_item(multiprofile_data_item)
-            multiprofile_display_specifier.display.display_type = "line_plot"
-            multiprofile_display_specifier.display.dimensional_scales = (model_data_item.dimensional_shape[0], )
-            multiprofile_display_specifier.display.dimensional_calibrations = (model_data_item.dimensional_calibrations[0], )
-            multiprofile_display_specifier.display.intensity_calibration = model_data_item.intensity_calibration
-            multiprofile_display_specifier.display.legend_labels = legend_labels
+            multiprofile_display_item = document_model.get_display_item_for_data_item(multiprofile_data_item)
+            multiprofile_display_item.display_type = "line_plot"
+            multiprofile_display_item.legend_labels = legend_labels
             for line_profile_region in line_profile_regions[1:]:
                 document_model.append_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector", parent=multiprofile_data_item))
                 document_model.append_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width", parent=multiprofile_data_item))
             multiprofile_data_item.title = _("Profiles of ") + ", ".join(legend_labels)
-            document_controller.display_data_item(multiprofile_display_specifier)
+            document_controller.show_display_item(multiprofile_display_item)
 
 Symbolic.register_computation_type("eels.background_subtraction11", EELSBackgroundSubtraction)
 Symbolic.register_computation_type("eels.mapping", EELSMapping)
