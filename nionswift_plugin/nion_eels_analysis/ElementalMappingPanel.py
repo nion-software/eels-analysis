@@ -216,13 +216,17 @@ class ElementalMappingPanel(Panel.Panel):
 
                 add_edge_column.add(add_row)
 
-        self.__focused_data_item_changed_event_listener = document_controller.focused_data_item_changed_event.listen(data_item_changed)
+        def display_item_changed(display_item):
+            data_item = display_item.data_item if display_item else None
+            data_item_changed(data_item)
+
+        self.__focused_display_item_changed_event_listener = document_controller.focused_display_item_changed_event.listen(display_item_changed)
         selected_data_item = document_controller.selected_data_item
         data_item_changed(selected_data_item)
 
     def close(self):
-        self.__focused_data_item_changed_event_listener.close()
-        self.__focused_data_item_changed_event_listener = None
+        self.__focused_display_item_changed_event_listener.close()
+        self.__focused_display_item_changed_event_listener = None
         if self.__elemental_mapping_controller:
             self.__elemental_mapping_controller.close()
             self.__elemental_mapping_controller = None
