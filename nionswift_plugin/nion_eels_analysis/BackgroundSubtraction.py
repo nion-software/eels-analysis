@@ -74,7 +74,7 @@ async def use_interval_as_signal(api, window):
         document_controller = window._document_controller
         document_model = document_controller.document_model
         await document_model.compute_immediate(document_controller.event_loop, computation._computation)
-        display_item = document_model.get_display_item_from_data_item(output._data_item)
+        display_item = document_model.get_display_item_for_data_item(output._data_item)
         display_item.view_to_intervals(output._data_item.xdata, [fit_ahead._graphic.interval, fit_behind._graphic.interval])
 
 

@@ -219,7 +219,8 @@ async def map_new_edge(document_controller, model_data_item, edge) -> None:
 
     await document_model.compute_immediate(document_controller.event_loop, computation)
 
-    document_controller.display_data_item(DataItem.DisplaySpecifier.from_data_item(map_data_item))
+    map_display_item = document_model.get_display_item_for_data_item(map_data_item)
+    document_controller.show_display_item(map_display_item)
 
 
 class ElementalMappingEdge:
