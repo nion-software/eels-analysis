@@ -262,8 +262,10 @@ class TestElementalMappingController(unittest.TestCase):
             si_edge = elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
             spectrum_data_item = self.__create_spectrum()
             document_model.append_data_item(spectrum_data_item)
+            spectrum_display_item = document_model.get_display_item_for_data_item(spectrum_data_item)
+            spectrum_display_data_channel = spectrum_display_item.get_display_data_channel_for_data_item(spectrum_data_item)
             computation = document_model.create_computation()
-            computation.create_object("eels_spectrum_xdata", document_model.get_object_specifier(spectrum_data_item, "display_xdata"))
+            computation.create_object("eels_spectrum_xdata", document_model.get_object_specifier(spectrum_display_data_channel, "display_xdata"))
             computation.create_input("fit_interval", document_model.get_object_specifier(si_edge.data_structure), "fit_interval")
             computation.create_input("signal_interval", document_model.get_object_specifier(si_edge.data_structure), "signal_interval")
             computation.processing_id = "eels.background_subtraction"
