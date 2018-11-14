@@ -13,6 +13,7 @@ from nion.data import xdata_1_0 as xd
 from nion.swift import DocumentController
 from nion.swift.model import Connection
 from nion.swift.model import DataItem
+from nion.swift.model import DisplayItem
 from nion.swift.model import DocumentModel
 from nion.swift.model import Graphics
 from nion.swift.model import Symbolic
@@ -64,7 +65,12 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
     eels_data_item.source = pick_region
     eels_display_item = document_model.get_display_item_for_data_item(eels_data_item)
     eels_display_item.display_type = "line_plot"
-    eels_display_item.legend_labels = ["Signal", "Subtracted", "Background"]
+    eels_display_item.display_layers = [
+        {"label": "Signal", "data_index": 0, "data_row": 2, "fill_color": "#0F0"},
+        {"label": "Background", "data_index": 0, "data_row": 1, "fill_color": "rgba(255, 0, 0, 0.3)"},
+        {"label": "Data", "data_index": 0, "data_row": 0, "fill_color": "#1E90FF"},
+    ]
+    eels_display_item.set_display_property("legend_position", "top-right")
     fit_region = Graphics.IntervalGraphic()
     fit_region.label = _("Fit")
     fit_region.graphic_id = "fit"
@@ -84,7 +90,7 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
     computation.create_input("fit_interval", document_model.get_object_specifier(edge.data_structure), "fit_interval")
     computation.create_input("signal_interval", document_model.get_object_specifier(edge.data_structure), "signal_interval")
     computation.processing_id = "eels.background_subtraction11"
-    computation.create_result("data", document_model.get_object_specifier(eels_data_item, "data_item"))
+    computation.create_result("data", document_model.get_object_specifier(eels_data_item))
     document_model.append_computation(computation)
 
     # the eels item will need the initial computation results to display properly (view to intervals)
@@ -188,17 +194,6 @@ class EELSMapping:
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)
 
 
-class EELSVStack:
-    def __init__(self, computation, **kwargs):
-        self.computation = computation
-
-    def execute(self, src_list):
-        self.__xdata = xd.vstack(src_list)
-
-    def commit(self):
-        self.computation.set_referenced_xdata("dst", self.__xdata)
-
-
 async def map_new_edge(document_controller, model_data_item, edge) -> None:
     document_model = document_controller.document_model
 
@@ -214,7 +209,7 @@ async def map_new_edge(document_controller, model_data_item, edge) -> None:
     computation.create_input("fit_interval", document_model.get_object_specifier(edge.data_structure), "fit_interval")
     computation.create_input("signal_interval", document_model.get_object_specifier(edge.data_structure), "signal_interval")
     computation.processing_id = "eels.mapping"
-    computation.create_result("map", document_model.get_object_specifier(map_data_item, "data_item"))
+    computation.create_result("map", document_model.get_object_specifier(map_data_item))
     document_model.append_computation(computation)
 
     await document_model.compute_immediate(document_controller.event_loop, computation)
@@ -534,39 +529,38 @@ class ElementalMappingController:
         model_data_item = self.__model_data_item
         if not model_data_item:
             return
-        multiprofile_data_item = None
-        legend_labels = list()
+        multiprofile_display_item = None
         line_profile_regions = list()
         items = list()
+
+        colors = ("rgba(0, 0, 255, 0.5)", "rgba(255, 0, 0, 0.5)", "rgba(0, 255, 0, 0.5)")
+
         for index, dependent_data_item in enumerate(document_model.get_dependent_data_items(model_data_item)):
             if self.__is_calibrated_map(dependent_data_item):
                 dependent_display_item = document_model.get_display_item_for_data_item(dependent_data_item)
-                if not multiprofile_data_item:
-                    multiprofile_data_item = DataItem.DataItem()
-                    document_model.append_data_item(multiprofile_data_item)
-                legend_labels.append(dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:])
+                if not multiprofile_display_item:
+                    multiprofile_display_item = DisplayItem.DisplayItem()
+                    multiprofile_display_item.title = _("Multi-profile")
+                    multiprofile_display_item.display_type = "line_plot"
+                    multiprofile_display_item.set_display_property("legend_position", "top-right")
+                    document_model.append_display_item(multiprofile_display_item)
                 line_profile_data_item = document_model.get_line_profile_new(dependent_data_item)
+                line_profile_display_item = document_model.get_display_item_for_data_item(line_profile_data_item)
+                line_profile_display_data_channel = line_profile_display_item.get_display_data_channel_for_data_item(line_profile_data_item)
                 line_profile_region = dependent_display_item.graphics[0]
                 line_profile_region.vector = (0.5, 0.2), (0.5, 0.8)
-                items.append(document_model.get_object_specifier(line_profile_data_item, "display_xdata"))
-                # multiprofile_data_item.append_data_item(line_profile_data_item)
+                items.append(document_model.get_object_specifier(line_profile_display_data_channel, "display_xdata"))
                 line_profile_regions.append(line_profile_region)
-        if multiprofile_data_item:
-            computation = document_model.create_computation()
-            computation.create_objects("src_list", items)
-            computation.processing_id = "eels.vstack1"
-            computation.source = multiprofile_data_item
-            computation.create_result("dst", document_model.get_object_specifier(multiprofile_data_item, "data_item"))
-            document_model.append_computation(computation)
-            multiprofile_display_item = document_model.get_display_item_for_data_item(multiprofile_data_item)
-            multiprofile_display_item.display_type = "line_plot"
-            multiprofile_display_item.legend_labels = legend_labels
+                multiprofile_display_item.append_display_data_channel_for_data_item(line_profile_data_item)
+                display_layers = multiprofile_display_item.display_layers
+                display_layers[-1]["label"] = dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:]
+                display_layers[-1]["fill_color"] = colors[index % len(colors)]
+                multiprofile_display_item.display_layers = display_layers
+        if multiprofile_display_item:
             for line_profile_region in line_profile_regions[1:]:
-                document_model.append_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector", parent=multiprofile_data_item))
-                document_model.append_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width", parent=multiprofile_data_item))
-            multiprofile_data_item.title = _("Profiles of ") + ", ".join(legend_labels)
+                document_model.append_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector", parent=multiprofile_display_item))
+                document_model.append_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width", parent=multiprofile_display_item))
             document_controller.show_display_item(multiprofile_display_item)
 
 Symbolic.register_computation_type("eels.background_subtraction11", EELSBackgroundSubtraction)
 Symbolic.register_computation_type("eels.mapping", EELSMapping)
-Symbolic.register_computation_type("eels.vstack1", EELSVStack)
