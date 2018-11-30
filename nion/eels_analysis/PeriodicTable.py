@@ -2,7 +2,7 @@
 import fractions
 import json
 import operator
-import os
+import pkgutil
 import typing
 
 # third party libraries
@@ -72,10 +72,7 @@ class ElectronShell:
 
 class PeriodicTable(metaclass=Singleton):
     def __init__(self):
-        dir = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
-        edge_data_file = os.path.join(dir, os.path.join("resources", "edges.json"))
-        with open(edge_data_file, "r") as f:
-            self.__edge_data = json.load(f)
+        self.__edge_data = json.loads(pkgutil.get_data(__name__, "resources/edges.json"))
 
     def element_symbol(self, atomic_number: int) -> str:
         for edge_data_item in self.__edge_data:
