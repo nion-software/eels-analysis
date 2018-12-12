@@ -10,7 +10,7 @@ import os
 
 setuptools.setup(
     name="nionswift-eels-analysis",
-    version="0.2.1",
+    version="0.3.0",
     author="Nion Software",
     author_email="swift@nion.com",
     description="Library and UI for doing EELS analysis with Nion Swift.",

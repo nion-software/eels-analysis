@@ -1,8 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
-0.2.2 (UNRELEASED)
+0.3.0 (2018-12-12)
 ------------------
+
+- Nion Swift 0.14 compatibility.
 
 - Use composite line plot display for display again.
 
