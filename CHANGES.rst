@@ -1,6 +1,11 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.4.0 (UNRELEASED)
+------------------
+
+- Add menu items for live thickness, thickness mapping, align zlp.
+
 0.3.0 (2018-12-12)
 ------------------
 
