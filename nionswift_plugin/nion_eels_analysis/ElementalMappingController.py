@@ -132,8 +132,8 @@ async def change_edge(document_controller: DocumentController.DocumentController
             computation = computation_
             break
 
-    edge_ref_data_structure = None  # type: DocumentModel.DataStructure
-    old_edge_data_structure = None  # type: DocumentModel.DataStructure
+    edge_ref_data_structure = None
+    old_edge_data_structure = None
     for data_structure in document_model.data_structures:
         if data_structure.source == eels_data_item and data_structure.structure_type == "elemental_mapping_edge_ref":
             edge_ref_data_structure = data_structure
@@ -219,7 +219,7 @@ async def map_new_edge(document_controller, model_data_item, edge) -> None:
 
 
 class ElementalMappingEdge:
-    def __init__(self, *, data_structure: DocumentModel.DataStructure=None, electron_shell: PeriodicTable.ElectronShell=None, fit_interval=None, signal_interval=None):
+    def __init__(self, *, data_structure=None, electron_shell: PeriodicTable.ElectronShell=None, fit_interval=None, signal_interval=None):
         self.__data_structure = data_structure
         self.__fit_interval = fit_interval
         self.__signal_interval = signal_interval
@@ -228,10 +228,10 @@ class ElementalMappingEdge:
             self.read(self.__data_structure)
 
     @property
-    def data_structure(self) -> DocumentModel.DataStructure:
+    def data_structure(self):
         return self.__data_structure
 
-    def read(self, data_structure: DocumentModel.DataStructure) -> None:
+    def read(self, data_structure) -> None:
         atomic_number = data_structure.get_property_value("atomic_number")
         shell_number = data_structure.get_property_value("shell_number")
         subshell_index = data_structure.get_property_value("subshell_index")
@@ -239,12 +239,12 @@ class ElementalMappingEdge:
         self.__fit_interval = data_structure.get_property_value("fit_interval", (0.4, 0.5))
         self.__signal_interval = data_structure.get_property_value("signal_interval", (0.5, 0.6))
 
-    def write(self, data_structure: DocumentModel.DataStructure) -> None:
+    def write(self, data_structure) -> None:
         self.__write_electron_shell(data_structure)
         self.__write_fit_interval(data_structure)
         self.__write_signal_interval(data_structure)
 
-    def matches(self, data_structure: DocumentModel.DataStructure) -> bool:
+    def matches(self, data_structure) -> bool:
         return self.__data_structure is not None and self.__data_structure.uuid == data_structure.uuid
 
     def __write_electron_shell(self, data_structure):
