@@ -1,15 +1,9 @@
-# system imports
-import gettext
-
-# third part imports
+# imports
 import numpy
 
 # local libraries
-from nion.data import xdata_1_0 as xd
 from nion.swift.model import Symbolic
 from nion.eels_analysis import eels_analysis
-
-_ = gettext.gettext
 
 
 class EELSBackgroundSubtraction:
@@ -96,50 +90,8 @@ def use_signal_for_map(api, window):
                 window.display_data_item(map)
 
 
-class MenuItemDelegate:
-
-    def __init__(self, api):
-        self.__api = api
-        self.menu_id = "eels_menu"  # required, specify menu_id where this item will go
-        self.menu_name = _("EELS")  # optional, specify default name if not a standard menu
-        self.menu_before_id = "window_menu"  # optional, specify before menu_id if not a standard menu
-        self.menu_item_name = _("Subtract Background from Signal")  # menu item name
-
-    def menu_item_execute(self, window):
-        window._document_controller.event_loop.create_task(use_interval_as_signal(self.__api, window))
-
-class MenuItemDelegate2:
-
-    def __init__(self, api):
-        self.__api = api
-        self.menu_id = "eels_menu"  # required, specify menu_id where this item will go
-        self.menu_name = _("EELS")  # optional, specify default name if not a standard menu
-        self.menu_before_id = "window_menu"  # optional, specify before menu_id if not a standard menu
-        self.menu_item_name = _("Map Signal")  # menu item name
-
-    def menu_item_execute(self, window):
-        use_signal_for_map(self.__api, window)
-
-
-class MenuExtension:
-
-    # required for Swift to recognize this as an extension class.
-    extension_id = "nion.eels_analysis.menu_item_background"
-
-    def __init__(self, api_broker):
-        # grab the api object.
-        api = api_broker.get_api(version="~1.0")
-        # be sure to keep a reference or it will be closed immediately.
-        self.__menu_item_ref = api.create_menu_item(MenuItemDelegate(api))
-        self.__menu_item_ref2 = api.create_menu_item(MenuItemDelegate2(api))
-
-    def close(self):
-        # close will be called when the extension is unloaded. in turn, close any references so they get closed. this
-        # is not strictly necessary since the references will be deleted naturally when this object is deleted.
-        self.__menu_item_ref.close()
-        self.__menu_item_ref = None
-        self.__menu_item_ref2.close()
-        self.__menu_item_ref2 = None
+def subtract_background_from_signal(api, window):
+    window._document_controller.event_loop.create_task(use_interval_as_signal(api, window))
 
 
 Symbolic.register_computation_type("eels.background_subtraction2", EELSBackgroundSubtraction)
