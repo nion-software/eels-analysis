@@ -16,8 +16,12 @@ from nion.swift.model import DataItem
 from nion.swift.model import DocumentModel
 from nion.ui import TestUI
 
+from nion.eels_analysis import eels_analysis
 from nion.eels_analysis import PeriodicTable
+
 from nionswift_plugin.nion_eels_analysis import ElementalMappingController
+from nionswift_plugin.nion_eels_analysis import AlignZLP
+from nionswift_plugin.nion_eels_analysis import ThicknessMap
 
 
 Facade.initialize()
@@ -32,7 +36,10 @@ class TestElementalMappingController(unittest.TestCase):
         pass
 
     def __create_spectrum_image(self) -> DataItem.DataItem:
-        data = numpy.zeros((8, 8, 1024))
+        return DataItem.new_data_item(self.__create_spectrum_image_xdata())
+
+    def __create_spectrum_image_xdata(self, dtype=numpy.float32):
+        data = numpy.zeros((8, 8, 1024), dtype)
         for row in range(data.shape[0]):
             for column in range(data.shape[1]):
                 data[row, column, :] = numpy.random.uniform(10, 1000, 1024)
@@ -40,10 +47,10 @@ class TestElementalMappingController(unittest.TestCase):
         dimensional_calibrations = [Calibration.Calibration(units="nm"), Calibration.Calibration(units="nm"), Calibration.Calibration(scale=2.0, units="eV")]
         data_descriptor = DataAndMetadata.DataDescriptor(is_sequence=False, collection_dimension_count=2, datum_dimension_count=1)
         xdata = DataAndMetadata.new_data_and_metadata(data, intensity_calibration=intensity_calibration, dimensional_calibrations=dimensional_calibrations, data_descriptor=data_descriptor)
-        return DataItem.new_data_item(xdata)
+        return xdata
 
     def __create_spectrum(self) -> DataItem.DataItem:
-        data = numpy.random.uniform(10, 1000, 1024)
+        data = numpy.random.uniform(10, 1000, 1024).astype(numpy.float32)
         intensity_calibration = Calibration.Calibration(units="~")
         dimensional_calibrations = [Calibration.Calibration(scale=2.0, units="eV")]
         data_descriptor = DataAndMetadata.DataDescriptor(is_sequence=False, collection_dimension_count=0, datum_dimension_count=1)
@@ -397,3 +404,27 @@ class TestElementalMappingController(unittest.TestCase):
             line_region1.vector = (0.11, 0.12), (0.21, 0.22)
             self.assertEqual(line_region1.vector, line_region2.vector)
             self.assertEqual(line_region1.width, line_region2.width)
+
+    def test_map_background_subtracted_signal_keeps_input_dtype(self):
+        si_xdata_32 = self.__create_spectrum_image_xdata(dtype=numpy.float32)
+        si_xdata_64 = self.__create_spectrum_image_xdata(dtype=numpy.float64)
+        mapped_xdata_32 = eels_analysis.map_background_subtracted_signal(si_xdata_32, None, [(0.2, 0.3)], (0.4, 0.5))
+        mapped_xdata_64 = eels_analysis.map_background_subtracted_signal(si_xdata_64, None, [(0.2, 0.3)], (0.4, 0.5))
+        self.assertEqual(numpy.float32, mapped_xdata_32.data.dtype)
+        self.assertEqual(numpy.float64, mapped_xdata_64.data.dtype)
+
+    def test_align_zlp_keeps_input_dtype(self):
+        si_xdata_32 = self.__create_spectrum_image_xdata(dtype=numpy.float32)
+        si_xdata_64 = self.__create_spectrum_image_xdata(dtype=numpy.float64)
+        mapped_xdata_32 = AlignZLP.align_zlp_xdata(si_xdata_32)
+        mapped_xdata_64 = AlignZLP.align_zlp_xdata(si_xdata_64)
+        self.assertEqual(numpy.float32, mapped_xdata_32.data.dtype)
+        self.assertEqual(numpy.float64, mapped_xdata_64.data.dtype)
+
+    def test_map_thickness_is_always_float32(self):
+        si_xdata_32 = self.__create_spectrum_image_xdata(dtype=numpy.float32)
+        si_xdata_64 = self.__create_spectrum_image_xdata(dtype=numpy.float64)
+        mapped_xdata_32 = ThicknessMap.map_thickness_xdata(si_xdata_32)
+        mapped_xdata_64 = ThicknessMap.map_thickness_xdata(si_xdata_64)
+        self.assertEqual(numpy.float32, mapped_xdata_32.data.dtype)
+        self.assertEqual(numpy.float32, mapped_xdata_64.data.dtype)

@@ -4,6 +4,8 @@ Changelog (nionswift-eels-analysis)
 0.4.1 (UNRELEASED)
 ------------------
 
+- Improve data type handling (do not auto-promote to float64).
+
 - Improve menu item layout.
 
 0.4.0 (2018-12-21)

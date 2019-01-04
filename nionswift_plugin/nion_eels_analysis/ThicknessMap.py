@@ -1,5 +1,6 @@
 # imports
 import numpy
+import typing
 
 # local libraries
 from nion.data import DataAndMetadata
@@ -18,22 +19,28 @@ def sum_zlp(d):
     return left_pos, right_pos, s
 
 
+def map_thickness_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=None) -> typing.Optional[DataAndMetadata.DataAndMetadata]:
+    data = numpy.empty((src_xdata.data_shape[0:2]), numpy.float32)
+    for row in range(src_xdata.data_shape[0]):
+        if row > 0 and row % 10 == 0:
+            if callable(progress_fn):
+                progress_fn(row)
+        for column in range(src_xdata.data_shape[1]):
+            l, r, s = sum_zlp(src_xdata.data[row, column, :])
+            data[row, column] = numpy.log(numpy.sum(src_xdata.data[row, column, :]) / s)
+    dimensional_calibrations = src_xdata.dimensional_calibrations[0:-1]
+    return DataAndMetadata.new_data_and_metadata(data, dimensional_calibrations=dimensional_calibrations)
+
+
 class EELSThicknessMapping:
     def __init__(self, computation, **kwargs):
         self.computation = computation
 
     def execute(self, spectrum_image_data_item):
-        spectrum_image_xdata = spectrum_image_data_item.xdata
-        print(spectrum_image_xdata.data_shape)
-        data = numpy.empty((spectrum_image_xdata.data_shape[0:2]))
-        for row in range(spectrum_image_xdata.data_shape[0]):
-            if row > 0 and row % 10 == 0:
-                print(f"Processing row {row} (thickness)")
-            for column in range(spectrum_image_xdata.data_shape[1]):
-                l, r, s = sum_zlp(spectrum_image_xdata.data[row, column, :])
-                data[row, column] = numpy.log(numpy.sum(spectrum_image_xdata.data[row, column, :]) / s)
-        dimensional_calibrations = spectrum_image_xdata.dimensional_calibrations[0:-1]
-        self.__mapped_xdata = DataAndMetadata.new_data_and_metadata(data, dimensional_calibrations=dimensional_calibrations)
+        def progress(row):
+            print(f"Processing row {row} (thickness)")
+
+        self.__mapped_xdata = map_thickness_xdata(spectrum_image_data_item.xdata, progress)
 
     def commit(self):
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)

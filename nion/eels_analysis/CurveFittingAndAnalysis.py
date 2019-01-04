@@ -97,7 +97,7 @@ class PolynomialCurveFit:
     def _compute_polynomial_model(self, x_values: numpy.ndarray) -> numpy.ndarray:
         """Prepare polynomial model array for the current polynomial order and log-scale settings.
         """
-        polynomial_model = numpy.ones([self._polynomial_order + 1, x_values.size], numpy.float64)
+        polynomial_model = numpy.ones([self._polynomial_order + 1, x_values.size], x_values.dtype)
         if self._polynomial_order > 0:
             if self._fit_log_x:
                 # For log x fit, all x values must be positive
@@ -248,7 +248,7 @@ def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: 
     x_origin = data_x_range[0]
     x_step = (data_x_range[1] - x_origin) / data_values.shape[-1]
     data_range_converter = RangeSliceConverter(x_origin, x_step)
-    x_values = numpy.arange(x_origin, data_x_range[1], x_step)
+    x_values = numpy.arange(x_origin, data_x_range[1], x_step, dtype=numpy.float32)
     next_slice = data_range_converter.get_slice(clean_fit_ranges[0])
     x_values_for_fit = x_values[next_slice]
     data_values_for_fit = numpy.maximum(data_values[..., next_slice], 1)
