@@ -1,7 +1,7 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
-0.4.1 (UNRELEASED)
+0.4.1 (2019-01-07)
 ------------------
 
 - Improve data type handling (do not auto-promote to float64).
