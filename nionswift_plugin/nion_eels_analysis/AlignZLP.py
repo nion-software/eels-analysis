@@ -22,7 +22,7 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=None
         count = int(numpy.product(s_shape))
 
         # use this as the reference position. all other spectra will be aligned to this one.
-        ref_pos = numpy.argmax(src_data[0, 0])
+        ref_pos = numpy.argmax(src_data[(0,)*len(s_shape)])
 
         # loop over all non-datum dimensions linearly
         for i in range(count):
@@ -52,7 +52,8 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=None
         dimensional_calibrations = dimensional_calibrations[0:-1] + [energy_calibration]
 
         # dst_data is complete. construct xdata with correct calibration and data descriptor.
-        return DataAndMetadata.new_data_and_metadata(dst_data, src_xdata.intensity_calibration, dimensional_calibrations, data_descriptor=DataAndMetadata.DataDescriptor(False, 2, 1))
+        data_descriptor = DataAndMetadata.DataDescriptor(src_xdata.is_sequence, src_xdata.collection_dimension_count, 1)
+        return DataAndMetadata.new_data_and_metadata(dst_data, src_xdata.intensity_calibration, dimensional_calibrations, data_descriptor=data_descriptor)
 
     return None
 
