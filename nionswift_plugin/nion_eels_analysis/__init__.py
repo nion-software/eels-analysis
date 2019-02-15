@@ -42,6 +42,8 @@ class MenuExtension:
         eels_menu.add_menu_item(_("Map Thickness"), functools.partial(ThicknessMap.map_thickness, api, window))
         eels_menu.add_separator()
         eels_menu.add_menu_item(_("Align ZLP (max method)"), functools.partial(AlignZLP.align_zlp, api, window))
+        eels_menu.add_menu_item(_("Align ZLP (com method)"), functools.partial(AlignZLP.align_zlp_com, api, window))
+        eels_menu.add_menu_item(_("Align ZLP (peak fit method)"), functools.partial(AlignZLP.align_zlp_fit, api, window))
         eels_menu.add_separator()
         eels_menu.add_menu_item(_("Show Live Thickness Measurement"), functools.partial(LiveThickness.attach_measure_thickness, api, window))
         eels_menu.add_menu_item(_("Show Live ZLP Measurement"), functools.partial(LiveZLP.attach_measure_zlp, api, window))
