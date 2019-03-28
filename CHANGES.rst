@@ -1,6 +1,13 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.4.2 (2019-03-27)
+------------------
+
+- Make Align ZLP support sequences AND 1D collections.
+
+- Added menu items for center-of-mass and gaussian fit for ZLP alignment (both do sub-pixel alignment but much faster than cross-correlation)
+
 0.4.1 (2019-01-07)
 ------------------
 
