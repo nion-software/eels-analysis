@@ -1,6 +1,11 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.4.3 (UNRELEASED)
+------------------
+
+- Moved ZLP analysis functions to nion.eels_analysis module for better reuse.
+
 0.4.2 (2019-03-27)
 ------------------
 
