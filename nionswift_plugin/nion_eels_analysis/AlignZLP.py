@@ -5,7 +5,7 @@ import scipy.ndimage
 
 # local libraries
 from nion.data import DataAndMetadata
-from nion.eels_analysis import ZLP_analysis
+from nion.eels_analysis import ZLP_Analysis
 
 
 def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=None) -> typing.Optional[DataAndMetadata.DataAndMetadata]:
@@ -76,8 +76,8 @@ def align_zlp_xdata_subpixel(src_xdata: DataAndMetadata.DataAndMetadata, progres
         flat_src_data = numpy.reshape(src_data, (-1,) + d_shape)
         flat_dst_data = numpy.zeros_like(flat_src_data)
 
-        get_position_fun = (ZLP_analysis.estimate_zlp_amplitude_position_width_com if method == 'com'
-                            else ZLP_analysis.estimate_zlp_amplitude_position_width_fit_spline)
+        get_position_fun = (ZLP_Analysis.estimate_zlp_amplitude_position_width_com if method == 'com'
+                            else ZLP_Analysis.estimate_zlp_amplitude_position_width_fit_spline)
         # use this as the reference position. all other spectra will be aligned to this one.
         ref_pos = get_position_fun(flat_src_data[0])[1]
         # put the first spectrum in the result

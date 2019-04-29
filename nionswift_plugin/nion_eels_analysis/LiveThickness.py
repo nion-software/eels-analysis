@@ -31,10 +31,18 @@ class MeasureThickness:
 
         This method will run in a thread and should not make any modifications to the library.
         """
-        self.__data = src.display_xdata.data
-        self.__left, self.__right, s = sum_zlp(self.__data)
-        self.__thickness  = math.log(sum(self.__data) / s)
-        self.__src = src
+        data = src.display_xdata.data
+        if data is not None and len(data.shape) == 1:
+            self.__data_length = data.shape[0]
+            self.__left, self.__right, s = sum_zlp(data)
+            self.__thickness  = math.log(sum(data) / s)
+            self.__src = src
+        else:
+            self.__data_length = None
+            self.__left = 0
+            self.__right = 0
+            self.__thickness = 0
+            self.__src = None
 
     def commit(self):
         """Commit the computation.
@@ -42,18 +50,19 @@ class MeasureThickness:
         This method will run at UI time and can make modifications to the library. It is essential
         that this method be as fast as possible. Any lengthy operations should be done in `execute`.
         """
-        left, right, thickness = self.__left, self.__right, self.__thickness
-        data = self.__data
-        start = left / data.shape[-1]
-        end = right / data.shape[-1]
-        thickness_interval = self.computation.get_result("thickness_interval", None)
-        if not thickness_interval:
-            thickness_interval = self.__src.add_interval_region(start, end)
-            self.computation.set_result("thickness_interval", thickness_interval)
-        thickness_interval.interval = start, end
-        thickness_interval.graphic_id = "thickness_interval"
-        thickness_interval.label = f"{self.__thickness:0.4f}"
-        thickness_interval._graphic.color = "#0F0"
+        if self.__src:
+            left, right, thickness = self.__left, self.__right, self.__thickness
+            data_length = self.__data_length
+            start = left / data_length
+            end = right / data_length
+            thickness_interval = self.computation.get_result("thickness_interval", None)
+            if not thickness_interval:
+                thickness_interval = self.__src.add_interval_region(start, end)
+                self.computation.set_result("thickness_interval", thickness_interval)
+            thickness_interval.interval = start, end
+            thickness_interval.graphic_id = "thickness_interval"
+            thickness_interval.label = f"{self.__thickness:0.4f}"
+            thickness_interval._graphic.color = "#0F0"
 
 
 def register_measure_thickness_process(api):
@@ -64,5 +73,5 @@ def register_measure_thickness_process(api):
 def attach_measure_thickness(api, window):
     """Attaches the measure Thickness computation to the target data item in the window."""
     target_data_item = window.target_data_item
-    if target_data_item:
+    if target_data_item and target_data_item.display_xdata.is_data_1d:
         api.library.create_computation("nion.eels_analysis.measure_thickness", inputs={"src": target_data_item}, outputs={"thickness_interval": None})

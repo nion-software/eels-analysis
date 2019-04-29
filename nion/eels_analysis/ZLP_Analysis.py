@@ -17,6 +17,7 @@ def jac_gaussian(x, a, b, c):
 
 
 def estimate_zlp_amplitude_position_width_fit_spline(d):
+    assert len(d.shape) == 1
     # estimate the ZLP, assumes the peak value is the ZLP and that the ZLP is the only gaussian feature in the data
     #gaussian = lambda x, a, b, c: a*numpy.exp(-(x-b)**2/(2*c**2))
     max_pos = numpy.argmax(d)
@@ -39,6 +40,7 @@ def estimate_zlp_amplitude_position_width_fit_spline(d):
 def estimate_zlp_amplitude_position_width_com(d):
 
     # estimate the ZLP, assumes the peak value is the ZLP and that the ZLP is the only gaussian feature in the data
+    assert len(d.shape) == 1
     mx_pos = numpy.argmax(d)
     mx = d[mx_pos]
     half_mx = mx/2
