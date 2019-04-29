@@ -1,7 +1,7 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
-0.4.3 (UNRELEASED)
+0.4.3 (2019-04-29)
 ------------------
 
 - Added checks to avoid applying live ZLP and thickness to 2D data items.
