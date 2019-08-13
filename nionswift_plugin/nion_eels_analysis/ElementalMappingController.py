@@ -85,12 +85,12 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
     document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "signal_interval", signal_region, "interval", parent=eels_data_item))
 
     computation = document_model.create_computation()
-    computation.create_object("eels_xdata", document_model.get_object_specifier(model_data_item, "xdata"))
-    computation.create_object("region", document_model.get_object_specifier(pick_region))
-    computation.create_input("fit_interval", document_model.get_object_specifier(edge.data_structure), "fit_interval")
-    computation.create_input("signal_interval", document_model.get_object_specifier(edge.data_structure), "signal_interval")
+    computation.create_input_item("eels_xdata", Symbolic.make_item(model_data_item, type="xdata"))
+    computation.create_input_item("region", Symbolic.make_item(pick_region))
+    computation.create_input_item("fit_interval", Symbolic.make_item(edge.data_structure), property_name="fit_interval")
+    computation.create_input_item("signal_interval", Symbolic.make_item(edge.data_structure), property_name="signal_interval")
     computation.processing_id = "eels.background_subtraction11"
-    computation.create_result("data", document_model.get_object_specifier(eels_data_item))
+    computation.create_output_item("data", Symbolic.make_item(eels_data_item))
     document_model.append_computation(computation)
 
     # the eels item will need the initial computation results to display properly (view to intervals)
@@ -159,9 +159,8 @@ async def change_edge(document_controller: DocumentController.DocumentController
             new_connection = Connection.PropertyConnection(edge.data_structure, source_property, target, target_property, parent=eels_data_item)
             document_model.append_connection(new_connection)
 
-    for computation_variable in computation.variables:
-        if computation_variable.name in ("fit_interval", "signal_interval"):
-            computation_variable.specifier = document_model.get_object_specifier(edge.data_structure)
+    computation.set_input_item("fit_interval", Symbolic.make_item(edge.data_structure))
+    computation.set_input_item("signal_interval", Symbolic.make_item(edge.data_structure))
 
     eels_data_item.title = "{} EELS Data of {}".format(pick_region.label, model_data_item.title)
 
@@ -205,11 +204,11 @@ async def map_new_edge(document_controller, model_data_item, edge) -> None:
 
     computation = document_model.create_computation()
     computation.source = map_data_item
-    computation.create_object("spectrum_image_xdata", document_model.get_object_specifier(model_data_item, "xdata"))
-    computation.create_input("fit_interval", document_model.get_object_specifier(edge.data_structure), "fit_interval")
-    computation.create_input("signal_interval", document_model.get_object_specifier(edge.data_structure), "signal_interval")
+    computation.create_input_item("spectrum_image_xdata", Symbolic.make_item(model_data_item, type="xdata"))
+    computation.create_input_item("fit_interval", Symbolic.make_item(edge.data_structure), property_name="fit_interval")
+    computation.create_input_item("signal_interval", Symbolic.make_item(edge.data_structure), property_name="signal_interval")
     computation.processing_id = "eels.mapping"
-    computation.create_result("map", document_model.get_object_specifier(map_data_item))
+    computation.create_output_item("map", Symbolic.make_item(map_data_item))
     document_model.append_computation(computation)
 
     await document_model.compute_immediate(document_controller.event_loop, computation)
@@ -531,7 +530,6 @@ class ElementalMappingController:
             return
         multiprofile_display_item = None
         line_profile_regions = list()
-        items = list()
 
         colors = ("rgba(0, 0, 255, 0.5)", "rgba(255, 0, 0, 0.5)", "rgba(0, 255, 0, 0.5)")
 
@@ -549,7 +547,6 @@ class ElementalMappingController:
                 line_profile_display_data_channel = line_profile_display_item.get_display_data_channel_for_data_item(line_profile_data_item)
                 line_profile_region = dependent_display_item.graphics[0]
                 line_profile_region.vector = (0.5, 0.2), (0.5, 0.8)
-                items.append(document_model.get_object_specifier(line_profile_display_data_channel, "display_xdata"))
                 line_profile_regions.append(line_profile_region)
                 multiprofile_display_item.append_display_data_channel_for_data_item(line_profile_data_item)
                 display_layers = multiprofile_display_item.display_layers

@@ -14,6 +14,7 @@ from nion.swift import DocumentController
 from nion.swift import Facade
 from nion.swift.model import DataItem
 from nion.swift.model import DocumentModel
+from nion.swift.model import Symbolic
 from nion.ui import TestUI
 
 from nion.eels_analysis import eels_analysis
@@ -272,9 +273,9 @@ class TestElementalMappingController(unittest.TestCase):
             spectrum_display_item = document_model.get_display_item_for_data_item(spectrum_data_item)
             spectrum_display_data_channel = spectrum_display_item.get_display_data_channel_for_data_item(spectrum_data_item)
             computation = document_model.create_computation()
-            computation.create_object("eels_spectrum_xdata", document_model.get_object_specifier(spectrum_display_data_channel, "display_xdata"))
-            computation.create_input("fit_interval", document_model.get_object_specifier(si_edge.data_structure), "fit_interval")
-            computation.create_input("signal_interval", document_model.get_object_specifier(si_edge.data_structure), "signal_interval")
+            computation.create_input_item("eels_spectrum_xdata", Symbolic.make_item(spectrum_display_data_channel, type="display_xdata"))
+            computation.create_input_item("fit_interval", Symbolic.make_item(si_edge.data_structure), property_name="fit_interval")
+            computation.create_input_item("signal_interval", Symbolic.make_item(si_edge.data_structure), property_name="signal_interval")
             computation.processing_id = "eels.background_subtraction"
             document_model.append_computation(computation)
             document_model.recompute_all()
@@ -320,15 +321,15 @@ class TestElementalMappingController(unittest.TestCase):
             old_edge_data_structure.set_property_value("signal_interval", new_signal_interval)
             self.assertEqual(old_fit_interval, eels_display_item.graphics[0].interval)
             self.assertEqual(old_signal_interval, eels_display_item.graphics[1].interval)
-            self.assertEqual(old_fit_interval, computation._get_variable("fit_interval").bound_item.value)
-            self.assertEqual(old_signal_interval, computation._get_variable("signal_interval").bound_item.value)
+            self.assertEqual(old_fit_interval, computation.get_input("fit_interval"))
+            self.assertEqual(old_signal_interval, computation.get_input("signal_interval"))
             # ensure changing new edge affects all connections
             new_edge_data_structure.set_property_value("fit_interval", new_fit_interval)
             new_edge_data_structure.set_property_value("signal_interval", new_signal_interval)
             self.assertEqual(new_fit_interval, eels_display_item.graphics[0].interval)
             self.assertEqual(new_signal_interval, eels_display_item.graphics[1].interval)
-            self.assertEqual(new_fit_interval, computation._get_variable("fit_interval").bound_item.value)
-            self.assertEqual(new_signal_interval, computation._get_variable("signal_interval").bound_item.value)
+            self.assertEqual(new_fit_interval, computation.get_input("fit_interval"))
+            self.assertEqual(new_signal_interval, computation.get_input("signal_interval"))
             # and the edge reference
             self.assertEqual(new_edge_data_structure, edge_ref_data_structure.get_referenced_object("edge"))
 

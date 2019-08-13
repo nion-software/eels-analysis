@@ -79,8 +79,8 @@ def use_signal_for_map(api, window):
     if target_data_item_ and target_display and target_interval:
         for computation in api.library._document_model.computations:
             if computation.processing_id == "eels.background_subtraction2" and target_interval._graphic in computation._inputs:
-                fit_interval_graphics = computation._get_variable("fit_interval_graphics").bound_item.value
-                signal_interval_graphic = computation._get_variable("signal_interval_graphic").bound_item.value
+                fit_interval_graphics = computation.get_input("fit_interval_graphics")
+                signal_interval_graphic = computation.get_input("signal_interval_graphic")
                 spectrum_image = api._new_api_object(api.library._document_model.get_source_data_items(target_data_item_)[0])
                 map = api.library.create_data_item_from_data(numpy.zeros_like(spectrum_image.display_xdata.data), title="{} Map".format(spectrum_image.title))
                 fit_interval_graphics = [api._new_api_object(g) for g in fit_interval_graphics]
