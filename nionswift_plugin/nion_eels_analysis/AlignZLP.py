@@ -92,8 +92,7 @@ def align_zlp_xdata_subpixel(src_xdata: DataAndMetadata.DataAndMetadata, progres
                 mx_pos = numpy.argmax(flat_src_data[i])
             # determine the offset and apply it
             offset = ref_pos - mx_pos
-            src_data_fft = numpy.fft.fftn(flat_src_data[i])
-            flat_dst_data[i] = numpy.fft.ifftn(scipy.ndimage.fourier_shift(src_data_fft, offset)).real
+            flat_dst_data[i] = scipy.ndimage.shift(flat_src_data[i], offset, order=1)
             # every row, report progress (will also work for a sequence or 1d collection
             # because there we have only 1 row anyways)
             if i % src_shape[1] == 0 and callable(progress_fn):
@@ -178,3 +177,4 @@ def align_zlp_fit(api, window):
             print("Failed: Data is not a sequence or collection of 1D spectra.")
     else:
         print("Failed: No data item selected.")
+
