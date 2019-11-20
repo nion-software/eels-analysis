@@ -257,15 +257,36 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
 
     The returned cross-section value is in units of nm * nm.
     """
-
+    useFEFF = True
     # Generate the energy differential cross-section array.
-    energyDiffSigma = energy_diff_cross_section_nm2_per_eV(atomic_number, shell_number, subshell_index,
+    # J. Kas - Add option to use FEFF's cross sections 
+    if useFEFF:
+        from nion.eels_analysis.PeriodicTable import ElectronShell
+        from atomic_eels import atomic_diff_cross_section
+
+        # Create an electron shell object.
+        shell = ElectronShell(atomic_number,shell_number,subshell_index)
+        
+        # Make edge string for atomic_diff_cross_section
+        edge_label = shell.get_shell_str_in_eels_notation(include_subshell=True)
+        #print(edge_label)
+        beam_energy_keV = beam_energy_eV/1000.0
+        convergence_angle_mrad = convergence_angle_rad*1000.0
+        collection_angle_mrad = collection_angle_rad*1000.0
+        energy_step = 0.1  # Set small energy step for now. Adjust later depending on core-hole broadening.
+        egrid_eV = numpy.arange(edge_onset_eV, edge_onset_eV + edge_delta_eV, 0.1)
+        energyDiffSigma,edge_energy = atomic_diff_cross_section(atomic_number, edge_label, beam_energy_keV,
+                                                                convergence_angle_mrad, collection_angle_mrad, egrid_eV)
+        #print(edge_energy)
+    else:
+        energyDiffSigma = energy_diff_cross_section_nm2_per_eV(atomic_number, shell_number, subshell_index,
                                                            edge_onset_eV, edge_delta_eV, beam_energy_eV,
                                                            convergence_angle_rad, collection_angle_rad)
 
-    # Integrate over energy window to get partial cross-section
-    energySampleCount = energyDiffSigma.shape[0]
-    energy_step = edge_delta_eV / (energySampleCount - 1)
+        energySampleCount = energyDiffSigma.shape[0]
+        energy_step = edge_delta_eV / (energySampleCount - 1)
+
+                                                    
     partialCrossSection = numpy.trapz(energyDiffSigma, dx = energy_step)
 
     return partialCrossSection

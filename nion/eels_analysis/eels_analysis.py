@@ -346,6 +346,9 @@ def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, dat
 
 def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, electron_shell: typing.Optional[PeriodicTable.ElectronShell], fit_ranges, signal_range) -> DataAndMetadata.DataAndMetadata:
     """Subtract si_k background from data and metadata with signal in first index."""
+    # For now set hardcoded switch.
+    useFEFF = True
+
     signal_index = -1
 
     signal_length = data_and_metadata.dimensional_shape[signal_index]
@@ -359,13 +362,18 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
     bkgd_ranges = numpy.array([numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0] * signal_length), signal_calibration.convert_to_calibrated_value(fit_range[1] * signal_length)]) for fit_range in fit_ranges])
 
     cross_section = None
+
     if electron_shell is not None:
         beam_energy_ev = data_and_metadata.metadata.get("beam_energy_eV")
         beam_convergence_angle_rad = data_and_metadata.metadata.get("beam_convergence_angle_rad")
         beam_collection_angle_rad = data_and_metadata.metadata.get("beam_collection_angle_rad")
 
         if beam_energy_ev is not None and beam_convergence_angle_rad is not None and beam_collection_angle_rad is not None:
-            if electron_shell.shell_number == 1 and electron_shell.subshell_index == 1:
+            if useFEFF:
+                # Don't need to check which shell this is when using FEFF.
+                print("Using FEFF to calculate cross-sections.")
+                cross_section = EELS_CrossSections.partial_cross_section_nm2(electron_shell.atomic_number, electron_shell.shell_number, electron_shell.subshell_index, edge_onset, edge_delta, beam_energy_ev, beam_convergence_angle_rad, beam_collection_angle_rad)
+            elif electron_shell.shell_number == 1 and electron_shell.subshell_index == 1:
                 cross_section = EELS_CrossSections.partial_cross_section_nm2(electron_shell.atomic_number, electron_shell.shell_number, electron_shell.subshell_index, edge_onset, edge_delta, beam_energy_ev, beam_convergence_angle_rad, beam_collection_angle_rad)
             elif electron_shell.atomic_number == 32 and electron_shell.shell_number == 2 and electron_shell.subshell_index == 3:
                 if abs(edge_delta - 100) < 3:
