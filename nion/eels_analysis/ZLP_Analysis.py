@@ -3,6 +3,7 @@ A library of functions for finding and characterizing the zero-loss peak
 """
 
 import numpy
+import scipy.interpolate
 import scipy.ndimage
 import scipy.optimize
 
