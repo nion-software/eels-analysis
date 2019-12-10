@@ -6,6 +6,7 @@ import numpy
 import scipy.interpolate
 import scipy.ndimage
 import scipy.optimize
+import scipy.interpolate
 
 
 def gaussian(x, a, b, c):

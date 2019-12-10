@@ -416,8 +416,8 @@ class TestElementalMappingController(unittest.TestCase):
     def test_align_zlp_keeps_input_dtype(self):
         si_xdata_32 = self.__create_spectrum_image_xdata(dtype=numpy.float32)
         si_xdata_64 = self.__create_spectrum_image_xdata(dtype=numpy.float64)
-        mapped_xdata_32 = AlignZLP.align_zlp_xdata(si_xdata_32)
-        mapped_xdata_64 = AlignZLP.align_zlp_xdata(si_xdata_64)
+        mapped_xdata_32 = AlignZLP.align_zlp_xdata(si_xdata_32)[0]
+        mapped_xdata_64 = AlignZLP.align_zlp_xdata(si_xdata_64)[0]
         self.assertEqual(numpy.float32, mapped_xdata_32.data.dtype)
         self.assertEqual(numpy.float64, mapped_xdata_64.data.dtype)
 
