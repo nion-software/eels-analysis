@@ -5,6 +5,7 @@ A library of functions for finding and characterizing the zero-loss peak
 import numpy
 import scipy.ndimage
 import scipy.optimize
+import scipy.interpolate
 
 
 def gaussian(x, a, b, c):
