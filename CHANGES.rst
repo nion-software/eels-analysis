@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.4.5 (unreleased):
+-------------------
+- Made Align ZLP output the measured shifts in addition to the aligned spectra.
+
 0.4.4 (2019-10-24)
 ------------------
 - Changed shift method in ZLP subpixel align to scipy.ndimage.shift with linear interpolation to get rid of artifacts.
