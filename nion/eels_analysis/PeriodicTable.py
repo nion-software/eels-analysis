@@ -61,15 +61,14 @@ class ElectronShell:
 
     @property
     def subshell_label(self) -> str:
-        # J. Kas - Deleted 'a' from zeroth index since azimuthal_quantum_number
-        #          runs from 0 (s-states) to 4 (f-states).
-        subshell_labels = ('s','p','d', 'f', 'g', 'h', 'i', 'j') # J. Kas - Seems the p was left out.
+        # azimuthal_quantum_number runs from 0 (s-states) to 4 (f-states).
+        subshell_labels = ('s', 'p', 'd', 'f', 'g', 'h', 'i', 'j')
         return subshell_labels[self.azimuthal_quantum_number]
 
     @property
     def spin_fraction(self) -> fractions.Fraction:
+        # subshell_index runs from 1 (s-states) to 7 (f-states).
         spins = (None, 1, 1, 3, 3, 5, 5, 7, 7, 9)
-        # J. Kas - changed self.azimuthal_quantum_number to self.subshell_index
         return fractions.Fraction(spins[self.subshell_index], 2)
 
 

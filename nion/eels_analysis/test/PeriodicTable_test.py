@@ -2,17 +2,14 @@
 # cd EELSAnalysis
 # python -m unittest test/core_loss_edge_test.py
 
-import math
+import fractions
 import os
 import sys
 import unittest
 
-import numpy
-import scipy.stats
-
 sys.path.append(os.path.dirname(os.path.realpath(os.path.join(__file__, "..", ".."))))
 
-from nion.eels_analysis import PeriodicTable 
+from nion.eels_analysis import PeriodicTable
 
 
 class TestLibrary(unittest.TestCase):
@@ -27,41 +24,12 @@ class TestLibrary(unittest.TestCase):
 
     def test_subshell_label(self):
         # Test all possible labels up to f-states
-        shell=PeriodicTable.ElectronShell(99,4,1)
-        self.assertEqual(shell.subshell_label,'s')
-        shell=PeriodicTable.ElectronShell(99,4,2)
-        self.assertEqual(shell.subshell_label,'p')
-        shell=PeriodicTable.ElectronShell(99,4,3)
-        self.assertEqual(shell.subshell_label,'p')
-        shell=PeriodicTable.ElectronShell(99,4,4)
-        self.assertEqual(shell.subshell_label,'d')
-        shell=PeriodicTable.ElectronShell(99,4,5)
-        self.assertEqual(shell.subshell_label,'d')
-        shell=PeriodicTable.ElectronShell(99,4,6)
-        self.assertEqual(shell.subshell_label,'f')
-        shell=PeriodicTable.ElectronShell(99,4,7)
-        self.assertEqual(shell.subshell_label,'f')
+        subshell_labels = [None, "s", "p", "p", "d", "d", "f", "f"]
+        spin_numerators = [None, 1, 1, 3, 3, 5, 5, 7]
+        for subshell_index in range(len(subshell_labels))[1:]:
+            electron_shell = PeriodicTable.ElectronShell(99, 4, subshell_index)
+            self.assertEqual(electron_shell.subshell_label, subshell_labels[subshell_index])
+            self.assertEqual(electron_shell.spin_fraction, fractions.Fraction(spin_numerators[subshell_index], 2))
 
-    def test_spin_fraction(self):
-        import fractions
-        # Test all possible spin fraction up to f-states
-        shell=PeriodicTable.ElectronShell(99,4,1)
-        self.assertEqual(shell.spin_fraction,fractions.Fraction(1,2))
-        shell=PeriodicTable.ElectronShell(99,4,2)
-        self.assertEqual(shell.spin_fraction,fractions.Fraction(1,2))
-        shell=PeriodicTable.ElectronShell(99,4,3)
-        self.assertEqual(shell.spin_fraction,fractions.Fraction(3,2))
-        shell=PeriodicTable.ElectronShell(99,4,4)
-        self.assertEqual(shell.spin_fraction,fractions.Fraction(3,2))
-        shell=PeriodicTable.ElectronShell(99,4,5)
-        self.assertEqual(shell.spin_fraction,fractions.Fraction(5,2))
-        shell=PeriodicTable.ElectronShell(99,4,6)
-        self.assertEqual(shell.spin_fraction,fractions.Fraction(5,2))
-        shell=PeriodicTable.ElectronShell(99,4,7)
-        self.assertEqual(shell.spin_fraction,fractions.Fraction(7,2))
-        
 if __name__ == '__main__':
     unittest.main()
-
-#for edge in edges:
-#    print(edge.atomic_number, edge.shell_number, edge.subshell_index,edge.get_shell_str_in_eels_notation(True),ptable.nominal_binding_energy_ev(edge))
