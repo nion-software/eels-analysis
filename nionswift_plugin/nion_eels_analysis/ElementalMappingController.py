@@ -188,8 +188,17 @@ class EELSMapping:
     def __init__(self, computation, **kwargs):
         self.computation = computation
 
-    def execute(self, spectrum_image_xdata, fit_interval, signal_interval):
-        self.__mapped_xdata = eels_analysis.map_background_subtracted_signal(spectrum_image_xdata, None, [fit_interval], signal_interval)
+    def execute(self, **kwargs):
+        spectrum_image_xdata = kwargs["spectrum_image_xdata"]
+        fit_interval = kwargs["fit_interval"]
+        signal_interval = kwargs["signal_interval"]
+        atomic_number = kwargs.get("atomic_number")
+        shell_number = kwargs.get("shell_number")
+        subshell_index = kwargs.get("subshell_index")
+        electron_shell = None
+        if atomic_number is not None and shell_number is not None and subshell_index is not None:
+            electron_shell = PeriodicTable.ElectronShell(atomic_number, shell_number, subshell_index)
+        self.__mapped_xdata = eels_analysis.map_background_subtracted_signal(spectrum_image_xdata, electron_shell, [fit_interval], signal_interval)
 
     def commit(self):
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)
@@ -210,6 +219,9 @@ async def map_new_edge(document_controller, model_data_item, edge) -> None:
     computation.create_input_item("spectrum_image_xdata", Symbolic.make_item(model_data_item, type="xdata"))
     computation.create_input_item("fit_interval", Symbolic.make_item(edge.data_structure), property_name="fit_interval")
     computation.create_input_item("signal_interval", Symbolic.make_item(edge.data_structure), property_name="signal_interval")
+    computation.create_variable(name="atomic_number", value_type="integral", value=edge.electron_shell.atomic_number)
+    computation.create_variable(name="shell_number", value_type="integral", value=edge.electron_shell.shell_number)
+    computation.create_variable(name="subshell_index", value_type="integral", value=edge.electron_shell.subshell_index)
     computation.processing_id = "eels.mapping"
     computation.create_output_item("map", Symbolic.make_item(map_data_item))
     document_model.append_computation(computation, project=project)
