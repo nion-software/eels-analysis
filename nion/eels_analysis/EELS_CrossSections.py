@@ -257,7 +257,7 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
 
     The returned cross-section value is in units of nm * nm.
     """
-    useFEFF = True
+    useFEFF = False
     # Generate the energy differential cross-section array.
     # J. Kas - Add option to use FEFF's cross sections 
     if useFEFF:

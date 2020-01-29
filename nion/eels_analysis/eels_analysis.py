@@ -347,8 +347,6 @@ def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, dat
 
 def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, electron_shell: typing.Optional[PeriodicTable.ElectronShell], fit_ranges, signal_range) -> DataAndMetadata.DataAndMetadata:
     """Subtract si_k background from data and metadata with signal in first index."""
-    # For now set hardcoded switch.
-    useFEFF = True
 
     signal_index = -1
 
@@ -402,35 +400,36 @@ def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au:
 
 
 def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_index: int,
-                              edge_onset_ev: float, edge_delta_ev: float, beam_energy_ev: float,
+                              edge_onset_eV: float, edge_delta_eV: float, beam_energy_eV: float,
                               convergence_angle_rad: float, collection_angle_rad: float) -> float:
-    """Returns the partial cross section.
+    """Return the partial cross section for the specified electron shell and experimental parameters.
 
-    Uses generalized oscillator strength function.
+    Uses energy_diff_cross_section_nm2_per_eV function.
 
-    beam_energy is in eV.
-    energy_start, energy_end are in eV.
-    convergence_angle is in radians.
-    collection_angle is in radians.
-
-    The return value units are nm * nm.
+    The returned cross-section value is in units of nm * nm.
     """
     cross_section = None
+    # Use registered eels_analysis_service to obtain differential cross sections if available.
     eels_analysis_service = Registry.get_component("eels_analysis_service")
+    from nion.eels_analysis.PeriodicTable import ElectronShell
+
     if cross_section is None and eels_analysis_service:
-        cross_section = eels_analysis_service.partial_cross_section_nm2(atomic_number=atomic_number,
-                                                                        shell_number=shell_number,
-                                                                        subshell_index=subshell_index,
-                                                                        edge_onset_ev=edge_onset_ev,
-                                                                        edge_delta_ev=edge_delta_ev,
-                                                                        beam_energy_ev=beam_energy_ev,
-                                                                        convergence_angle_rad=convergence_angle_rad,
-                                                                        collection_angle_rad=collection_angle_rad)
+        energyDiffSigma = eels_analysis_service.energy_diff_cross_section_nm2_per_eV(atomic_number, shell_number, subshell_index,
+                                                           edge_onset_eV, edge_delta_eV, beam_energy_eV,
+                                                           convergence_angle_rad, collection_angle_rad)
+        energy_step = 0.1  # For now this is hard-coded in the energy_diff_cross_section registered eels service.
+        cross_section = numpy.trapz(energyDiffSigma, dx = energy_step)
+        
     if cross_section is None and shell_number == 1 and subshell_index == 1:
-        # k edges only
-        cross_section = EELS_CrossSections.partial_cross_section_nm2(atomic_number, shell_number, subshell_index,
-                                                                     edge_onset_ev, edge_delta_ev, beam_energy_ev,
-                                                                     convergence_angle_rad, collection_angle_rad)
+        # K edges only
+        energyDiffSigma = EELS_CrossSections.energy_diff_cross_section_nm2_per_eV(atomic_number, shell_number, subshell_index,
+                                                           edge_onset_eV, edge_delta_eV, beam_energy_eV,
+                                                           convergence_angle_rad, collection_angle_rad)
+        energySampleCount = energyDiffSigma.shape[0]
+        energy_step = edge_delta_eV / (energySampleCount - 1)
+        cross_section = numpy.trapz(energyDiffSigma, dx = energy_step)
+        
+        
     if cross_section is None and atomic_number == 32 and shell_number == 2 and subshell_index == 3:
         # special section for testing
         if abs(edge_delta_ev - 100) < 3:
@@ -439,8 +438,9 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
             cross_section = 8.79e-8
         elif abs(edge_delta_ev - 200) < 3:
             cross_section = 1.40e-7
+            
     return cross_section
-
+        
 
 def relative_atomic_abundance(counts_edge: float, partial_cross_section_nm2: float) -> float:
     """Return the relative atomic concentration.
