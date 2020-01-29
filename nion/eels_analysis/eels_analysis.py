@@ -16,6 +16,7 @@ from nion.eels_analysis import EELS_CrossSections
 from nion.eels_analysis import EELS_DataAnalysis
 from nion.eels_analysis import PeriodicTable
 from nion.data import DataAndMetadata
+from nion.utils import Registry
 
 
 def extract_signal_from_polynomial_background_data(data, signal_range, fit_ranges, first_x = 0.0, delta_x = 1.0,
@@ -369,19 +370,7 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
         beam_collection_angle_rad = data_and_metadata.metadata.get("beam_collection_angle_rad")
 
         if beam_energy_ev is not None and beam_convergence_angle_rad is not None and beam_collection_angle_rad is not None:
-            if useFEFF:
-                # Don't need to check which shell this is when using FEFF.
-                print("Using FEFF to calculate cross-sections.")
-                cross_section = EELS_CrossSections.partial_cross_section_nm2(electron_shell.atomic_number, electron_shell.shell_number, electron_shell.subshell_index, edge_onset, edge_delta, beam_energy_ev, beam_convergence_angle_rad, beam_collection_angle_rad)
-            elif electron_shell.shell_number == 1 and electron_shell.subshell_index == 1:
-                cross_section = EELS_CrossSections.partial_cross_section_nm2(electron_shell.atomic_number, electron_shell.shell_number, electron_shell.subshell_index, edge_onset, edge_delta, beam_energy_ev, beam_convergence_angle_rad, beam_collection_angle_rad)
-            elif electron_shell.atomic_number == 32 and electron_shell.shell_number == 2 and electron_shell.subshell_index == 3:
-                if abs(edge_delta - 100) < 3:
-                    cross_section = 7.31e-8
-                elif abs(edge_delta - 120) < 3:
-                    cross_section = 8.79e-8
-                elif abs(edge_delta - 200) < 3:
-                    cross_section = 1.40e-7
+            cross_section = partial_cross_section_nm2(electron_shell.atomic_number, electron_shell.shell_number, electron_shell.subshell_index, edge_onset, edge_delta, beam_energy_ev, beam_convergence_angle_rad, beam_collection_angle_rad)
 
     data = data_and_metadata.data
 
@@ -412,9 +401,9 @@ def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au:
     pass
 
 
-def partial_cross_section_nm2(beam_energy: float, energy_loss_start_eV: float, energy_loss_end_eV: float,
-                              convergence_angle: float, collection_angle: float,
-                              atomic_number: int, shell_number: int, subshell_index: int) -> float:
+def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_index: int,
+                              edge_onset_ev: float, edge_delta_ev: float, beam_energy_ev: float,
+                              convergence_angle_rad: float, collection_angle_rad: float) -> float:
     """Returns the partial cross section.
 
     Uses generalized oscillator strength function.
@@ -426,7 +415,31 @@ def partial_cross_section_nm2(beam_energy: float, energy_loss_start_eV: float, e
 
     The return value units are nm * nm.
     """
-    pass
+    cross_section = None
+    eels_analysis_service = Registry.get_component("eels_analysis_service")
+    if cross_section is None and eels_analysis_service:
+        cross_section = eels_analysis_service.partial_cross_section_nm2(atomic_number=atomic_number,
+                                                                        shell_number=shell_number,
+                                                                        subshell_index=subshell_index,
+                                                                        edge_onset_ev=edge_onset_ev,
+                                                                        edge_delta_ev=edge_delta_ev,
+                                                                        beam_energy_ev=beam_energy_ev,
+                                                                        convergence_angle_rad=convergence_angle_rad,
+                                                                        collection_angle_rad=collection_angle_rad)
+    if cross_section is None and shell_number == 1 and subshell_index == 1:
+        # k edges only
+        cross_section = EELS_CrossSections.partial_cross_section_nm2(atomic_number, shell_number, subshell_index,
+                                                                     edge_onset_ev, edge_delta_ev, beam_energy_ev,
+                                                                     convergence_angle_rad, collection_angle_rad)
+    if cross_section is None and atomic_number == 32 and shell_number == 2 and subshell_index == 3:
+        # special section for testing
+        if abs(edge_delta_ev - 100) < 3:
+            cross_section = 7.31e-8
+        elif abs(edge_delta_ev - 120) < 3:
+            cross_section = 8.79e-8
+        elif abs(edge_delta_ev - 200) < 3:
+            cross_section = 1.40e-7
+    return cross_section
 
 
 def relative_atomic_abundance(counts_edge: float, partial_cross_section_nm2: float) -> float:
