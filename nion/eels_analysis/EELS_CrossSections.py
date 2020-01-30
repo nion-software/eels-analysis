@@ -31,13 +31,13 @@ def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_
     beamGamma = 1 + beam_energy_eV / electronRestEnergy_eV
     beamBeta2 = 1 - 1 / beamGamma ** 2
 
-    energySampleCount = numpy.fmin(numpy.fmax(50, 100 * numpy.round(edge_delta_eV / 100)), 1000) + 1
+    energySampleCount = int(numpy.fmin(numpy.fmax(50, 100 * numpy.round(edge_delta_eV / 100)), 1000) + 1)
     thetaSampleCount = int(numpy.fmin(numpy.fmax(50, 100 * numpy.round(collection_angle_rad / 0.050)), 400) + 1)
 
     screenedZ2 = 1.
     shellOccupancy = 1
     if atomic_number > 1:
-        screenedZ2 = (atomic_number - 0.5) ** 2
+        screenedZ2 = (float(atomic_number) - 0.5) ** 2
         shellOccupancy = 2
 
     # Generate epsilon array (scaled energy-loss) = E/m0c^2 = E/Me over requested energy loss range
