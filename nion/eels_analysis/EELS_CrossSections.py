@@ -37,7 +37,7 @@ def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_
     screenedZ2 = 1.
     shellOccupancy = 1
     if atomic_number > 1:
-        screenedZ2 = (float(atomic_number) - 0.5) ** 2
+        screenedZ2 = (atomic_number - 0.5) ** 2
         shellOccupancy = 2
 
     # Generate epsilon array (scaled energy-loss) = E/m0c^2 = E/Me over requested energy loss range
