@@ -397,23 +397,45 @@ def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au:
     pass
 
 
+def energy_diff_cross_section_nm2_per_ev(atomic_number: int, shell_number: int, subshell_index: int,
+                                         edge_onset_ev: float, edge_delta_ev: float, beam_energy_ev: float,
+                                         convergence_angle_rad: float, collection_angle_rad: float) -> numpy.ndarray:
+    """Return the energy differential cross section for the specified electron shell and experimental parameters.
+
+    The returned differential cross-section value is in units of nm * nm / eV.
+    """
+    energy_diff_sigma = None
+    eels_analysis_service = Registry.get_component("eels_analysis_service")
+    if energy_diff_sigma is None and hasattr(eels_analysis_service, "energy_diff_cross_section_nm2_per_ev"):
+        energy_diff_sigma = eels_analysis_service.energy_diff_cross_section_nm2_per_ev(atomic_number=atomic_number,
+                                                                                       shell_number=shell_number,
+                                                                                       subshell_index=subshell_index,
+                                                                                       edge_onset_ev=edge_onset_ev,
+                                                                                       edge_delta_ev=edge_delta_ev,
+                                                                                       beam_energy_ev=beam_energy_ev,
+                                                                                       convergence_angle_rad=convergence_angle_rad,
+                                                                                       collection_angle_rad=collection_angle_rad)
+    if energy_diff_sigma is None and shell_number == 1 and subshell_index == 1:
+        # k edges only
+        energy_diff_sigma = EELS_CrossSections.energy_diff_cross_section_nm2_per_ev(atomic_number, shell_number,
+                                                                                    subshell_index,
+                                                                                    edge_onset_ev, edge_delta_ev,
+                                                                                    beam_energy_ev,
+                                                                                    convergence_angle_rad,
+                                                                                    collection_angle_rad)
+    return energy_diff_sigma
+
+
 def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_index: int,
                               edge_onset_ev: float, edge_delta_ev: float, beam_energy_ev: float,
                               convergence_angle_rad: float, collection_angle_rad: float) -> float:
     """Returns the partial cross section.
 
-    Uses generalized oscillator strength function.
-
-    beam_energy is in eV.
-    energy_start, energy_end are in eV.
-    convergence_angle is in radians.
-    collection_angle is in radians.
-
     The return value units are nm * nm.
     """
     cross_section = None
     eels_analysis_service = Registry.get_component("eels_analysis_service")
-    if cross_section is None and eels_analysis_service:
+    if cross_section is None and hasattr(eels_analysis_service, "partial_cross_section_nm2"):
         cross_section = eels_analysis_service.partial_cross_section_nm2(atomic_number=atomic_number,
                                                                         shell_number=shell_number,
                                                                         subshell_index=subshell_index,
@@ -422,11 +444,22 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
                                                                         beam_energy_ev=beam_energy_ev,
                                                                         convergence_angle_rad=convergence_angle_rad,
                                                                         collection_angle_rad=collection_angle_rad)
-    if cross_section is None and shell_number == 1 and subshell_index == 1:
-        # k edges only
-        cross_section = EELS_CrossSections.partial_cross_section_nm2(atomic_number, shell_number, subshell_index,
-                                                                     edge_onset_ev, edge_delta_ev, beam_energy_ev,
-                                                                     convergence_angle_rad, collection_angle_rad)
+
+    if cross_section is None:
+        energy_diff_sigma = energy_diff_cross_section_nm2_per_ev(atomic_number=atomic_number,
+                                                                 shell_number=shell_number,
+                                                                 subshell_index=subshell_index,
+                                                                 edge_onset_ev=edge_onset_ev,
+                                                                 edge_delta_ev=edge_delta_ev,
+                                                                 beam_energy_ev=beam_energy_ev,
+                                                                 convergence_angle_rad=convergence_angle_rad,
+                                                                 collection_angle_rad=collection_angle_rad)
+
+        # Integrate over energy window to get partial cross-section
+        energy_sample_count = energy_diff_sigma.shape[0]
+        energy_step = edge_delta_ev / (energy_sample_count - 1)
+        cross_section = numpy.trapz(energy_diff_sigma, dx=energy_step)
+
     if cross_section is None and atomic_number == 32 and shell_number == 2 and subshell_index == 3:
         # special section for testing
         if abs(edge_delta_ev - 100) < 3:
@@ -435,6 +468,7 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
             cross_section = 8.79e-8
         elif abs(edge_delta_ev - 200) < 3:
             cross_section = 1.40e-7
+
     return cross_section
 
 

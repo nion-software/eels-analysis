@@ -180,7 +180,7 @@ def kohl_collection_efficiency(theta_rad: numpy.ndarray, alpha_rad: float, beta_
     return collection_efficiency
 
 
-def energy_diff_cross_section_nm2_per_eV(atomic_number: int, shell_number: int, subshell_index: int,
+def energy_diff_cross_section_nm2_per_ev(atomic_number: int, shell_number: int, subshell_index: int,
                                          edge_onset_eV: float, edge_delta_eV: float, beam_energy_eV: float,
                                          convergence_angle_rad: float, collection_angle_rad: float) -> numpy.ndarray:
     """Return the energy differential cross section for the specified electron shell and experimental parameters.
@@ -253,13 +253,13 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
                               convergence_angle_rad: float, collection_angle_rad: float) -> float:
     """Return the partial cross section for the specified electron shell and experimental parameters.
 
-    Uses energy_diff_cross_section_nm2_per_eV function.
+    Uses energy_diff_cross_section_nm2_per_ev function.
 
     The returned cross-section value is in units of nm * nm.
     """
 
     # Generate the energy differential cross-section array.
-    energyDiffSigma = energy_diff_cross_section_nm2_per_eV(atomic_number, shell_number, subshell_index,
+    energyDiffSigma = energy_diff_cross_section_nm2_per_ev(atomic_number, shell_number, subshell_index,
                                                            edge_onset_eV, edge_delta_eV, beam_energy_eV,
                                                            convergence_angle_rad, collection_angle_rad)
 
