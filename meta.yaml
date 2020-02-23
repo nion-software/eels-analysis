@@ -29,6 +29,7 @@ test:
 
 about:
   home: https://github.com/nion-software/eels-analysis
+  license: GPL-3.0
   summary: "Library and UI for doing EELS analysis with Nion Swift."
   description: "Library and UI for doing EELS analysis with Nion Swift."
 

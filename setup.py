@@ -19,6 +19,7 @@ setuptools.setup(
     packages=["nion.eels_analysis", "nion.eels_analysis.test", "nionswift_plugin.nion_eels_analysis", "nionswift_plugin.nion_eels_analysis.test"],
     package_data={"nion.eels_analysis": ["resources/*"]},
     install_requires=["nionswift>=0.14.0"],
+    license='GPLv3',
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Programming Language :: Python :: 3.6",
