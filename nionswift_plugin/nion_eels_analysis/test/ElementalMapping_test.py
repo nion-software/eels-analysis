@@ -119,7 +119,12 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertIsNotNone(elemental_mapping_controller.model_data_item)
             energy_calibration = explorer_data_item.dimensional_calibrations[-1]
             explorer_display_item.graphics[-1].interval = energy_calibration.convert_from_calibrated_value(1200) / 1024, energy_calibration.convert_from_calibrated_value(1226) / 1024
-            document_controller.periodic()  # update explorer interval
+            for _ in range(3):
+                # there is something funny about how async works; recent versions of Swift are faster
+                # and have revealed some race condition about how items get added to the async queue.
+                # to avoid that problem, do periodic over a period of a few ms.
+                document_controller.periodic()  # update explorer interval
+                time.sleep(0.01)
             edges = PeriodicTable.PeriodicTable().find_edges_in_energy_interval(elemental_mapping_controller.explorer_interval)
             elemental_mapping_controller.add_edge(edges[0])
             self.assertEqual(1, len(document_model.data_structures))
