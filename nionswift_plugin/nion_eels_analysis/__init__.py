@@ -7,6 +7,7 @@ from . import AlignZLP
 from . import ThicknessMap
 from . import LiveThickness
 from . import LiveZLP
+from . import AlignMultiSI
 
 from nion.swift import Facade
 
@@ -47,3 +48,6 @@ class MenuExtension:
         eels_menu.add_separator()
         eels_menu.add_menu_item(_("Show Live Thickness Measurement"), functools.partial(LiveThickness.attach_measure_thickness, api, window))
         eels_menu.add_menu_item(_("Show Live ZLP Measurement"), functools.partial(LiveZLP.attach_measure_zlp, api, window))
+        eels_menu.add_separator()
+        eels_menu.add_menu_item(_("Align sequence of spectrum images"), functools.partial(AlignMultiSI.align_multi_si, api, window))
+        eels_menu.add_separator()
