@@ -1,6 +1,5 @@
 # standard libraries
 import contextlib
-import logging
 import time
 import unittest
 
@@ -36,21 +35,6 @@ class TestElementalMappingController(unittest.TestCase):
 
     def tearDown(self):
         pass
-
-    def __exception_handler(self, event_loop):
-        class ContextManager:
-            def __init__(self):
-                self.__errors = list()
-            def __enter__(self):
-                def handle_exception(loop, context):
-                    self.__errors.append(context.get("exception", context["message"]))
-                event_loop.set_exception_handler(handle_exception)
-                return self
-            def __exit__(self, type, value, traceback):
-                for error in self.__errors:
-                    logging.error(f"Caught exception: {error}")
-                assert not self.__errors
-        return ContextManager()
 
     def __create_spectrum_image(self) -> DataItem.DataItem:
         return DataItem.new_data_item(self.__create_spectrum_image_xdata())
@@ -103,7 +87,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             data_item = self.__create_spectrum_image()
             document_model.append_data_item(data_item)
             elemental_mapping_controller.set_current_data_item(data_item)
@@ -121,7 +105,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -155,7 +139,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -167,7 +151,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -184,7 +168,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -201,7 +185,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             model_display_item = document_model.get_display_item_for_data_item(model_data_item)
@@ -221,7 +205,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -242,7 +226,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             model_display_item = document_model.get_display_item_for_data_item(model_data_item)
@@ -265,7 +249,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -284,7 +268,7 @@ class TestElementalMappingController(unittest.TestCase):
         self.app._set_document_model(document_model)  # required to allow API to find document model
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -307,7 +291,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             model_display_item = document_model.get_display_item_for_data_item(model_data_item)
@@ -358,7 +342,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -377,7 +361,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -402,7 +386,7 @@ class TestElementalMappingController(unittest.TestCase):
         document_model = DocumentModel.DocumentModel()
         elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
         document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller), self.__exception_handler(document_controller.event_loop):
+        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
