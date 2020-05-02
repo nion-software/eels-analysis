@@ -4,7 +4,6 @@ dist: xenial
 os: linux
 jobs:
   include:
-    - python: 3.6
     - python: 3.7
       dist: xenial
     - python: 3.8
@@ -56,6 +55,6 @@ deploy:
     secure: "ow6bbjzRRJkfzZqB/jEEqjmYft3JT57kLR/aE5bxfI4VIofrq9pDadH4nhd8/kOih7ltGXxtC5LOCnAST0ZWwxDCHYM8uurX0j++AWvd4kbnsNj5BfuNs6HZDB/o0cDNofPyvfDPX/oCA4QLqdtM0rP59+h8+JhubcWVSMhwfzU1dE/N+XhekcyOJ42UC3SHhf6E5CXLZvJ6xl7V8S4H5SrWuOKUbVGSVAkzUXHrg5OPK17UWfOMdFD1/iwVJ8HN9JeoXwgEle0XGgJZeH8RMrdRsfOF/XApwhz5mQ90gblvnKXM0ExCezNthGjsk+58rzi9oRBJpvlo3nmndnD4TqV5YVifvkDNY5x7o3pBN48F9zMKgIJtv9is7Xf9Z0xMeyPZ/cNQ4Tv/Kx/LEpGWnrUKbt3B4DUHfUGBZqrrE+fyYtUGbXi1AdIbi6mSw5IbtY7/yozdzqkaVVFFT3PsSXggfwh5jBQkRP7DNOzh/MLO+rL1dDEk8ZYkcfhH14DAT3tYVnXdBo7NHG2mYWc+ZRXFlurTxoszIsrfmEVOR1iINXeMQawwZAx8RHJcbS/IcRhbxlQZ5TJpVecqraCpUdqxvSc6oMTWTH5SI+Ckmtw6mZQoWUpvUdi99s98GdA7+7IcqefWSXnyMYxuoFXtoQO3ctrruV1j5k1f3kKsLZo="
   on:
     tags: true
-    python: '3.6'
+    python: '3.7'
     branch: master
   distributions: "sdist bdist_wheel" # Your distributions here
