@@ -1,7 +1,7 @@
 """
 A library of functions for finding and characterizing the zero-loss peak
 """
-
+import logging
 import numpy
 import scipy.interpolate
 import scipy.ndimage
@@ -33,9 +33,13 @@ def estimate_zlp_amplitude_position_width_fit_spline(d):
         p0 = (d_max, max_pos, fwhm/2)
         #c = fwhm / (2 * math.sqrt(2 * math.log(2)))
         # now fit the gaussian to the data, using the amplitude, std dev, and bspline position as estimates (10%)
-        popt, pcov = scipy.optimize.curve_fit(gaussian, numpy.arange(r[0], r[1]), d[r[0]:r[1]], p0=p0,
-                                              jac=jac_gaussian)#, bounds=([d_max * 0.9, r[0], c * 0.9], [d_max * 1.1, r[1], c * 1.1]))
-        return popt
+        try:
+            popt, pcov = scipy.optimize.curve_fit(gaussian, numpy.arange(r[0], r[1]), d[r[0]:r[1]], p0=p0,
+                                                  jac=jac_gaussian)
+        except RuntimeError as e:
+            logging.error(str(e))
+        else:
+            return popt
     return numpy.nan, numpy.nan, numpy.nan
 
 
