@@ -4,9 +4,9 @@ Changelog (nionswift-eels-analysis)
 0.4.5 (unreleased):
 -------------------
 - Made Align ZLP output the measured shifts in addition to the aligned spectra.
-- Allow graphics to select the ROI for alinging spectra in Align ZLP.
+- Allow graphics to select the ROI for aligning spectra in Align ZLP.
 - Allow 2D images in Align ZLP and interpret y-axis as sequence axis.
-- Reworked Align ZLP to elimiate duplicate code.
+- Reworked Align ZLP to eliminate duplicate code.
 
 0.4.4 (2019-10-24)
 ------------------
