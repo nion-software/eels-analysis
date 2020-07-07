@@ -10,11 +10,10 @@ import numpy
 from nion.data import Calibration
 from nion.data import DataAndMetadata
 from nion.swift import Application
-from nion.swift import DocumentController
 from nion.swift import Facade
 from nion.swift.model import DataItem
-from nion.swift.model import DocumentModel
 from nion.swift.model import Symbolic
+from nion.swift.test import TestContext
 from nion.ui import TestUI
 
 from nion.eels_analysis import eels_analysis
@@ -84,10 +83,10 @@ class TestElementalMappingController(unittest.TestCase):
             time.sleep(1/50)
 
     def test_explore_creates_initial_line_plot(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             data_item = self.__create_spectrum_image()
             document_model.append_data_item(data_item)
             elemental_mapping_controller.set_current_data_item(data_item)
@@ -102,10 +101,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual("explore", explorer_display_item.graphics[-1].graphic_id)
 
     def test_explore_adds_edge(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -136,10 +135,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(3, edge_data_struct.get_property_value("subshell_index"))
 
     def test_adding_multiple_edges(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -148,10 +147,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(2, len(document_model.data_structures))
 
     def test_removing_edges(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -165,10 +164,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(0, len(document_model.data_structures))
 
     def test_controller_has_proper_edge_bundles_when_explorer_selected(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -182,10 +181,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(1, len(edge_bundle))
 
     def test_picking_edge_produces_properly_configured_composite(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             model_display_item = document_model.get_display_item_for_data_item(model_data_item)
@@ -202,10 +201,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(document_model.data_structures[0], document_model.data_structures[1].get_referenced_object("edge"))
 
     def test_deleting_pick_also_deletes_computation(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -223,10 +222,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(1, len(document_model.data_structures))
 
     def test_deleting_pick_region_also_deletes_pick_composition(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             model_display_item = document_model.get_display_item_for_data_item(model_data_item)
@@ -246,10 +245,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(1, len(document_model.data_structures))
 
     def test_selecting_composite_updates_edge_value(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -264,11 +263,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(si_edge.data_structure, elemental_mapping_controller.edge.data_structure)
 
     def test_background_subtraction_computation_functions_reasonably(self):
-        document_model = DocumentModel.DocumentModel()
-        self.app._set_document_model(document_model)  # required to allow API to find document model
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -288,10 +286,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(2, len(document_model.data_items))
 
     def test_changing_edge_configures_other_items_correctly(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             model_display_item = document_model.get_display_item_for_data_item(model_data_item)
@@ -339,10 +337,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(new_edge_data_structure, edge_ref_data_structure.get_referenced_object("edge"))
 
     def test_mapping_edge_produces_properly_configured_map(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -358,10 +356,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(mapped_data_item.dimensional_calibrations, model_data_item.dimensional_calibrations[0:2])
 
     def test_multiprofile_of_two_maps_builds_two_line_profiles(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
@@ -383,10 +381,10 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertIn(line_profile2_data_item, composite_display_item.data_items)
 
     def test_multiprofile_of_two_maps_connects_line_profiles(self):
-        document_model = DocumentModel.DocumentModel()
-        elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
-        document_controller = DocumentController.DocumentController(self.app.ui, document_model, workspace_id="library")
-        with contextlib.closing(document_controller), contextlib.closing(elemental_mapping_controller):
+        with TestContext.create_memory_context() as test_context:
+            document_controller = test_context.create_document_controller()
+            document_model = document_controller.document_model
+            elemental_mapping_controller = ElementalMappingController.ElementalMappingController(document_model)
             model_data_item = self.__create_spectrum_image()
             document_model.append_data_item(model_data_item)
             elemental_mapping_controller.set_current_data_item(model_data_item)
