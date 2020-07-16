@@ -70,7 +70,7 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=None
         dimensional_calibrations = copy.deepcopy(src_xdata.dimensional_calibrations)
         energy_calibration = dimensional_calibrations[-1]
         energy_calibration.offset = -(ref_pos + 0.5) * energy_calibration.scale
-        dimensional_calibrations = dimensional_calibrations[:-1] + [energy_calibration]
+        dimensional_calibrations = list(dimensional_calibrations[:-1]) + [energy_calibration]
         shift_calibration = copy.copy(energy_calibration)
         shift_calibration.offset = 0
 
