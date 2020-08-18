@@ -1,9 +1,13 @@
 # imports
+import gettext
 import numpy
 
 # local libraries
 from nion.swift.model import Symbolic
 from nion.eels_analysis import eels_analysis
+
+
+_ = gettext.gettext
 
 
 class EELSBackgroundSubtraction:
@@ -42,14 +46,29 @@ class EELSMapping:
 
 async def use_interval_as_signal(api, window):
     target_data_item = window.target_data_item
-    target_display = window.target_display
-    target_graphic = target_display.selected_graphics[0] if target_display and len(target_display.selected_graphics) == 1 else None
+    target_display_item = window.target_display
+    target_graphic = target_display_item.selected_graphics[0] if target_display_item and len(target_display_item.selected_graphics) == 1 else None
     target_interval = target_graphic if target_graphic and target_graphic.graphic_type == "interval-graphic" else None
     if target_data_item and target_interval:
-        target_display_item = api.library._document_model.get_display_item_for_data_item(target_data_item._data_item)
         interval = target_interval.interval
-        fit_ahead = target_data_item.add_interval_region(interval[0] * 0.8, interval[0] * 0.9)
-        fit_behind = target_data_item.add_interval_region(interval[1] * 1.1, interval[1] * 1.2)
+        fit_ahead = target_display_item.add_graphic(
+            {
+                "type": "interval-graphic",
+                "start": interval[0] * 0.8,
+                "end": interval[0] * 0.9,
+                "graphic_id": "background",
+                "label": _("Background"),
+            }
+        )
+        fit_behind = target_display_item.add_graphic(
+            {
+                "type": "interval-graphic",
+                "start": interval[1] * 1.1,
+                "end": interval[1] * 1.2,
+                "graphic_id": "background",
+                "label": _("Background"),
+            }
+        )
         background = api.library.create_data_item(title="{} Background".format(target_data_item.title))
         signal = api.library.create_data_item(title="{} Subtracted".format(target_data_item.title))
         computation = api.library.create_computation("eels.background_subtraction2", inputs={"eels_spectrum_data_item": target_data_item, "fit_interval_graphics": [fit_ahead, fit_behind], "signal_interval_graphic": target_interval}, outputs={"background": background, "subtracted": signal})
@@ -57,18 +76,17 @@ async def use_interval_as_signal(api, window):
         target_interval._graphic.source = computation._computation
         fit_ahead._graphic.source = target_interval._graphic
         fit_behind._graphic.source = target_interval._graphic
-        fit_ahead.label = "background"
-        fit_behind.label = "background"
-        target_interval.label = "signal"
+        target_interval.graphic_id = "signal"
+        target_interval.label = _("Signal")
         target_interval._graphic.color = "#0F0"
-        target_display_item.append_display_data_channel_for_data_item(background._data_item)
-        target_display_item.append_display_data_channel_for_data_item(signal._data_item)
-        target_display_item.display_layers = [
+        target_display_item._display_item.append_display_data_channel_for_data_item(background._data_item)
+        target_display_item._display_item.append_display_data_channel_for_data_item(signal._data_item)
+        target_display_item._display_item.display_layers = [
             {"label": "Signal", "data_index": 2, "fill_color": "#0F0"},
             {"label": "Background", "data_index": 1, "fill_color": "rgba(255, 0, 0, 0.3)"},
             {"label": "Data", "data_index": 0, "fill_color": "#1E90FF"},
         ]
-        target_display_item.set_display_property("legend_position", "top-right")
+        target_display_item._display_item.set_display_property("legend_position", "top-right")
 
 
 def use_signal_for_map(api, window):
