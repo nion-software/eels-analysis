@@ -17,12 +17,13 @@ class EELSBackgroundSubtraction:
     def execute(self, eels_spectrum_data_item, fit_interval_graphics, signal_interval_graphic):
         eels_spectrum_xdata = eels_spectrum_data_item.xdata
         fit_intervals = [fit_interval_graphic.interval for fit_interval_graphic in fit_interval_graphics]
-        signal_interval = signal_interval_graphic.interval
+        fit_minimum = min([fit_interval[0] for fit_interval in fit_intervals])
+        signal_interval = fit_minimum, 1.0
         signal_xdata = eels_analysis.extract_original_signal(eels_spectrum_xdata, fit_intervals, signal_interval)
         self.__background_xdata = eels_analysis.calculate_background_signal(eels_spectrum_xdata, fit_intervals, signal_interval)
         subtracted_xdata = signal_xdata - self.__background_xdata
-        offset = int(round((signal_interval[0] - fit_intervals[0][0]) * eels_spectrum_xdata.data_shape[0]))
-        length = int(round((signal_interval[1] - signal_interval[0]) * eels_spectrum_xdata.data_shape[0]))
+        offset = int(round((signal_interval[0] - fit_minimum) * eels_spectrum_xdata.data_shape[0]))
+        length = int(round((signal_interval[1] - fit_minimum) * eels_spectrum_xdata.data_shape[0]))
         self.__subtracted_xdata = subtracted_xdata[offset:offset + length]
 
     def commit(self):
