@@ -1,6 +1,9 @@
 import functools
 import gettext
 
+# ensure background models are registered
+from nion.eels_analysis import BackgroundModel
+
 from . import BackgroundSubtraction
 from . import ElementalMappingPanel
 from . import AlignZLP
