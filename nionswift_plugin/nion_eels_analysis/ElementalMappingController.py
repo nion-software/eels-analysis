@@ -423,7 +423,7 @@ class ElementalMappingController:
         pick_region.size = min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1])
         pick_region.label = _("Explore")
         model_display_item.add_graphic(pick_region)
-        pick_data_item = document_model.get_pick_region_new(model_display_item, pick_region=pick_region)
+        pick_data_item = document_model.get_pick_region_new(model_display_item, model_display_item.data_item, pick_region=pick_region)
         if pick_data_item:
             explore_interval = Graphics.IntervalGraphic()
             explore_interval.interval = 0.4, 0.6
@@ -559,7 +559,7 @@ class ElementalMappingController:
                     multiprofile_display_item.display_type = "line_plot"
                     multiprofile_display_item.set_display_property("legend_position", "top-right")
                     document_model.append_display_item(multiprofile_display_item)
-                line_profile_data_item = document_model.get_line_profile_new(dependent_display_item)
+                line_profile_data_item = document_model.get_line_profile_new(dependent_display_item, dependent_display_item.data_item)
                 line_profile_display_item = document_model.get_display_item_for_data_item(line_profile_data_item)
                 line_profile_display_data_channel = line_profile_display_item.get_display_data_channel_for_data_item(line_profile_data_item)
                 line_profile_region = dependent_display_item.graphics[0]
