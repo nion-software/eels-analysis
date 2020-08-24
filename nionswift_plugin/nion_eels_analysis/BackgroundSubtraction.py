@@ -182,7 +182,7 @@ def use_signal_for_map(api, window):
                     background_model = computation.get_input("background_model")
                     background_model = api._new_api_object(background_model)
                     source_data_items = api.library._document_model.get_source_data_items(eels_spectrum_data_item._data_item)
-                    if len(source_data_items) == 1 and source_data_items[0].is_navigable and source_data_items[0].datum_dimension_count == 1:
+                    if len(source_data_items) == 1 and source_data_items[0].xdata.is_navigable and source_data_items[0].datum_dimension_count == 1:
                         spectrum_image = api._new_api_object(source_data_items[0])
                         map = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape), title="{} Map".format(spectrum_image.title))
                         signal_interval_graphic = target_interval
