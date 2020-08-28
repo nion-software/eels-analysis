@@ -220,7 +220,7 @@ def component_registered(component, component_types):
         DataStructure.DataStructure.register_entity(background_model_entity, entity_name=component.title)
 
 
-Registry.listen_component_registered_event(component_registered)
+_component_registered_listener = Registry.listen_component_registered_event(component_registered)
 
 # handle any components that have already been registered.
 for component in Registry.get_components_by_type("background-model"):
