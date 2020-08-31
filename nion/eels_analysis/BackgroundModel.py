@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 # imports
+import copy
 import gettext
 import numpy
 import typing
@@ -25,63 +26,64 @@ class PolynomialBackgroundModel:
         self.transform = transform
         self.untransform = untransform
         self.title = title
+        self.package_title = _("EELS Analysis")
 
-    def analyze_spectrum(self, spectrum: DataAndMetadata.DataAndMetadata, fit_intervals: typing.Sequence[Calibration.CalibratedInterval], **kwargs) -> BackgroundModelParameters:
-        # assert that spectrum is 1d with eV calibration
-        assert spectrum.is_datum_1d
-        assert not spectrum.is_navigable
-        assert spectrum.datum_dimensional_calibrations[0].units == "eV"
-        # analyze the fit
-        reference_frame = Calibration.ReferenceFrameAxis(spectrum.datum_dimensional_calibrations[0], spectrum.datum_dimension_shape[0])
-        xs = numpy.concatenate([Core.get_calibrated_interval_domain(reference_frame, fit_interval) for fit_interval in fit_intervals])
-        ys = numpy.concatenate([Core.get_calibrated_interval_slice(spectrum, reference_frame, fit_interval).data for fit_interval in fit_intervals])
+    def fit_background(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata, fit_intervals: typing.Sequence[Calibration.CalibratedInterval], background_interval: Calibration.CalibratedInterval, **kwargs) -> typing.Dict:
+        return {
+            "background_model": self.__fit_background(spectrum_xdata, fit_intervals, background_interval),
+        }
+
+    def integrate_signal(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata, fit_intervals: typing.Sequence[Calibration.CalibratedInterval], signal_interval: Calibration.CalibratedInterval, **kwargs) -> typing.Dict:
+        # set up initial values
+        subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata, self.__fit_background(spectrum_xdata, fit_intervals, signal_interval))
+        if spectrum_xdata.is_navigable:
+            return {
+                "integrated": DataAndMetadata.new_data_and_metadata(
+                    numpy.trapz(subtracted_xdata.data),
+                    dimensional_calibrations=spectrum_xdata.navigation_dimensional_calibrations)
+            }
+        else:
+            return {
+                "integrated_value": numpy.trapz(subtracted_xdata.data),
+            }
+
+    def __fit_background(self, spectrum_xdata: DataAndMetadata.DataAndMetadata, fit_intervals: typing.Sequence[Calibration.CalibratedInterval], background_interval: Calibration.CalibratedInterval) -> DataAndMetadata.DataAndMetadata:
+        reference_frame = Calibration.ReferenceFrameAxis(spectrum_xdata.datum_dimensional_calibrations[0], spectrum_xdata.datum_dimension_shape[0])
+        # fit polynomial to the data
+        xs = numpy.concatenate(
+            [Core.get_calibrated_interval_domain(reference_frame, fit_interval) for fit_interval in fit_intervals])
+        if len(fit_intervals) > 1:
+            ys = numpy.concatenate(
+                [Core.get_calibrated_interval_slice(spectrum_xdata, reference_frame, fit_interval).data for fit_interval in
+                 fit_intervals])
+        else:
+            ys = Core.get_calibrated_interval_slice(spectrum_xdata, reference_frame, fit_intervals[0]).data
         transform_data = self.transform or (lambda x: x)
+        # generate background model data from the series
+        n = reference_frame.convert_to_pixel(background_interval.end).int_value - reference_frame.convert_to_pixel(
+            background_interval.start).int_value
+        interval_start = reference_frame.convert_to_calibrated(background_interval.start).value
+        interval_end = reference_frame.convert_to_calibrated(background_interval.end).value
+        interval_end -= (interval_end - interval_start) / n  # n samples at the left edges of each pixel
+        untransform_data = self.untransform or (lambda x: x)
+        calibration = copy.deepcopy(spectrum_xdata.datum_dimensional_calibrations[0])
+        calibration.offset = reference_frame.convert_to_calibrated(background_interval.start).value
+        if spectrum_xdata.is_navigable:
+            calibrations = list(copy.deepcopy(spectrum_xdata.navigation_dimensional_calibrations)) + [calibration]
+            background_xdata = DataAndMetadata.new_data_and_metadata(numpy.empty(spectrum_xdata.navigation_dimension_shape + (n, )),
+                                                                     dimensional_calibrations=calibrations,
+                                                                     intensity_calibration=spectrum_xdata.intensity_calibration)
+            for index in numpy.ndindex(spectrum_xdata.navigation_dimension_shape):
+                background_xdata.data[index] = self.__perform_fit(xs, ys[index], transform_data, untransform_data, n, interval_start, interval_end)
+        else:
+            poly_data = self.__perform_fit(xs, ys, transform_data, untransform_data, n, interval_start, interval_end)
+            background_xdata = DataAndMetadata.new_data_and_metadata(poly_data, dimensional_calibrations=[calibration],
+                                                                     intensity_calibration=spectrum_xdata.intensity_calibration)
+        return background_xdata
+
+    def __perform_fit(self, xs, ys, transform_data, untransform_data, n, interval_start, interval_end):
         series = typing.cast(typing.Any, numpy.polynomial.polynomial.Polynomial.fit(xs, transform_data(ys), self.deg))
-        # store the fit parameters in the dictionary.
-        return {
-            "coefficients": numpy.array(series.convert().coef).tolist(),
-        }
-
-    def analyze_spectra(self, spectra: DataAndMetadata.DataAndMetadata, fit_intervals: typing.Sequence[Calibration.CalibratedInterval], **kwargs) -> BackgroundModelParameters:
-        # assert that spectrum is 1d with eV calibration
-        assert spectra.is_datum_1d
-        assert spectra.datum_dimensional_calibrations[0].units == "eV"
-        # analyze the fit
-        reference_frame = Calibration.ReferenceFrameAxis(spectra.datum_dimensional_calibrations[0], spectra.datum_dimension_shape[0])
-        xs = numpy.concatenate([Core.get_calibrated_interval_domain(reference_frame, fit_interval) for fit_interval in fit_intervals])
-        ys = numpy.concatenate([Core.get_calibrated_interval_slice(spectra, reference_frame, fit_interval).data for fit_interval in fit_intervals], axis=-1)
-        transform_data = self.transform or (lambda x: x)
-        coefficients = numpy.empty(list(spectra.navigation_dimension_shape) + [self.deg + 1,])
-        for index in numpy.ndindex(spectra.navigation_dimension_shape):
-            series = typing.cast(typing.Any, numpy.polynomial.polynomial.Polynomial.fit(xs, transform_data(ys[index]), self.deg))
-            coefficients[index] = series.convert().coef
-        # store the fit parameters in the dictionary.
-        return {
-            "coefficients": coefficients,
-        }
-
-    def generate_background(self, background_model: BackgroundModelParameters, reference_frame: Calibration.ReferenceFrameAxis, interval: Calibration.CalibratedInterval) -> DataAndMetadata:
-        n = reference_frame.convert_to_pixel(interval.end).int_value - reference_frame.convert_to_pixel(interval.start).int_value
-        interval_start = reference_frame.convert_to_calibrated(interval.start).value
-        interval_end = reference_frame.convert_to_calibrated(interval.end).value
-        interval_end -= (interval_end - interval_start) / n  # n samples at the left edges of each pixel
-        untransform_data = self.untransform or (lambda x: x)
-        series = numpy.polynomial.polynomial.Polynomial(background_model["coefficients"])
-        poly_data = untransform_data(series.linspace(n, [interval_start, interval_end])[1])
-        return DataAndMetadata.new_data_and_metadata(poly_data)
-
-    def generate_backgrounds(self, background_model: BackgroundModelParameters, reference_frame: Calibration.ReferenceFrameAxis, interval: Calibration.CalibratedInterval) -> DataAndMetadata:
-        coefficients = background_model["coefficients"]
-        n = reference_frame.convert_to_pixel(interval.end).int_value - reference_frame.convert_to_pixel(interval.start).int_value
-        interval_start = reference_frame.convert_to_calibrated(interval.start).value
-        interval_end = reference_frame.convert_to_calibrated(interval.end).value
-        interval_end -= (interval_end - interval_start) / n  # n samples at the left edges of each pixel
-        untransform_data = self.untransform or (lambda x: x)
-        mapped_data = numpy.empty(list(coefficients.shape[:-1]) + [n,])
-        for index in numpy.ndindex(mapped_data.shape[:-1]):
-            series = numpy.polynomial.polynomial.Polynomial(coefficients[index])
-            mapped_data[index] = untransform_data(series.linspace(n, [interval_start, interval_end])[1])
-        return DataAndMetadata.new_data_and_metadata(mapped_data)
+        return untransform_data(series.linspace(n, [interval_start, interval_end])[1])
 
 
 # register background models with the registry.

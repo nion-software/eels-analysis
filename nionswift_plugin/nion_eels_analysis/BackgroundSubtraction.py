@@ -37,9 +37,10 @@ class EELSBackgroundSubtraction:
 
     def execute(self, eels_spectrum_data_item, background_model, fit_interval_graphics, **kwargs) -> None:
         try:
-            assert eels_spectrum_data_item.xdata.is_datum_1d
-            assert eels_spectrum_data_item.xdata.datum_dimensional_calibrations[0].units == "eV"
-            eels_spectrum_xdata = eels_spectrum_data_item.xdata
+            spectrum_xdata = eels_spectrum_data_item.xdata
+            assert spectrum_xdata.is_datum_1d
+            assert spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
+            eels_spectrum_xdata = spectrum_xdata
             # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
             fit_intervals = list()
             for fit_interval_graphic in fit_interval_graphics:
@@ -55,16 +56,21 @@ class EELSBackgroundSubtraction:
                                                              eels_spectrum_xdata.datum_dimension_shape[0])
             signal_xdata = Core.get_calibrated_interval_slice(eels_spectrum_xdata, reference_frame, signal_interval)
             background_xdata = None
+            subtracted_xdata = None
             if background_model._data_structure.entity:
                 entity_id = background_model._data_structure.entity.entity_type.entity_id
                 for component in Registry.get_components_by_type("background-model"):
                     if entity_id == component.background_model_id:
-                        background_model = component.analyze_spectrum(eels_spectrum_data_item.xdata, fit_intervals)
-                        background_xdata = component.generate_background(background_model, reference_frame, signal_interval)
+                        fit_result = component.fit_background(spectrum_xdata=spectrum_xdata, fit_intervals=fit_intervals, background_interval=signal_interval)
+                        background_xdata = fit_result["background_model"]
+                        # use 'or' to avoid doing subtraction if subtracted_spectrum already present
+                        subtracted_xdata = fit_result.get("subtracted_spectrum", None) or Core.calibrated_subtract_spectrum(spectrum_xdata, background_xdata)
             if background_xdata is None:
                 background_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros_like(signal_xdata.data), intensity_calibration=signal_xdata.intensity_calibration, dimensional_calibrations=signal_xdata.dimensional_calibrations)
-            self.__background_xdata = DataAndMetadata.new_data_and_metadata(background_xdata.data, intensity_calibration=signal_xdata.intensity_calibration, dimensional_calibrations=signal_xdata.dimensional_calibrations)
-            self.__subtracted_xdata = signal_xdata - self.__background_xdata
+            if subtracted_xdata is None:
+                subtracted_xdata = DataAndMetadata.new_data_and_metadata(signal_xdata.data, intensity_calibration=signal_xdata.intensity_calibration, dimensional_calibrations=signal_xdata.dimensional_calibrations)
+            self.__background_xdata = background_xdata
+            self.__subtracted_xdata = subtracted_xdata
         except Exception as e:
             import traceback
             print(traceback.format_exc())
@@ -107,17 +113,17 @@ class EELSMapping:
             signal_interval = Calibration.CalibratedInterval(
                 Calibration.Coordinate(Calibration.CoordinateType.NORMALIZED, signal_interval_graphic.interval[0]),
                 Calibration.Coordinate(Calibration.CoordinateType.NORMALIZED, signal_interval_graphic.interval[1]))
-            reference_frame = Calibration.ReferenceFrameAxis(spectrum_image_xdata.datum_dimensional_calibrations[0],
-                                                             spectrum_image_xdata.datum_dimension_shape[0])
-            signal_slice = slice(reference_frame.convert_to_pixel(signal_interval.start).int_value, reference_frame.convert_to_pixel(signal_interval.end).int_value)
             mapped_xdata = None
             if background_model._data_structure.entity:
                 entity_id = background_model._data_structure.entity.entity_type.entity_id
                 for component in Registry.get_components_by_type("background-model"):
                     if entity_id == component.background_model_id:
-                        background_model = component.analyze_spectra(spectrum_image_xdata, fit_intervals)
-                        poly_xdata = component.generate_backgrounds(background_model, reference_frame, signal_interval)
-                        mapped_xdata = DataAndMetadata.new_data_and_metadata(numpy.trapz(spectrum_image_xdata[..., signal_slice] - poly_xdata.data), dimensional_calibrations=spectrum_image_xdata.navigation_dimensional_calibrations)
+                        # import time
+                        # t0 = time.perf_counter()
+                        integrate_result = component.integrate_signal(spectrum_xdata=spectrum_image_xdata, fit_intervals=fit_intervals, signal_interval=signal_interval)
+                        # t1 = time.perf_counter()
+                        # print(f"{component.background_model_id} {((t1 - t0) * 1000)}ms")
+                        mapped_xdata = integrate_result["integrated"]
             if mapped_xdata is None:
                 mapped_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros(spectrum_image_xdata.navigation_dimension_shape), dimensional_calibrations=spectrum_image_xdata.navigation_dimensional_calibrations)
             self.__mapped_xdata = mapped_xdata
@@ -217,7 +223,7 @@ def component_registered(component, component_types):
         # when a background model is registered, create an empty (for now) entity type, and register it with the data
         # structure so that an entity for use with the UI and computations can be created when the data structure loads.
         background_model_entity = Schema.entity(component.background_model_id, BackgroundModel, None, {})
-        DataStructure.DataStructure.register_entity(background_model_entity, entity_name=component.title)
+        DataStructure.DataStructure.register_entity(background_model_entity, entity_name=component.title, entity_package_name=component.package_title)
 
 
 _component_registered_listener = Registry.listen_component_registered_event(component_registered)
