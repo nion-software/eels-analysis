@@ -19,12 +19,9 @@ _ = gettext.gettext
 BackgroundModelParameters = typing.Dict
 
 
-class PolynomialBackgroundModel:
-    def __init__(self, background_model_id: str, deg: int, transform = None, untransform = None, title: str = None):
+class AbstractBackgroundModel:
+    def __init__(self, background_model_id: str, title: str = None):
         self.background_model_id = background_model_id
-        self.deg = deg
-        self.transform = transform
-        self.untransform = untransform
         self.title = title
         self.package_title = _("EELS Analysis")
 
@@ -58,14 +55,12 @@ class PolynomialBackgroundModel:
                  fit_intervals])
         else:
             ys = Core.get_calibrated_interval_slice(spectrum_xdata, reference_frame, fit_intervals[0]).data
-        transform_data = self.transform or (lambda x: x)
         # generate background model data from the series
         n = reference_frame.convert_to_pixel(background_interval.end).int_value - reference_frame.convert_to_pixel(
             background_interval.start).int_value
         interval_start = reference_frame.convert_to_calibrated(background_interval.start).value
         interval_end = reference_frame.convert_to_calibrated(background_interval.end).value
         interval_end -= (interval_end - interval_start) / n  # n samples at the left edges of each pixel
-        untransform_data = self.untransform or (lambda x: x)
         calibration = copy.deepcopy(spectrum_xdata.datum_dimensional_calibrations[0])
         calibration.offset = reference_frame.convert_to_calibrated(background_interval.start).value
         if spectrum_xdata.is_navigable:
@@ -74,14 +69,28 @@ class PolynomialBackgroundModel:
                                                                      dimensional_calibrations=calibrations,
                                                                      intensity_calibration=spectrum_xdata.intensity_calibration)
             for index in numpy.ndindex(spectrum_xdata.navigation_dimension_shape):
-                background_xdata.data[index] = self.__perform_fit(xs, ys[index], transform_data, untransform_data, n, interval_start, interval_end)
+                background_xdata.data[index] = self._perform_fit(xs, ys[index], n, interval_start, interval_end)
         else:
-            poly_data = self.__perform_fit(xs, ys, transform_data, untransform_data, n, interval_start, interval_end)
+            poly_data = self._perform_fit(xs, ys, n, interval_start, interval_end)
             background_xdata = DataAndMetadata.new_data_and_metadata(poly_data, dimensional_calibrations=[calibration],
                                                                      intensity_calibration=spectrum_xdata.intensity_calibration)
         return background_xdata
 
-    def __perform_fit(self, xs, ys, transform_data, untransform_data, n, interval_start, interval_end):
+    def _perform_fit(self, xs: numpy.ndarray, ys: numpy.ndarray, n: int, interval_start: float, interval_end: float) -> numpy.ndarray:
+        raise NotImplementedError()
+
+
+class PolynomialBackgroundModel(AbstractBackgroundModel):
+
+    def __init__(self, background_model_id: str, deg: int, transform = None, untransform = None, title: str = None):
+        super().__init__(background_model_id, title)
+        self.deg = deg
+        self.transform = transform
+        self.untransform = untransform
+
+    def _perform_fit(self, xs: numpy.ndarray, ys: numpy.ndarray, n: int, interval_start: float, interval_end: float) -> numpy.ndarray:
+        transform_data = self.transform or (lambda x: x)
+        untransform_data = self.untransform or (lambda x: x)
         series = typing.cast(typing.Any, numpy.polynomial.polynomial.Polynomial.fit(xs, transform_data(ys), self.deg))
         return untransform_data(series.linspace(n, [interval_start, interval_end])[1])
 
