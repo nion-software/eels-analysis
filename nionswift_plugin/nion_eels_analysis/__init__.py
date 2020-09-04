@@ -39,7 +39,7 @@ class MenuExtension:
         eels_menu = document_window.get_or_create_menu("eels_menu", _("EELS"), "window_menu")
 
         eels_menu.add_separator()
-        eels_menu.add_menu_item(_("Subtract Background from Signal"), functools.partial(BackgroundSubtraction.subtract_background_from_signal, api, window))
+        eels_menu.add_menu_item(_("Fit Background"), functools.partial(BackgroundSubtraction.subtract_background_from_signal, api, window))
         eels_menu.add_separator()
         eels_menu.add_menu_item(_("Map Signal"), functools.partial(BackgroundSubtraction.use_signal_for_map, api, window))
         eels_menu.add_menu_item(_("Map Thickness"), functools.partial(ThicknessMap.map_thickness, api, window))
