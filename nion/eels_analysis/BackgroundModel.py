@@ -63,21 +63,39 @@ class AbstractBackgroundModel:
         interval_end -= (interval_end - interval_start) / n  # n samples at the left edges of each pixel
         calibration = copy.deepcopy(spectrum_xdata.datum_dimensional_calibrations[0])
         calibration.offset = reference_frame.convert_to_calibrated(background_interval.start).value
+        fs = numpy.linspace(interval_start, interval_end, n)
         if spectrum_xdata.is_navigable:
             calibrations = list(copy.deepcopy(spectrum_xdata.navigation_dimensional_calibrations)) + [calibration]
-            background_xdata = DataAndMetadata.new_data_and_metadata(numpy.empty(spectrum_xdata.navigation_dimension_shape + (n, )),
+            yss = numpy.reshape(ys, (numpy.product(ys.shape[:-1]),) + (ys.shape[-1],))
+            fit_data = self._perform_fits(xs, yss, fs)
+            background_xdata = DataAndMetadata.new_data_and_metadata(numpy.reshape(fit_data, ys.shape[:-1] + (n,)),
+                                                                     data_descriptor=DataAndMetadata.DataDescriptor(False, spectrum_xdata.navigation_dimension_count, spectrum_xdata.datum_dimension_count),
                                                                      dimensional_calibrations=calibrations,
                                                                      intensity_calibration=spectrum_xdata.intensity_calibration)
-            for index in numpy.ndindex(spectrum_xdata.navigation_dimension_shape):
-                background_xdata.data[index] = self._perform_fit(xs, ys[index], n, interval_start, interval_end)
         else:
-            poly_data = self._perform_fit(xs, ys, n, interval_start, interval_end)
+            poly_data = self._perform_fit(xs, ys, fs)
             background_xdata = DataAndMetadata.new_data_and_metadata(poly_data, dimensional_calibrations=[calibration],
                                                                      intensity_calibration=spectrum_xdata.intensity_calibration)
         return background_xdata
 
-    def _perform_fit(self, xs: numpy.ndarray, ys: numpy.ndarray, n: int, interval_start: float, interval_end: float) -> numpy.ndarray:
-        raise NotImplementedError()
+    def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
+        # xs will be a set of x-values with shape (L) representing the energies at which to fit
+        # ys will be an array of y-values with shape (m,L)
+        # fs will be an array of x-values with shape (n) representing energies at which to generate fitted data
+        # return an ndarray of the fit with shape (m,n)
+        # implement at least one of _perform_fits and _perform_fit
+        fit = numpy.empty(yss.shape[:-1] + fs.shape)
+        for index in numpy.ndindex(yss.shape[:-1]):
+            fit[index] = self._perform_fit(xs, yss[index], fs)
+        return fit
+
+    def _perform_fit(self, xs: numpy.ndarray, ys: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
+        # xs will be a set of x-values with shape (L) representing the energies at which to fit
+        # ys will be an array of y-values with shape (L)
+        # fs will be an array of x-values with shape (n) representing energies at which to generate fitted data
+        # return an ndarray of the fit with shape (n)
+        # implement at least one of _perform_fits and _perform_fit
+        return numpy.reshape(self._perform_fits(xs, numpy.reshape(ys, (1,) + ys.shape), fs), fs.shape)
 
 
 class PolynomialBackgroundModel(AbstractBackgroundModel):
@@ -88,11 +106,18 @@ class PolynomialBackgroundModel(AbstractBackgroundModel):
         self.transform = transform
         self.untransform = untransform
 
-    def _perform_fit(self, xs: numpy.ndarray, ys: numpy.ndarray, n: int, interval_start: float, interval_end: float) -> numpy.ndarray:
+    def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
+        transform_data = self.transform or (lambda x: x)
+        untransform_data = self.untransform or (lambda x: x)
+        fit = untransform_data(numpy.polynomial.polynomial.polyval(fs, numpy.polynomial.polynomial.polyfit(xs, transform_data(yss.transpose()), self.deg)))
+        return numpy.where(numpy.isfinite(fit), fit, 0)
+
+    def __unused_perform_fit(self, xs: numpy.ndarray, ys: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
+        # here an an example of using numpy.polynomial.polynomial.Polynomial.fit for when it supports evaluating arrays
         transform_data = self.transform or (lambda x: x)
         untransform_data = self.untransform or (lambda x: x)
         series = typing.cast(typing.Any, numpy.polynomial.polynomial.Polynomial.fit(xs, transform_data(ys), self.deg))
-        return untransform_data(series.linspace(n, [interval_start, interval_end])[1])
+        return untransform_data(series(fs))
 
 
 # register background models with the registry.
