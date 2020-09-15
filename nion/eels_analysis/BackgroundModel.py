@@ -120,9 +120,47 @@ class PolynomialBackgroundModel(AbstractBackgroundModel):
         return untransform_data(series(fs))
 
 
+class TwoAreaBackgroundModel(AbstractBackgroundModel):
+    # Fit power law or exponential background model using the two-area method described in Egerton chapter 4.
+    # This approximation is slightly faster than the polynomial fit for mapping large SI, and may perform better for high-noise spectra.
+
+    def __init__(self,
+                 background_model_id: str,
+                 params_func: typing.Callable[[numpy.ndarray, numpy.ndarray, float, float, float], typing.Tuple[numpy.ndarray, numpy.ndarray]],
+                 model_func: typing.Callable[[numpy.ndarray, numpy.ndarray, numpy.ndarray], numpy.ndarray],
+                 title: str = None):
+        super().__init__(background_model_id, title)
+        self.model_func = model_func
+        self.params_func = params_func
+
+    def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
+        half_interval = len(xs) // 2
+        areas_1 = typing.cast(numpy.ndarray, numpy.trapz(yss[..., :half_interval], xs[:half_interval], axis=1))
+        areas_2 = typing.cast(numpy.ndarray, numpy.trapz(yss[..., half_interval:2 * half_interval], xs[half_interval:2 * half_interval], axis=1))
+        x_start = xs[0]
+        x_center = xs[half_interval]
+        x_end = xs[-1]
+        params = self.params_func(areas_1, areas_2, x_start, x_center, x_end)
+        xs_tiled = numpy.transpose(numpy.tile(fs, (len(yss), 1)))
+        series = typing.cast(typing.Any, numpy.transpose(self.model_func(xs_tiled, *params)))
+        return series
+
+
+def power_law_params(areas_1: numpy.ndarray, areas_2: numpy.ndarray, x_start: float, x_center: float, x_end: float) -> typing.Tuple[numpy.ndarray, numpy.ndarray]:
+    r = 2 * (numpy.log(areas_1) - numpy.log(areas_2)) / (numpy.log(x_end) - numpy.log(x_start))
+    k = 1 - r
+    A = k * areas_2 / (x_end ** k - x_center ** k)
+    return A, r
+
+
+def power_law_func(x: numpy.ndarray, A: numpy.ndarray, r: numpy.ndarray) -> numpy.ndarray:
+    return A * x ** -r
+
+
 # register background models with the registry.
 Registry.register_component(PolynomialBackgroundModel("constant_background_model", 0, title=_("Constant Background")), {"background-model"})
 Registry.register_component(PolynomialBackgroundModel("linear_background_model", 1, title=_("Linear Background")), {"background-model"})
 Registry.register_component(PolynomialBackgroundModel("power_law_background_model", 1, transform=numpy.log, untransform=numpy.exp, title=_("Power Law Background")), {"background-model"})
 Registry.register_component(PolynomialBackgroundModel("poly2_background_model", 2, title=_("2nd Order Polynomial Background")), {"background-model"})
 Registry.register_component(PolynomialBackgroundModel("poly2_log_background_model", 2, transform=numpy.log, untransform=numpy.exp, title=_("2nd Order Power Law Background")), {"background-model"})
+Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_background_model", params_func=power_law_params, model_func=power_law_func, title=_("Power Law Two Area Background")), {"background-model"})
