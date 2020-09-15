@@ -65,21 +65,13 @@ class AbstractBackgroundModel:
         calibration.offset = reference_frame.convert_to_calibrated(background_interval.start).value
         fs = numpy.linspace(interval_start, interval_end, n)
         if spectrum_xdata.is_navigable:
-            if self.loop:
-                calibrations = list(copy.deepcopy(spectrum_xdata.navigation_dimensional_calibrations)) + [calibration]
-                background_xdata = DataAndMetadata.new_data_and_metadata(numpy.empty(spectrum_xdata.navigation_dimension_shape + (n, )),
-                                                                        dimensional_calibrations=calibrations,
-                                                                        intensity_calibration=spectrum_xdata.intensity_calibration)
-                for index in numpy.ndindex(spectrum_xdata.navigation_dimension_shape):
-                    background_xdata.data[index] = self._perform_fit(xs, ys[index], fs)
-            else:
-                calibrations = list(copy.deepcopy(spectrum_xdata.navigation_dimensional_calibrations)) + [calibration]
-                yss = numpy.reshape(ys, (numpy.product(ys.shape[:-1]),) + (ys.shape[-1],))
-                fit_data = self._perform_fits(xs, yss, fs)
-                background_xdata = DataAndMetadata.new_data_and_metadata(numpy.reshape(fit_data, ys.shape[:-1] + (n,)),
-                                                                        data_descriptor=DataAndMetadata.DataDescriptor(False, spectrum_xdata.navigation_dimension_count, spectrum_xdata.datum_dimension_count),
-                                                                        dimensional_calibrations=calibrations,
-                                                                        intensity_calibration=spectrum_xdata.intensity_calibration)
+            calibrations = list(copy.deepcopy(spectrum_xdata.navigation_dimensional_calibrations)) + [calibration]
+            yss = numpy.reshape(ys, (numpy.product(ys.shape[:-1]),) + (ys.shape[-1],))
+            fit_data = self._perform_fits(xs, yss, fs)
+            background_xdata = DataAndMetadata.new_data_and_metadata(numpy.reshape(fit_data, ys.shape[:-1] + (n,)),
+                                                                    data_descriptor=DataAndMetadata.DataDescriptor(False, spectrum_xdata.navigation_dimension_count, spectrum_xdata.datum_dimension_count),
+                                                                    dimensional_calibrations=calibrations,
+                                                                    intensity_calibration=spectrum_xdata.intensity_calibration)
         else:
             poly_data = self._perform_fit(xs, ys, fs)
             background_xdata = DataAndMetadata.new_data_and_metadata(poly_data, dimensional_calibrations=[calibration],
@@ -130,11 +122,10 @@ class PolynomialBackgroundModel(AbstractBackgroundModel):
 
 class TwoAreaBackgroundModel(AbstractBackgroundModel):
 
-    def __init__(self, background_model_id: str,params_func, model_func = None, title: str = None, loop = None):
+    def __init__(self, background_model_id: str, params_func = None, model_func = None, title: str = None):
         super().__init__(background_model_id, title)
         self.model_func = model_func
         self.params_func = params_func
-        self.loop = loop
 
 
     def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
@@ -148,25 +139,9 @@ class TwoAreaBackgroundModel(AbstractBackgroundModel):
         x_center = xs[half_interval]
         x_end = xs[-1]
         p1s, p2s = self.params_func(areas_1,areas_2, x_start, x_center, x_end)
-        # grid = numpy.tile(fs,(len(yss),1))
-        # series = typing.cast(typing.Any, self.model_func(grid,p1,p2)) # this is how I wish it worked, but these arrays don't broadcast together
         series = numpy.empty((len(yss),len(fs)))
         for idx, (p1, p2) in enumerate(zip(p1s,p2s)):
             series[idx] = self.model_func(fs,p1,p2)
-        return series
-
-    def _perform_fit(self, xs: numpy.ndarray, ys: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
-        if not len(xs) % 2 == 0:
-            ys = ys[:-1]
-            xs = xs[:-1]
-        half_interval = int(len(xs)/2)
-        area_1 = numpy.trapz(ys[:half_interval], xs[:half_interval])
-        area_2 = numpy.trapz(ys[half_interval:], xs[half_interval:])
-        x_start = xs[0]
-        x_center = xs[half_interval]
-        x_end = xs[-1]
-        p1, p2 = self.params_func(area_1,area_2, x_start, x_center, x_end)
-        series = typing.cast(typing.Any, self.model_func(fs,p1,p2))
         return series
 
 def power_law_params(area_1,area_2, x_start, x_center, x_end):
@@ -179,7 +154,7 @@ def power_law_func(x,A,r):
     return A*x**-r
 
 # register background models with the registry.
-Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_background_model", params_func=power_law_params, model_func=power_law_func, loop = False, title=_("Power law split fit Background")), {"background-model"})
+Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_background_model", params_func=power_law_params, model_func=power_law_func, title=_("Power law split fit Background")), {"background-model"})
 Registry.register_component(PolynomialBackgroundModel("constant_background_model", 0, title=_("Constant Background")), {"background-model"})
 Registry.register_component(PolynomialBackgroundModel("linear_background_model", 1, title=_("Linear Background")), {"background-model"})
 Registry.register_component(PolynomialBackgroundModel("power_law_background_model", 1, transform=numpy.log, untransform=numpy.exp, title=_("Power Law Background")), {"background-model"})
