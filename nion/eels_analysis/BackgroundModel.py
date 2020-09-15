@@ -69,9 +69,9 @@ class AbstractBackgroundModel:
             yss = numpy.reshape(ys, (numpy.product(ys.shape[:-1]),) + (ys.shape[-1],))
             fit_data = self._perform_fits(xs, yss, fs)
             background_xdata = DataAndMetadata.new_data_and_metadata(numpy.reshape(fit_data, ys.shape[:-1] + (n,)),
-                                                                    data_descriptor=DataAndMetadata.DataDescriptor(False, spectrum_xdata.navigation_dimension_count, spectrum_xdata.datum_dimension_count),
-                                                                    dimensional_calibrations=calibrations,
-                                                                    intensity_calibration=spectrum_xdata.intensity_calibration)
+                                                                     data_descriptor=DataAndMetadata.DataDescriptor(False, spectrum_xdata.navigation_dimension_count, spectrum_xdata.datum_dimension_count),
+                                                                     dimensional_calibrations=calibrations,
+                                                                     intensity_calibration=spectrum_xdata.intensity_calibration)
         else:
             poly_data = self._perform_fit(xs, ys, fs)
             background_xdata = DataAndMetadata.new_data_and_metadata(poly_data, dimensional_calibrations=[calibration],
@@ -100,12 +100,11 @@ class AbstractBackgroundModel:
 
 class PolynomialBackgroundModel(AbstractBackgroundModel):
 
-    def __init__(self, background_model_id: str, deg: int, transform = None, untransform = None, title: str = None, loop = None):
+    def __init__(self, background_model_id: str, deg: int, transform = None, untransform = None, title: str = None):
         super().__init__(background_model_id, title)
         self.deg = deg
         self.transform = transform
         self.untransform = untransform
-        self.loop = loop
 
     def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
         transform_data = self.transform or (lambda x: x)
@@ -132,7 +131,7 @@ class TwoAreaBackgroundModel(AbstractBackgroundModel):
         if not len(xs) % 2 == 0:
             yss = yss[...,:-1]
             xs = xs[:-1]
-        half_interval = int(len(xs)/2)
+        half_interval = len(xs) // 2
         areas_1 = numpy.trapz(yss[...,:half_interval], xs[:half_interval], axis=1)
         areas_2 = numpy.trapz(yss[...,half_interval:], xs[half_interval:], axis=1)
         x_start = xs[0]
@@ -144,17 +143,17 @@ class TwoAreaBackgroundModel(AbstractBackgroundModel):
             series[idx] = self.model_func(fs,p1,p2)
         return series
 
-def power_law_params(area_1,area_2, x_start, x_center, x_end):
-    r = 2 * (numpy.log(area_1) - numpy.log(area_2)) / (numpy.log(x_end) - numpy.log(x_start))
+def power_law_params(areas_1: numpy.ndarray, areas_2: numpy.ndarray, x_start: float, x_center: float, x_end: float) -> typing.Tuple[numpy.ndarray, numpy.ndarray]:
+    r = 2 * (numpy.log(areas_1) - numpy.log(areas_2)) / (numpy.log(x_end) - numpy.log(x_start))
     k = 1 - r
-    A = k * area_2 / (x_end ** k - x_center ** k)
+    A = k * areas_2 / (x_end ** k - x_center ** k)
     return A, r
 
-def power_law_func(x,A,r):
+def power_law_func(x: numpy.ndarray, A: float, r: float) -> numpy.ndarray:
     return A*x**-r
 
 # register background models with the registry.
-Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_background_model", params_func=power_law_params, model_func=power_law_func, title=_("Power law split fit Background")), {"background-model"})
+Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_background_model", params_func=power_law_params, model_func=power_law_func, title=_("Power Law Two Area Background")), {"background-model"})
 Registry.register_component(PolynomialBackgroundModel("constant_background_model", 0, title=_("Constant Background")), {"background-model"})
 Registry.register_component(PolynomialBackgroundModel("linear_background_model", 1, title=_("Linear Background")), {"background-model"})
 Registry.register_component(PolynomialBackgroundModel("power_law_background_model", 1, transform=numpy.log, untransform=numpy.exp, title=_("Power Law Background")), {"background-model"})
