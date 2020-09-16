@@ -119,13 +119,14 @@ class PolynomialBackgroundModel(AbstractBackgroundModel):
         series = typing.cast(typing.Any, numpy.polynomial.polynomial.Polynomial.fit(xs, transform_data(ys), self.deg))
         return untransform_data(series(fs))
 
-class TwoAreaBackgroundModel(AbstractBackgroundModel):
 
+class TwoAreaBackgroundModel(AbstractBackgroundModel):
+#Fit power law or exponential background model using the two-area method described in Egerton chapter 4.
+#This approximation is slightly faster than the polynomial fit for mapping large SI, and may perform better for high-noise spectra.
     def __init__(self, background_model_id: str, params_func = None, model_func = None, title: str = None):
         super().__init__(background_model_id, title)
         self.model_func = model_func
         self.params_func = params_func
-
 
     def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
         if not len(xs) % 2 == 0:
@@ -137,11 +138,11 @@ class TwoAreaBackgroundModel(AbstractBackgroundModel):
         x_start = xs[0]
         x_center = xs[half_interval]
         x_end = xs[-1]
-        p1s, p2s = self.params_func(areas_1,areas_2, x_start, x_center, x_end)
-        series = numpy.empty((len(yss),len(fs)))
-        for idx, (p1, p2) in enumerate(zip(p1s,p2s)):
-            series[idx] = self.model_func(fs,p1,p2)
+        p1s, p2s = self.params_func(areas_1, areas_2, x_start, x_center, x_end)
+        grid = numpy.transpose(numpy.tile(fs,(len(yss),1)))
+        series = typing.cast(typing.Any, numpy.transpose(self.model_func(grid,p1s,p2s)))
         return series
+
 
 def power_law_params(areas_1: numpy.ndarray, areas_2: numpy.ndarray, x_start: float, x_center: float, x_end: float) -> typing.Tuple[numpy.ndarray, numpy.ndarray]:
     r = 2 * (numpy.log(areas_1) - numpy.log(areas_2)) / (numpy.log(x_end) - numpy.log(x_start))
@@ -149,8 +150,10 @@ def power_law_params(areas_1: numpy.ndarray, areas_2: numpy.ndarray, x_start: fl
     A = k * areas_2 / (x_end ** k - x_center ** k)
     return A, r
 
-def power_law_func(x: numpy.ndarray, A: float, r: float) -> numpy.ndarray:
+
+def power_law_func(x: numpy.ndarray, A: numpy.ndarray, r: numpy.ndarray) -> numpy.ndarray:
     return A*x**-r
+    
 
 # register background models with the registry.
 Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_background_model", params_func=power_law_params, model_func=power_law_func, title=_("Power Law Two Area Background")), {"background-model"})
