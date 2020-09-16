@@ -121,26 +121,23 @@ class PolynomialBackgroundModel(AbstractBackgroundModel):
 
 
 class TwoAreaBackgroundModel(AbstractBackgroundModel):
-#Fit power law or exponential background model using the two-area method described in Egerton chapter 4.
-#This approximation is slightly faster than the polynomial fit for mapping large SI, and may perform better for high-noise spectra.
-    def __init__(self, background_model_id: str, params_func = None, model_func = None, title: str = None):
+    # Fit power law or exponential background model using the two-area method described in Egerton chapter 4.
+    # This approximation is slightly faster than the polynomial fit for mapping large SI, and may perform better for high-noise spectra.
+    def __init__(self, background_model_id: str, params_func: typing.Callable[[numpy.ndarray, numpy.ndarray, float, float, float], typing.Tuple[numpy.ndarray, numpy.ndarray]], model_func: typing.Callable[[numpy.ndarray, typing.Tuple[numpy.ndarray]], numpy.ndarray], title: str = None):
         super().__init__(background_model_id, title)
         self.model_func = model_func
         self.params_func = params_func
 
     def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
-        if not len(xs) % 2 == 0:
-            yss = yss[...,:-1]
-            xs = xs[:-1]
         half_interval = len(xs) // 2
         areas_1 = numpy.trapz(yss[...,:half_interval], xs[:half_interval], axis=1)
-        areas_2 = numpy.trapz(yss[...,half_interval:], xs[half_interval:], axis=1)
+        areas_2 = numpy.trapz(yss[...,half_interval:2*half_interval], xs[half_interval:2*half_interval], axis=1)
         x_start = xs[0]
         x_center = xs[half_interval]
         x_end = xs[-1]
-        p1s, p2s = self.params_func(areas_1, areas_2, x_start, x_center, x_end)
-        grid = numpy.transpose(numpy.tile(fs,(len(yss),1)))
-        series = typing.cast(typing.Any, numpy.transpose(self.model_func(grid,p1s,p2s)))
+        params = self.params_func(areas_1, areas_2, x_start, x_center, x_end)
+        xs_tiled = numpy.transpose(numpy.tile(fs,(len(yss),1)))
+        series = typing.cast(typing.Any, numpy.transpose(self.model_func(xs_tiled, *params)))
         return series
 
 

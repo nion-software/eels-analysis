@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.5.1 (UNRELEASED):
+-------------------
+- Add Two-Area background fitting class.
+
 0.5.0 (2020-08-31):
 -------------------
 - Rework background models to allow for plug-in models.
