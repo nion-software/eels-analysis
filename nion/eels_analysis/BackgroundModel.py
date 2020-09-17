@@ -25,12 +25,16 @@ class AbstractBackgroundModel:
         self.title = title
         self.package_title = _("EELS Analysis")
 
-    def fit_background(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata, fit_intervals: typing.Sequence[Calibration.CalibratedInterval], background_interval: Calibration.CalibratedInterval, **kwargs) -> typing.Dict:
+    def fit_background(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata,
+                       fit_intervals: typing.Sequence[Calibration.CalibratedInterval],
+                       background_interval: Calibration.CalibratedInterval, **kwargs) -> typing.Dict:
         return {
             "background_model": self.__fit_background(spectrum_xdata, fit_intervals, background_interval),
         }
 
-    def integrate_signal(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata, fit_intervals: typing.Sequence[Calibration.CalibratedInterval], signal_interval: Calibration.CalibratedInterval, **kwargs) -> typing.Dict:
+    def integrate_signal(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata,
+                         fit_intervals: typing.Sequence[Calibration.CalibratedInterval],
+                         signal_interval: Calibration.CalibratedInterval, **kwargs) -> typing.Dict:
         # set up initial values
         subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata, self.__fit_background(spectrum_xdata, fit_intervals, signal_interval))
         if spectrum_xdata.is_navigable:
@@ -44,7 +48,9 @@ class AbstractBackgroundModel:
                 "integrated_value": numpy.trapz(subtracted_xdata.data),
             }
 
-    def __fit_background(self, spectrum_xdata: DataAndMetadata.DataAndMetadata, fit_intervals: typing.Sequence[Calibration.CalibratedInterval], background_interval: Calibration.CalibratedInterval) -> DataAndMetadata.DataAndMetadata:
+    def __fit_background(self, spectrum_xdata: DataAndMetadata.DataAndMetadata,
+                         fit_intervals: typing.Sequence[Calibration.CalibratedInterval],
+                         background_interval: Calibration.CalibratedInterval) -> DataAndMetadata.DataAndMetadata:
         reference_frame = Calibration.ReferenceFrameAxis(spectrum_xdata.datum_dimensional_calibrations[0], spectrum_xdata.datum_dimension_shape[0])
         # fit polynomial to the data
         xs = numpy.concatenate(
@@ -68,8 +74,10 @@ class AbstractBackgroundModel:
             calibrations = list(copy.deepcopy(spectrum_xdata.navigation_dimensional_calibrations)) + [calibration]
             yss = numpy.reshape(ys, (numpy.product(ys.shape[:-1]),) + (ys.shape[-1],))
             fit_data = self._perform_fits(xs, yss, fs)
+            data_descriptor = DataAndMetadata.DataDescriptor(False, spectrum_xdata.navigation_dimension_count,
+                                                             spectrum_xdata.datum_dimension_count)
             background_xdata = DataAndMetadata.new_data_and_metadata(numpy.reshape(fit_data, ys.shape[:-1] + (n,)),
-                                                                     data_descriptor=DataAndMetadata.DataDescriptor(False, spectrum_xdata.navigation_dimension_count, spectrum_xdata.datum_dimension_count),
+                                                                     data_descriptor=data_descriptor,
                                                                      dimensional_calibrations=calibrations,
                                                                      intensity_calibration=spectrum_xdata.intensity_calibration)
         else:
@@ -100,7 +108,7 @@ class AbstractBackgroundModel:
 
 class PolynomialBackgroundModel(AbstractBackgroundModel):
 
-    def __init__(self, background_model_id: str, deg: int, transform = None, untransform = None, title: str = None):
+    def __init__(self, background_model_id: str, deg: int, transform=None, untransform=None, title: str = None):
         super().__init__(background_model_id, title)
         self.deg = deg
         self.transform = transform
@@ -146,7 +154,11 @@ class TwoAreaBackgroundModel(AbstractBackgroundModel):
         return series
 
 
-def power_law_params(areas_1: numpy.ndarray, areas_2: numpy.ndarray, x_start: float, x_center: float, x_end: float) -> typing.Tuple[numpy.ndarray, numpy.ndarray]:
+def power_law_params(areas_1: numpy.ndarray,
+                     areas_2: numpy.ndarray,
+                     x_start: float,
+                     x_center: float,
+                     x_end: float) -> typing.Tuple[numpy.ndarray, numpy.ndarray]:
     r = 2 * (numpy.log(areas_1) - numpy.log(areas_2)) / (numpy.log(x_end) - numpy.log(x_start))
     k = 1 - r
     A = k * areas_2 / (x_end ** k - x_center ** k)
@@ -158,9 +170,20 @@ def power_law_func(x: numpy.ndarray, A: numpy.ndarray, r: numpy.ndarray) -> nump
 
 
 # register background models with the registry.
-Registry.register_component(PolynomialBackgroundModel("constant_background_model", 0, title=_("Constant Background")), {"background-model"})
-Registry.register_component(PolynomialBackgroundModel("linear_background_model", 1, title=_("Linear Background")), {"background-model"})
-Registry.register_component(PolynomialBackgroundModel("power_law_background_model", 1, transform=numpy.log, untransform=numpy.exp, title=_("Power Law Background")), {"background-model"})
-Registry.register_component(PolynomialBackgroundModel("poly2_background_model", 2, title=_("2nd Order Polynomial Background")), {"background-model"})
-Registry.register_component(PolynomialBackgroundModel("poly2_log_background_model", 2, transform=numpy.log, untransform=numpy.exp, title=_("2nd Order Power Law Background")), {"background-model"})
-Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_background_model", params_func=power_law_params, model_func=power_law_func, title=_("Power Law Two Area Background")), {"background-model"})
+Registry.register_component(PolynomialBackgroundModel("constant_background_model", 0,
+                                                      title=_("Constant Background")), {"background-model"})
+
+Registry.register_component(PolynomialBackgroundModel("linear_background_model", 1,
+                                                      title=_("Linear Background")), {"background-model"})
+
+Registry.register_component(PolynomialBackgroundModel("power_law_background_model", 1,
+                                                      transform=numpy.log, untransform=numpy.exp, title=_("Power Law Background")), {"background-model"})
+
+Registry.register_component(PolynomialBackgroundModel("poly2_background_model", 2,
+                                                      title=_("2nd Order Polynomial Background")), {"background-model"})
+
+Registry.register_component(PolynomialBackgroundModel("poly2_log_background_model", 2, transform=numpy.log, untransform=numpy.exp,
+                                                      title=_("2nd Order Power Law Background")), {"background-model"})
+
+Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_background_model", params_func=power_law_params, model_func=power_law_func,
+                                                   title=_("Power Law Two Area Background")), {"background-model"})
