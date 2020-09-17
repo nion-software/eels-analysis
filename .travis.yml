@@ -40,12 +40,17 @@ branches:
 # command to install dependencies
 install:
   - pip install -r test-requirements.txt
+  - python -m pip install mypy
+  - python -m pip install flake8
+  - mypy --version
 
 # command to run tests
 script:
   - python --version
   - python -m unittest discover nionswift_plugin -v -p '*_test.py'
   - python -m unittest discover nion -v -p '*_test.py'
+  - mypy --namespace-packages --ignore-missing-imports --follow-imports=silent nion/eels_analysis/BackgroundModel.py
+  - flake8 --max-line-length=160 nion/eels_analysis/BackgroundModel.py
 
 # command to deploy to pypi on tags
 deploy:
