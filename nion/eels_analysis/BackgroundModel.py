@@ -134,7 +134,8 @@ class TwoAreaBackgroundModel(AbstractBackgroundModel):
 
     def __init__(self,
                  background_model_id: str,
-                 params_func: typing.Callable[[numpy.ndarray, numpy.ndarray, float, float, float], typing.Tuple[numpy.ndarray, numpy.ndarray]],
+                 params_func: typing.Callable[[numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.ndarray, float, float, float],
+                                              typing.Tuple[numpy.ndarray, numpy.ndarray]],
                  model_func: typing.Callable[[numpy.ndarray, numpy.ndarray, numpy.ndarray], numpy.ndarray],
                  title: str = None):
         super().__init__(background_model_id, title)
@@ -143,22 +144,28 @@ class TwoAreaBackgroundModel(AbstractBackgroundModel):
 
     def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
         half_interval = len(xs) // 2
-        areas_1 = typing.cast(numpy.ndarray, numpy.trapz(yss[..., :half_interval], xs[:half_interval], axis=1))
-        areas_2 = typing.cast(numpy.ndarray, numpy.trapz(yss[..., half_interval:2 * half_interval], xs[half_interval:2 * half_interval], axis=1))
+        x_interval_1 = xs[:half_interval]
+        x_interval_2 = xs[half_interval:2 * half_interval]
+        y_interval_1 = yss[..., :half_interval]
+        y_interval_2 = yss[..., half_interval:2 * half_interval]
         x_start = xs[0]
         x_center = xs[half_interval]
         x_end = xs[-1]
-        params = self.params_func(areas_1, areas_2, x_start, x_center, x_end)
+        params = self.params_func(x_interval_1, x_interval_2, y_interval_1, y_interval_2, x_start, x_center, x_end)
         xs_tiled = numpy.transpose(numpy.tile(fs, (len(yss), 1)))
         series = typing.cast(typing.Any, numpy.transpose(self.model_func(xs_tiled, *params)))
         return series
 
 
-def power_law_params(areas_1: numpy.ndarray,
-                     areas_2: numpy.ndarray,
+def power_law_params(x_interval_1: numpy.ndarray,
+                     x_interval_2: numpy.ndarray,
+                     y_interval_1: numpy.ndarray,
+                     y_interval_2: numpy.ndarray,
                      x_start: float,
                      x_center: float,
                      x_end: float) -> typing.Tuple[numpy.ndarray, numpy.ndarray]:
+    areas_1 = typing.cast(numpy.ndarray, numpy.trapz(y_interval_1, x_interval_1, axis=1))
+    areas_2 = typing.cast(numpy.ndarray, numpy.trapz(y_interval_2, x_interval_2, axis=1))
     r = 2 * (numpy.log(areas_1) - numpy.log(areas_2)) / (numpy.log(x_end) - numpy.log(x_start))
     k = 1 - r
     A = k * areas_2 / (x_end ** k - x_center ** k)
@@ -167,6 +174,28 @@ def power_law_params(areas_1: numpy.ndarray,
 
 def power_law_func(x: numpy.ndarray, A: numpy.ndarray, r: numpy.ndarray) -> numpy.ndarray:
     return A * x ** -r
+
+
+def exponential_params(x_interval_1: numpy.ndarray,
+                       x_interval_2: numpy.ndarray,
+                       y_interval_1: numpy.ndarray,
+                       y_interval_2: numpy.ndarray,
+                       x_start: float,
+                       x_center: float,
+                       x_end: float) -> typing.Tuple[numpy.ndarray, numpy.ndarray]:
+    y_log_1 = numpy.log(y_interval_1)
+    y_log_2 = numpy.log(y_interval_2)
+    geo_mean_1 = numpy.exp(numpy.mean(y_log_1))
+    geo_mean_2 = numpy.exp(numpy.mean(y_log_2))
+    x1 = (x_start + x_center) / 2
+    x2 = (x_center + x_end) / 2
+    A = numpy.exp((numpy.log(geo_mean_1) - (x1 / x2) * numpy.log(geo_mean_2)) / (1 - x1 / x2))
+    tau = -x2 / (numpy.log(geo_mean_2) - numpy.log(A))
+    return A, tau
+
+
+def exponential_func(x: numpy.ndarray, A: numpy.ndarray, tau: numpy.ndarray) -> numpy.ndarray:
+    return A * numpy.exp(-x / tau)
 
 
 # register background models with the registry.
@@ -187,3 +216,6 @@ Registry.register_component(PolynomialBackgroundModel("poly2_log_background_mode
 
 Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_background_model", params_func=power_law_params, model_func=power_law_func,
                                                    title=_("Power Law Two Area Background")), {"background-model"})
+
+Registry.register_component(TwoAreaBackgroundModel("exponential_two_area_background_model", params_func=exponential_params, model_func=exponential_func,
+                                                   title=_("Exponential Two Area Background")), {"background-model"})
