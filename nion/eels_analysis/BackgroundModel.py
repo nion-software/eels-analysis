@@ -117,7 +117,7 @@ class PolynomialBackgroundModel(AbstractBackgroundModel):
     def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
         transform_data = self.transform or (lambda x: x)
         untransform_data = self.untransform or (lambda x: x)
-        fit = untransform_data(numpy.polynomial.polynomial.polyval(fs, numpy.polynomial.polynomial.polyfit(xs, transform_data(yss.transpose()), self.deg)))
+        fit = untransform_data(numpy.polynomial.polynomial.polyval(self.transform(fs), numpy.polynomial.polynomial.polyfit(self.transform(xs), transform_data(yss.transpose()), self.deg)))
         return numpy.where(numpy.isfinite(fit), fit, 0)
 
     def __unused_perform_fit(self, xs: numpy.ndarray, ys: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:

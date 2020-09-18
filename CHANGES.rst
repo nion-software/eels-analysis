@@ -5,6 +5,7 @@ Changelog (nionswift-eels-analysis)
 -------------------
 - Add Two-Area background fitting class.
 - Add exponential functions for two-area method.
+-Fix polyfit transform behavior to correctly do power law model.
 
 0.5.0 (2020-08-31):
 -------------------
