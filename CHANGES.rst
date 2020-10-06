@@ -1,7 +1,7 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
-0.5.1 (UNRELEASED):
+0.5.1 (2020-10-06):
 -------------------
 - Add exponential functions for two-area method.
 - Add two-area background fitting class.
