@@ -201,22 +201,22 @@ def exponential_func(x: numpy.ndarray, A: numpy.ndarray, tau: numpy.ndarray) -> 
 
 # register background models with the registry.
 Registry.register_component(PolynomialBackgroundModel("constant_background_model", 0,
-                                                      title=_("Constant Background")), {"background-model"})
+                                                      title=_("Constant")), {"background-model"})
 
 Registry.register_component(PolynomialBackgroundModel("linear_background_model", 1,
-                                                      title=_("Linear Background")), {"background-model"})
+                                                      title=_("Linear")), {"background-model"})
 
 Registry.register_component(PolynomialBackgroundModel("power_law_background_model", 1,
-                                                      transform=numpy.log, untransform=numpy.exp, title=_("Power Law Background")), {"background-model"})
+                                                      transform=numpy.log, untransform=numpy.exp, title=_("Power Law")), {"background-model"})
 
 Registry.register_component(PolynomialBackgroundModel("poly2_background_model", 2,
-                                                      title=_("2nd Order Polynomial Background")), {"background-model"})
+                                                      title=_("2nd Order Polynomial")), {"background-model"})
 
 Registry.register_component(PolynomialBackgroundModel("poly2_log_background_model", 2, transform=numpy.log, untransform=numpy.exp,
-                                                      title=_("2nd Order Power Law Background")), {"background-model"})
+                                                      title=_("2nd Order Power Law")), {"background-model"})
 
 Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_background_model", params_func=power_law_params, model_func=power_law_func,
-                                                   title=_("Power Law Two Area Background")), {"background-model"})
+                                                   title=_("Power Law Two Area")), {"background-model"})
 
 Registry.register_component(TwoAreaBackgroundModel("exponential_two_area_background_model", params_func=exponential_params, model_func=exponential_func,
-                                                   title=_("Exponential Two Area Background")), {"background-model"})
+                                                   title=_("Exponential Two Area")), {"background-model"})
