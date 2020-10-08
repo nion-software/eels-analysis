@@ -145,7 +145,7 @@ async def use_interval_as_background(api: Facade.API_1, window: Facade.DocumentW
         background = api.library.create_data_item(title="{} Background".format(target_data_item.title))
         signal = api.library.create_data_item(title="{} Subtracted".format(target_data_item.title))
 
-        background_model = DataStructure.DataStructure(structure_type="linear_background_model")
+        background_model = DataStructure.DataStructure(structure_type="power_law_background_model")
         window._document_controller.document_model.append_data_structure(background_model)
         background_model.source = background._data_item
 
