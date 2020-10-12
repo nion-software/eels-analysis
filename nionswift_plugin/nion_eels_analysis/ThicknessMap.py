@@ -12,10 +12,13 @@ def sum_zlp(d):
     # estimate the ZLP, assumes the peak value is the ZLP and that the ZLP is the only gaussian feature in the data
     mx_pos = numpy.argmax(d)
     mx = d[mx_pos]
-    mx_tenth = mx/10
-    left_pos = mx_pos - sum(d[:mx_pos] > mx_tenth)
-    right_pos = mx_pos + (mx_pos - left_pos)
-    s = sum(d[left_pos:right_pos])
+    mx_fraction = mx/100
+    left_pos = mx_pos - sum(d[:mx_pos + 1] > mx_fraction)
+    right_pos = mx_pos + (mx_pos - left_pos) + 1
+    if right_pos-left_pos == 3:
+        s = sum(d[left_pos:right_pos])
+    else:
+        s = 2*sum(d[left_pos:mx_pos-1]) + sum(d[mx_pos-1:mx_pos+2])
     return left_pos, right_pos, s
 
 
@@ -25,6 +28,8 @@ def map_thickness_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=
         if row > 0 and row % 10 == 0:
             if callable(progress_fn):
                 progress_fn(row)
+                l, r, s = sum_zlp(src_xdata.data[row, column, :])
+                print(f'left={l}, max={s}, right={r}')
         for column in range(src_xdata.data_shape[1]):
             l, r, s = sum_zlp(src_xdata.data[row, column, :])
             data[row, column] = numpy.log(numpy.sum(src_xdata.data[row, column, :]) / s)
