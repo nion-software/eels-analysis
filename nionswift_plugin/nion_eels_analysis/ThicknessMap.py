@@ -30,7 +30,6 @@ def map_thickness_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=
         if row > 0 and row % 10 == 0:
             if callable(progress_fn):
                 progress_fn(row)
-                l, r, s = sum_zlp(src_xdata.data[row, column, :])
         for column in range(src_xdata.data_shape[1]):
             l, r, s = sum_zlp(src_xdata.data[row, column, :])
             data[row, column] = numpy.log(numpy.sum(src_xdata.data[row, column, :]) / s)
