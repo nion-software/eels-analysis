@@ -9,12 +9,13 @@ from nion.swift.model import Symbolic
 
 
 def sum_zlp(d):
-    # estimate the ZLP, assumes the peak value is the ZLP and that the ZLP is the only gaussian feature in the data
+    # Estimates the ZLP, assuming the peak value is the ZLP and that the ZLP is the only gaussian feature in the data.
+    # This procedure returns a minimum of three channels for the ZLP integration interval.
     mx_pos = numpy.argmax(d)
     mx = d[mx_pos]
-    mx_tenth = mx/10
-    left_pos = mx_pos - sum(d[:mx_pos] > mx_tenth)
-    right_pos = mx_pos + (mx_pos - left_pos)
+    mx_fraction = mx/10
+    left_pos = mx_pos - sum(d[:mx_pos + 1] > mx_fraction)
+    right_pos = mx_pos + (mx_pos - left_pos) + 1
     s = sum(d[left_pos:right_pos])
     return left_pos, right_pos, s
 
