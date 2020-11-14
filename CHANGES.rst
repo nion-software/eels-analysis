@@ -1,6 +1,12 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.5.2 (2020-11-13):
+-------------------
+- Fix issue with single channel zero loss peaks in thickness calculation.
+- Ensure default background is power law.
+- Improve wording in background menu.
+
 0.5.1 (2020-10-06):
 -------------------
 - Add exponential functions for two-area method.
