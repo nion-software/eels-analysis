@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.5.3 (unreleased):
+-------------------
+- Fix issue with Align ZLP (COM) when using it on empty data.
+
 0.5.2 (2020-11-13):
 -------------------
 - Fix issue with single channel zero loss peaks in thickness calculation.
