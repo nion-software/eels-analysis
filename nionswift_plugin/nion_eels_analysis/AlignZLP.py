@@ -13,7 +13,8 @@ from nion.eels_analysis import ZLP_Analysis
 
 def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=None, method='com', roi: typing.Optional[API_1_0.Graphic]=None, ref_index: int=0) -> typing.Tuple[typing.Optional[DataAndMetadata.DataAndMetadata], typing.Optional[DataAndMetadata.DataAndMetadata]]:
     # check to make sure it is suitable for this algorithm
-    if (src_xdata.is_datum_1d and (src_xdata.is_sequence or src_xdata.is_collection)) or (src_xdata.is_datum_2d and not (src_xdata.is_sequence or src_xdata.is_collection)):
+    # if (src_xdata.is_datum_1d and (src_xdata.is_sequence or src_xdata.is_collection)) or (src_xdata.is_datum_2d and not (src_xdata.is_sequence or src_xdata.is_collection)):
+    if src_xdata.is_datum_1d or (src_xdata.is_datum_2d and not (src_xdata.is_sequence or src_xdata.is_collection)):
         # get the numpy array and create the destination data
         src_data = src_xdata.data
 
@@ -76,8 +77,11 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=None
 
         # dst_data is complete. construct xdata with correct calibration and data descriptor.
         data_descriptor = DataAndMetadata.DataDescriptor(src_xdata.is_sequence, src_xdata.collection_dimension_count, src_xdata.datum_dimension_count)
+        shift_xdata = None
+        if flat_pos_data.size > 1:
+            shift_xdata = DataAndMetadata.new_data_and_metadata(flat_pos_data.reshape(src_shape[:-d_rank]), shift_calibration, dimensional_calibrations[:-d_rank])
         return (DataAndMetadata.new_data_and_metadata(flat_dst_data.reshape(src_shape), src_xdata.intensity_calibration, dimensional_calibrations, data_descriptor=data_descriptor),
-                DataAndMetadata.new_data_and_metadata(flat_pos_data.reshape(src_shape[:-d_rank]), shift_calibration, dimensional_calibrations[:-d_rank]))
+                shift_xdata)
 
     return None, None
 
@@ -101,8 +105,9 @@ def _run_align_zlp(api: API_1_0.API, window: API_1_0.DocumentWindow, method_id: 
 
         if dst_xdata:
             # create a new data item in the library and set its title.
-            shift_data_item = api.library.create_data_item_from_data_and_metadata(shift_xdata)
-            shift_data_item.title = f"Shifts ({method_name}) " + src_display.data_item.title
+            if shift_xdata:
+                shift_data_item = api.library.create_data_item_from_data_and_metadata(shift_xdata)
+                shift_data_item.title = f"Shifts ({method_name}) " + src_display.data_item.title
             data_item = api.library.create_data_item_from_data_and_metadata(dst_xdata)
             data_item.title = f"Aligned ({method_name}) " + src_display.data_item.title
 
