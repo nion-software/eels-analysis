@@ -49,8 +49,15 @@ def estimate_zlp_amplitude_position_width_com(d):
     assert len(d.shape) == 1
     mx_pos = numpy.argmax(d)
     mx = d[mx_pos]
-    half_mx = mx/2
-    left_pos = mx_pos - numpy.sum(d[:mx_pos] > half_mx)
-    right_pos = mx_pos + numpy.sum(d[mx_pos:] > half_mx)
-    mx_pos_sub = numpy.sum(d[left_pos:right_pos] * numpy.arange(right_pos - left_pos))/(numpy.sum(d[left_pos:right_pos]) or 1)
+    quarter_max = mx*0.25
+    left_pos = mx_pos - numpy.sum(d[:mx_pos] > quarter_max) * 3
+    right_pos = mx_pos + numpy.sum(d[mx_pos:] > quarter_max) * 3
+    left_pos = mx_pos - 2
+    right_pos = mx_pos + 3
+    left_pos = max(0, left_pos)
+    right_pos = min(d.size, right_pos)
+    d_sub = d[left_pos:right_pos] - quarter_max
+    d_sub -= numpy.amin(d_sub)
+    d_sub[d_sub < 0] = 0
+    mx_pos_sub = numpy.sum(d_sub * numpy.arange(right_pos - left_pos))/(numpy.sum(d_sub) or 1)
     return mx, mx_pos_sub + left_pos, left_pos, right_pos
