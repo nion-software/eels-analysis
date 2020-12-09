@@ -4,6 +4,8 @@ Changelog (nionswift-eels-analysis)
 0.5.3 (unreleased):
 -------------------
 - Fix issue with Align ZLP (COM) when using it on empty data.
+- Fix issue with Align ZLP (COM) that caused a bias towards half-integer shifts.
+- Allow Align ZLP to be used on single spectra. Useful for bringing the ZLP to calibrated zero.
 
 0.5.2 (2020-11-13):
 -------------------
