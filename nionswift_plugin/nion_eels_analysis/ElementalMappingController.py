@@ -66,11 +66,9 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
     eels_data_item.source = pick_region
     eels_display_item = document_model.get_display_item_for_data_item(eels_data_item)
     eels_display_item.display_type = "line_plot"
-    eels_display_item.display_layers = [
-        {"label": "Signal", "data_index": 0, "data_row": 2, "fill_color": "#0F0"},
-        {"label": "Background", "data_index": 0, "data_row": 1, "fill_color": "rgba(255, 0, 0, 0.3)"},
-        {"label": "Data", "data_index": 0, "data_row": 0, "fill_color": "#1E90FF"},
-    ]
+    eels_display_item._set_display_layer_properties(0, label=_("Signal"), data_row=2, fill_color="#0F0")
+    eels_display_item._add_display_layer_for_data_item(eels_data_item, label=_("Background"), data_row=1, fill_color="rgba(255, 0, 0, 0.3)")
+    eels_display_item._add_display_layer_for_data_item(eels_data_item, label=_("Data"), data_row=0, fill_color="#1E90FF")
     eels_display_item.set_display_property("legend_position", "top-right")
     fit_region = Graphics.IntervalGraphic()
     fit_region.label = _("Fit")
@@ -566,10 +564,8 @@ class ElementalMappingController:
                 line_profile_region.vector = (0.5, 0.2), (0.5, 0.8)
                 line_profile_regions.append(line_profile_region)
                 multiprofile_display_item.append_display_data_channel_for_data_item(line_profile_data_item)
-                display_layers = multiprofile_display_item.display_layers
-                display_layers[-1]["label"] = dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:]
-                display_layers[-1]["fill_color"] = colors[index % len(colors)]
-                multiprofile_display_item.display_layers = display_layers
+                layer_label = dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:]
+                multiprofile_display_item._set_display_layer_properties(index, label=layer_label, fill_color=colors[index % len(colors)])
         if multiprofile_display_item:
             for line_profile_region in line_profile_regions[1:]:
                 document_model.append_connection(Connection.PropertyConnection(line_profile_regions[0], "vector", line_profile_region, "vector", parent=multiprofile_display_item))

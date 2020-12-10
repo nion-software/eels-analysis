@@ -164,11 +164,11 @@ async def use_interval_as_background(api: Facade.API_1, window: Facade.DocumentW
             target_interval.label = _("Background")
         target_display_item._display_item.append_display_data_channel_for_data_item(background._data_item)
         target_display_item._display_item.append_display_data_channel_for_data_item(signal._data_item)
-        target_display_item._display_item.display_layers = [
-            {"label": "Background", "data_index": 1, "fill_color": "rgba(255, 0, 0, 0.3)"},
-            {"label": "Signal", "data_index": 2, "fill_color": "#0F0"},
-            {"label": "Data", "data_index": 0, "fill_color": "#1E90FF"},
-        ]
+        target_display_item._display_item.move_display_layer_at_index_backward(0)
+        target_display_item._display_item.move_display_layer_at_index_backward(1)
+        target_display_item._display_item._set_display_layer_properties(0, label=_("Background"), fill_color="rgba(255, 0, 0, 0.3)")
+        target_display_item._display_item._set_display_layer_properties(1, label=_("Signal"), fill_color="#0F0")
+        target_display_item._display_item._set_display_layer_properties(2, label=_("Data"), fill_color="#1E90FF")
         target_display_item._display_item.set_display_property("legend_position", "top-right")
 
 
