@@ -3,6 +3,7 @@ from __future__ import annotations
 # imports
 import gettext
 import numpy
+import typing
 
 # local libraries
 from nion.data import Calibration
@@ -137,39 +138,44 @@ class EELSMapping:
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)
 
 
-async def use_interval_as_background(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
+def add_background_subtraction_computation(api: Facade.API_1, library: Facade.Library, display_item: Facade.Display, data_item: Facade.DataItem, intervals: typing.Sequence[Facade.Graphic]) -> None:
+    background = api.library.create_data_item(title="{} Background".format(data_item.title))
+    signal = api.library.create_data_item(title="{} Subtracted".format(data_item.title))
+
+    background_model = DataStructure.DataStructure(structure_type="power_law_background_model")
+    library._document_model.append_data_structure(background_model)
+    background_model.source = background._data_item
+
+    api.library.create_computation("eels.background_subtraction3",
+                                   inputs={
+                                       "eels_spectrum_data_item": data_item,
+                                       "background_model": api._new_api_object(background_model),
+                                       "fit_interval_graphics": intervals,
+                                   },
+                                   outputs={
+                                       "background": background,
+                                       "subtracted": signal}
+                                   )
+    for target_interval in intervals:
+        target_interval.graphic_id = "background"
+        target_interval.label = _("Background")
+    display_item._display_item.append_display_data_channel_for_data_item(background._data_item)
+    display_item._display_item.append_display_data_channel_for_data_item(signal._data_item)
+    display_item._display_item.move_display_layer_at_index_backward(0)
+    display_item._display_item.move_display_layer_at_index_backward(1)
+    display_item._display_item._set_display_layer_properties(0, label=_("Background"),
+                                                             fill_color="rgba(255, 0, 0, 0.3)")
+    display_item._display_item._set_display_layer_properties(1, label=_("Signal"), fill_color="#0F0")
+    display_item._display_item._set_display_layer_properties(2, label=_("Data"), fill_color="#1E90FF")
+    display_item._display_item.set_display_property("legend_position", "top-right")
+
+
+def subtract_background_from_signal(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
     target_data_item = window.target_data_item
     target_display_item = window.target_display
     target_intervals = [graphic for graphic in target_display_item.selected_graphics if graphic.graphic_type == "interval-graphic"]
     if target_data_item and target_intervals:
-        background = api.library.create_data_item(title="{} Background".format(target_data_item.title))
-        signal = api.library.create_data_item(title="{} Subtracted".format(target_data_item.title))
-
-        background_model = DataStructure.DataStructure(structure_type="power_law_background_model")
-        window._document_controller.document_model.append_data_structure(background_model)
-        background_model.source = background._data_item
-
-        api.library.create_computation("eels.background_subtraction3",
-                                       inputs={
-                                           "eels_spectrum_data_item": target_data_item,
-                                           "background_model": api._new_api_object(background_model),
-                                           "fit_interval_graphics": target_intervals,
-                                       },
-                                       outputs={
-                                           "background": background,
-                                           "subtracted": signal}
-                                       )
-        for target_interval in target_intervals:
-            target_interval.graphic_id = "background"
-            target_interval.label = _("Background")
-        target_display_item._display_item.append_display_data_channel_for_data_item(background._data_item)
-        target_display_item._display_item.append_display_data_channel_for_data_item(signal._data_item)
-        target_display_item._display_item.move_display_layer_at_index_backward(0)
-        target_display_item._display_item.move_display_layer_at_index_backward(1)
-        target_display_item._display_item._set_display_layer_properties(0, label=_("Background"), fill_color="rgba(255, 0, 0, 0.3)")
-        target_display_item._display_item._set_display_layer_properties(1, label=_("Signal"), fill_color="#0F0")
-        target_display_item._display_item._set_display_layer_properties(2, label=_("Data"), fill_color="#1E90FF")
-        target_display_item._display_item.set_display_property("legend_position", "top-right")
+        add_background_subtraction_computation(api, window.library, target_display_item, target_data_item, target_intervals)
 
 
 def use_signal_for_map(api, window):
@@ -206,10 +212,6 @@ def use_signal_for_map(api, window):
                         )
                         window.display_data_item(map)
                     break
-
-
-def subtract_background_from_signal(api, window):
-    window._document_controller.event_loop.create_task(use_interval_as_background(api, window))
 
 
 Symbolic.register_computation_type("eels.background_subtraction3", EELSBackgroundSubtraction)
