@@ -248,8 +248,8 @@ def subtract_linear_background(data_and_metadata: DataAndMetadata.DataAndMetadat
 
     signal_length = data_and_metadata.dimensional_shape[signal_index]
 
-    fit_range = (numpy.asarray(fit_range) * signal_length).astype(numpy.int)
-    signal_range = (numpy.asarray(signal_range) * signal_length).astype(numpy.int)
+    fit_range = (numpy.asarray(fit_range) * signal_length).astype(int)
+    signal_range = (numpy.asarray(signal_range) * signal_length).astype(int)
 
     data = data_and_metadata.data
 
@@ -268,7 +268,7 @@ def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetada
 
     signal_length = data_and_metadata.dimensional_shape[signal_index]
 
-    signal_range = (numpy.asarray(signal_range) * signal_length).astype(numpy.float)
+    signal_range = (numpy.asarray(signal_range) * signal_length).astype(float)
 
     data = data_and_metadata.data
 
@@ -306,7 +306,7 @@ def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, 
 
     signal_length = data_and_metadata.dimensional_shape[signal_index]
 
-    signal_range = (numpy.asarray(signal_range) * signal_length).astype(numpy.float)
+    signal_range = (numpy.asarray(signal_range) * signal_length).astype(float)
 
     max_channel = int(round(max([fit_range[1] * signal_length for fit_range in fit_ranges] + [signal_range[1]])))
     min_channel = int(round(min([fit_range[0] * signal_length for fit_range in fit_ranges] + [signal_range[0]])))
@@ -351,7 +351,7 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
 
     signal_length = data_and_metadata.dimensional_shape[signal_index]
 
-    signal_range = (numpy.asarray(signal_range) * signal_length).astype(numpy.float)
+    signal_range = (numpy.asarray(signal_range) * signal_length).astype(float)
 
     signal_calibration = data_and_metadata.dimensional_calibrations[signal_index]
     spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(data_and_metadata.dimensional_shape[signal_index])])

@@ -29,7 +29,7 @@ class TestZLPAnalysis(unittest.TestCase):
         self.assertAlmostEqual(FWHM_in, (right_pos - left_pos)/2, delta=2)
 
     def test_estimate_zlp_amplitude_position_width_fails_with_2D_data(self):
-        data = numpy.zeros((4, 4), numpy.float)
+        data = numpy.zeros((4, 4), float)
         with self.assertRaises(Exception):
             ZLP_Analysis.estimate_zlp_amplitude_position_width_com(data)
         with self.assertRaises(Exception):
