@@ -42,7 +42,7 @@ class MenuExtension:
 
         eels_menu.add_separator()
         eels_menu.add_menu_item(_("Fit Background"), functools.partial(BackgroundSubtraction.subtract_background_from_signal, api, window))
-        eels_menu.add_menu_item(_("Fit Zero Loss Peak"), functools.partial(PeakFitting.fit_zero_loss_peak, api, window))
+        # eels_menu.add_menu_item(_("Fit Zero Loss Peak"), functools.partial(PeakFitting.fit_zero_loss_peak, api, window))
         eels_menu.add_separator()
         eels_menu.add_menu_item(_("Map Signal"), functools.partial(BackgroundSubtraction.use_signal_for_map, api, window))
         eels_menu.add_menu_item(_("Map Thickness"), functools.partial(ThicknessMap.map_thickness, api, window))
