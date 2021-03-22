@@ -3,12 +3,16 @@ import logging
 import copy
 import numpy
 import typing
+import contextlib
 import scipy.ndimage
 
 # local libraries
 from nion.typeshed import API_1_0
 from nion.data import DataAndMetadata
 from nion.eels_analysis import ZLP_Analysis
+from nion.ui import Declarative
+from nion.utils import Converter
+from nion.utils import Event
 
 
 def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=None, method='com', roi: typing.Optional[API_1_0.Graphic]=None, ref_index: int=0) -> typing.Tuple[typing.Optional[DataAndMetadata.DataAndMetadata], typing.Optional[DataAndMetadata.DataAndMetadata]]:
@@ -129,3 +133,181 @@ def align_zlp_com(api: API_1_0.API, window: API_1_0.DocumentWindow):
 
 def align_zlp_fit(api: API_1_0.API, window: API_1_0.DocumentWindow):
     _run_align_zlp(api, window, "fit", "peak fit")
+
+
+def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
+    class UIHandler:
+        def __init__(self, data_item: API_1_0.DataItem, src_data_item: API_1_0.DataItem, offset_graphic: API_1_0.Graphic, second_graphic: API_1_0.Graphic, units='eV'):
+            self.ev_converter = Converter.PhysicalValueToStringConverter(units)
+            self.property_changed_event = Event.Event()
+            self.__data_item = data_item
+            self.__src_data_item = src_data_item
+            self.__offset_graphic = offset_graphic
+            self.__second_graphic = second_graphic
+            self.__offset_energy = 0
+            self.__graphic_updating = False
+            self.__second_point = data_item.display_xdata.dimensional_calibrations[0].convert_to_calibrated_value(second_graphic.position * len(data_item.display_xdata.data))
+            self.__offset_changed_listener = offset_graphic._graphic.property_changed_event.listen(self.__offset_graphic_changed)
+            self.__second_changed_listener = second_graphic._graphic.property_changed_event.listen(self.__second_graphic_changed)
+
+        def close(self):
+            self.__offset_changed_listener.close()
+            self.__offset_changed_listener = None
+            self.__second_changed_listener.close()
+            self.__second_changed_listener = None
+            self.__data_item = None
+            self.__src_data_item = None
+            self.__second_graphic = None
+            self.__offset_graphic = None
+
+        @property
+        def offset_energy(self):
+            return self.__offset_energy
+
+        @offset_energy.setter
+        def offset_energy(self, offset_energy):
+            self.__offset_energy = offset_energy
+            self.property_changed_event.fire("offset_energy")
+            self.__update_calibration(keep_scale=True)
+
+        @property
+        def second_point(self):
+            return self.__second_point
+
+        @second_point.setter
+        def second_point(self, energy):
+            self.__second_point = energy
+            self.property_changed_event.fire("second_point")
+            self.__update_calibration()
+
+        @contextlib.contextmanager
+        def __lock_graphic_updates(self):
+            self.__graphic_updating = True
+            try:
+                yield self.__graphic_updating
+            finally:
+                self.__graphic_updating = False
+
+        def __update_calibration(self, keep_scale=False):
+            dimensional_calibrations = copy.deepcopy(self.__data_item.display_xdata.dimensional_calibrations)
+            energy_calibration = dimensional_calibrations[0]
+            if keep_scale:
+                scale = energy_calibration.scale
+            else:
+                scale = (self.__second_point - self.__offset_energy) / ((self.__second_graphic.position - self.__offset_graphic.position) * len(self.__data_item.display_xdata.data))
+            offset = self.__offset_energy - self.__offset_graphic.position * len(self.__data_item.display_xdata.data) * scale
+            energy_calibration.scale = scale
+            energy_calibration.offset = offset
+            dimensional_calibrations = copy.deepcopy(self.__src_data_item.xdata.dimensional_calibrations)
+            dimensional_calibrations[-1] = energy_calibration
+            self.__src_data_item.set_dimensional_calibrations(dimensional_calibrations)
+            offset_graphic_position = (self.offset_energy - offset) / scale / len(self.__data_item.display_xdata.data)
+            second_graphic_position = (self.second_point - offset) / scale / len(self.__data_item.display_xdata.data)
+            with self.__lock_graphic_updates():
+                self.__offset_graphic.position = min(max(0, offset_graphic_position), 0.99)
+                self.__second_graphic.position = min(max(0, second_graphic_position), 0.99)
+
+        def __offset_graphic_changed(self, property_name):
+            if not self.__graphic_updating:
+                self.__update_calibration(keep_scale=True)
+
+        def __second_graphic_changed(self, property_name):
+            if not self.__graphic_updating:
+                self.__update_calibration()
+
+
+    ui = Declarative.DeclarativeUI()
+
+    row_1 = ui.create_row(ui.create_label(text="Move the graphics in the spectrum and/or change the numbers\nin the fields below to change the calibration.\n"
+                                               "The offset graphic will be positioned on the ZLP if possible."),
+                          margin=5, spacing=5)
+    row_2 = ui.create_row(ui.create_label(text="Offset Point energy"),
+                          ui.create_line_edit(text="@binding(offset_energy, converter=ev_converter)"),
+                          ui.create_stretch(),
+                          margin=5, spacing=5)
+    row_3 = ui.create_row(ui.create_label(text="Scale Point energy"),
+                          ui.create_line_edit(text="@binding(second_point, converter=ev_converter)"),
+                          ui.create_stretch(),
+                          margin=5, spacing=5)
+    column = ui.create_column(row_1, row_2, row_3, ui.create_stretch(), margin=5, spacing=5)
+
+    data_item: API_1_0.DataItem = window.target_data_item
+    if data_item is None or data_item.xdata is None or not data_item.display_xdata.is_data_1d:
+        class DummyHandler:
+            ...
+
+        window.show_modeless_dialog(ui.create_modeless_dialog(ui.create_label(text=("This tool cannot be used for the selected type of data.\n"
+                                                                                    "To use it you have to select a data item containing 1-D data or a sequence of 1-D data.")),
+                                                              title="Calibrate Spectrum", margin=10),
+                                    handler=DummyHandler)
+        return
+
+    if data_item._data_item.is_live:
+        class DummyHandler:
+            ...
+
+        window.show_modeless_dialog(ui.create_modeless_dialog(ui.create_label(text=("This tool cannot be used on live data.\n"
+                                                                                    "To use it you have to select a data item containing 1-D data or a sequence of 1-D data.")),
+                                                              title="Calibrate Spectrum", margin=10),
+                                    handler=DummyHandler)
+        return
+
+    # This is the data item we will update the calibrations on. If the selected data item is the result of a pick
+    # computation we will update the source SI. Otherwise we just update the spectrum itself.
+    src_data_item = data_item
+
+    for computation in api.library._document_model.computations:
+        if computation.processing_id in {"pick-point", "pick-mask-average", "pick-mask-sum"}:
+            if computation.get_output("target") == data_item._data_item:
+                input_ = computation.get_input("src")
+                # If input_ is a "DataSource" we need to get the actual data item
+                if hasattr(input_, "data_item"):
+                    input_ = input_.data_item
+                src_data_item = api._new_api_object(input_)
+
+    mx_pos = numpy.nan
+    try:
+        mx_pos = ZLP_Analysis.estimate_zlp_amplitude_position_width_fit_spline(data_item.display_xdata.data)[1]
+    except TypeError:
+        pass
+
+    # fallback to com if fit failed
+    if mx_pos is numpy.nan:
+        mx_pos = ZLP_Analysis.estimate_zlp_amplitude_position_width_com(data_item.display_xdata.data)[1]
+
+    # fallback to simple max if everything else failed
+    if mx_pos is numpy.nan:
+        mx_pos = numpy.argmax(data_item.display_xdata.data)
+
+    # We need to move the detected maximum by half a pixel because we want to center the calibration and the graphic
+    # on the pixel center but the maximum is calculated for the left edge.
+    mx_pos += 0.5
+
+    dimensional_calibrations = copy.deepcopy(data_item.display_xdata.dimensional_calibrations)
+    energy_calibration = dimensional_calibrations[0]
+    energy_calibration.offset = -mx_pos * energy_calibration.scale
+    dimensional_calibrations = copy.deepcopy(src_data_item.xdata.dimensional_calibrations)
+    dimensional_calibrations[-1] = energy_calibration
+    src_data_item.set_dimensional_calibrations(dimensional_calibrations)
+
+
+    offset_graphic = data_item.add_channel_region(mx_pos / len(data_item.display_xdata.data))
+    offset_graphic.label = "Offset Point"
+    second_graphic = data_item.add_channel_region((offset_graphic.position + 1.0) * 0.5)
+    second_graphic.label = "Scale Point"
+
+    handler = UIHandler(data_item, src_data_item, offset_graphic, second_graphic, units=energy_calibration.units)
+    dialog = Declarative.construct(window._document_controller.ui, window._document_controller, ui.create_modeless_dialog(column, title="Calibrate Spectrum"), handler)
+
+    def wc(w):
+        data_item.remove_region(offset_graphic)
+        data_item.remove_region(second_graphic)
+        handler.configuration_dialog_close_listener.close()
+        handler.configuration_dialog_close_listener = None
+
+    handler.configuration_dialog_close_listener = dialog._window_close_event.listen(wc)
+
+    dialog.show()
+
+    # Return the dialog which is useful for testing
+    return dialog
