@@ -156,6 +156,7 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
             self.__second_changed_listener.close()
             self.__second_changed_listener = None
             self.__data_item = None
+            self.__src_data_item = None
             self.__second_graphic = None
             self.__offset_graphic = None
 
