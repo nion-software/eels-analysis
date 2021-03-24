@@ -137,10 +137,11 @@ def align_zlp_fit(api: API_1_0.API, window: API_1_0.DocumentWindow):
 
 def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
     class UIHandler:
-        def __init__(self, data_item: API_1_0.DataItem, offset_graphic: API_1_0.Graphic, second_graphic: API_1_0.Graphic):
+        def __init__(self, data_item: API_1_0.DataItem, src_data_item: API_1_0.DataItem, offset_graphic: API_1_0.Graphic, second_graphic: API_1_0.Graphic):
             self.ev_converter = Converter.PhysicalValueToStringConverter('eV')
             self.property_changed_event = Event.Event()
             self.__data_item = data_item
+            self.__src_data_item = src_data_item
             self.__offset_graphic = offset_graphic
             self.__second_graphic = second_graphic
             self.__offset_energy = 0
@@ -196,9 +197,9 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
             offset = self.__offset_energy - self.__offset_graphic.position * len(self.__data_item.display_xdata.data) * scale
             energy_calibration.scale = scale
             energy_calibration.offset = offset
-            dimensional_calibrations = copy.deepcopy(self.__data_item.xdata.dimensional_calibrations)
+            dimensional_calibrations = copy.deepcopy(self.__src_data_item.xdata.dimensional_calibrations)
             dimensional_calibrations[-1] = energy_calibration
-            self.__data_item.set_dimensional_calibrations(dimensional_calibrations)
+            self.__src_data_item.set_dimensional_calibrations(dimensional_calibrations)
             offset_graphic_position = (self.offset_energy - offset) / scale / len(self.__data_item.display_xdata.data)
             second_graphic_position = (self.second_point - offset) / scale / len(self.__data_item.display_xdata.data)
             with self.__lock_graphic_updates():
@@ -221,15 +222,30 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
                           margin=5, spacing=5)
     row_2 = ui.create_row(ui.create_label(text="Offset Point energy"),
                           ui.create_line_edit(text="@binding(offset_energy, converter=ev_converter)"),
+                          ui.create_stretch(),
                           margin=5, spacing=5)
     row_3 = ui.create_row(ui.create_label(text="Scale Point energy"),
                           ui.create_line_edit(text="@binding(second_point, converter=ev_converter)"),
+                          ui.create_stretch(),
                           margin=5, spacing=5)
-    column = ui.create_column(row_1, row_2, row_3, margin=5, spacing=5)
+    column = ui.create_column(row_1, row_2, row_3, ui.create_stretch(), margin=5, spacing=5)
 
     data_item: API_1_0.DataItem = window.target_data_item
     if data_item is None or data_item.xdata is None or not data_item.display_xdata.is_data_1d:
         return
+
+    # This is the data item we will update the calibrations on. If the selected data item is the result of a pick
+    # computation we will update the source SI. Otherwise we just update the spectrum itself.
+    src_data_item = data_item
+
+    for computation in api.library._document_model.computations:
+        if computation.processing_id in {"pick-point", "pick-mask-average", "pick-mask-sum"}:
+            if computation.get_output("target") == data_item._data_item:
+                input_ = computation.get_input("src")
+                # If input_ is a "DataSource" we need to get the actual data item
+                if hasattr(input_, "data_item"):
+                    input_ = input_.data_item
+                src_data_item = api._new_api_object(input_)
 
     mx_pos = numpy.nan
     try:
@@ -252,9 +268,9 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
     dimensional_calibrations = copy.deepcopy(data_item.display_xdata.dimensional_calibrations)
     energy_calibration = dimensional_calibrations[0]
     energy_calibration.offset = -mx_pos * energy_calibration.scale
-    dimensional_calibrations = copy.deepcopy(data_item.xdata.dimensional_calibrations)
+    dimensional_calibrations = copy.deepcopy(src_data_item.xdata.dimensional_calibrations)
     dimensional_calibrations[-1] = energy_calibration
-    data_item.set_dimensional_calibrations(dimensional_calibrations)
+    src_data_item.set_dimensional_calibrations(dimensional_calibrations)
 
 
     offset_graphic = data_item.add_channel_region(mx_pos / len(data_item.display_xdata.data))
@@ -262,7 +278,7 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
     second_graphic = data_item.add_channel_region((offset_graphic.position + 1.0) * 0.5)
     second_graphic.label = "Scale Point"
 
-    handler = UIHandler(data_item, offset_graphic, second_graphic)
+    handler = UIHandler(data_item, src_data_item, offset_graphic, second_graphic)
     dialog = Declarative.construct(window._document_controller.ui, window._document_controller, ui.create_modeless_dialog(column, title="Calibrate Spectrum"), handler)
 
     def wc(w):
