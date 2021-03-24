@@ -3,6 +3,7 @@ import logging
 import copy
 import numpy
 import typing
+import contextlib
 import scipy.ndimage
 
 # local libraries
@@ -143,6 +144,7 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
             self.__offset_graphic = offset_graphic
             self.__second_graphic = second_graphic
             self.__offset_energy = 0
+            self.__graphic_updating = False
             self.__second_point = data_item.display_xdata.dimensional_calibrations[0].convert_to_calibrated_value(second_graphic.position * len(data_item.display_xdata.data))
             self.__offset_changed_listener = offset_graphic._graphic.property_changed_event.listen(self.__offset_graphic_changed)
             self.__second_changed_listener = second_graphic._graphic.property_changed_event.listen(self.__second_graphic_changed)
@@ -176,6 +178,14 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
             self.property_changed_event.fire("second_point")
             self.__update_calibration()
 
+        @contextlib.contextmanager
+        def __lock_graphic_updates(self):
+            self.__graphic_updating = True
+            try:
+                yield self.__graphic_updating
+            finally:
+                self.__graphic_updating = False
+
         def __update_calibration(self, keep_scale=False):
             dimensional_calibrations = copy.deepcopy(self.__data_item.display_xdata.dimensional_calibrations)
             energy_calibration = dimensional_calibrations[0]
@@ -189,12 +199,19 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
             dimensional_calibrations = copy.deepcopy(self.__data_item.xdata.dimensional_calibrations)
             dimensional_calibrations[-1] = energy_calibration
             self.__data_item.set_dimensional_calibrations(dimensional_calibrations)
+            offset_graphic_position = (self.offset_energy - offset) / scale / len(self.__data_item.display_xdata.data)
+            second_graphic_position = (self.second_point - offset) / scale / len(self.__data_item.display_xdata.data)
+            with self.__lock_graphic_updates():
+                self.__offset_graphic.position = min(max(0, offset_graphic_position), 0.99)
+                self.__second_graphic.position = min(max(0, second_graphic_position), 0.99)
 
         def __offset_graphic_changed(self, property_name):
-            self.__update_calibration(keep_scale=True)
+            if not self.__graphic_updating:
+                self.__update_calibration(keep_scale=True)
 
         def __second_graphic_changed(self, property_name):
-            self.__update_calibration()
+            if not self.__graphic_updating:
+                self.__update_calibration()
 
 
     ui = Declarative.DeclarativeUI()
@@ -202,10 +219,10 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
     row_1 = ui.create_row(ui.create_label(text="Move the graphics in the spectrum and/or change the numbers\nin the fields below to change the calibration.\n"
                                                "The offset graphic will be positioned on the ZLP if possible."),
                           margin=5, spacing=5)
-    row_2 = ui.create_row(ui.create_label(text="Offset energy"),
+    row_2 = ui.create_row(ui.create_label(text="Offset Point energy"),
                           ui.create_line_edit(text="@binding(offset_energy, converter=ev_converter)"),
                           margin=5, spacing=5)
-    row_3 = ui.create_row(ui.create_label(text="Second point energy"),
+    row_3 = ui.create_row(ui.create_label(text="Scale Point energy"),
                           ui.create_line_edit(text="@binding(second_point, converter=ev_converter)"),
                           margin=5, spacing=5)
     column = ui.create_column(row_1, row_2, row_3, margin=5, spacing=5)
@@ -241,9 +258,9 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
 
 
     offset_graphic = data_item.add_channel_region(mx_pos / len(data_item.display_xdata.data))
-    offset_graphic.label = "Offset"
+    offset_graphic.label = "Offset Point"
     second_graphic = data_item.add_channel_region((offset_graphic.position + 1.0) * 0.5)
-    second_graphic.label = "Second Point"
+    second_graphic.label = "Scale Point"
 
     handler = UIHandler(data_item, offset_graphic, second_graphic)
     dialog = Declarative.construct(window._document_controller.ui, window._document_controller, ui.create_modeless_dialog(column, title="Calibrate Spectrum"), handler)
