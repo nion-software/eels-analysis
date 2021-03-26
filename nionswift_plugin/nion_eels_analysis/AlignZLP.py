@@ -233,6 +233,21 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
 
     data_item: API_1_0.DataItem = window.target_data_item
     if data_item is None or data_item.xdata is None or not data_item.display_xdata.is_data_1d:
+        class DummyHandler:
+            ...
+
+        window.show_modeless_dialog(ui.create_modeless_dialog(ui.create_label(text=("This tool cannot be used for the selected type of data.\n"
+                                                                                    "To use it you have to select a data item containing 1-D data or a sequence of 1-D data.")), margin=10),
+                                    handler=DummyHandler)
+        return
+
+    if data_item._data_item.is_live:
+        class DummyHandler:
+            ...
+
+        window.show_modeless_dialog(ui.create_modeless_dialog(ui.create_label(text=("This tool cannot be used on live data.\n"
+                                                                                    "To use it you have to select a data item containing 1-D data or a sequence of 1-D data.")), margin=10),
+                                    handler=DummyHandler)
         return
 
     # This is the data item we will update the calibrations on. If the selected data item is the result of a pick
@@ -291,3 +306,6 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
     handler.configuration_dialog_close_listener = dialog._window_close_event.listen(wc)
 
     dialog.show()
+
+    # Return the dialog which is useful for testing
+    return dialog

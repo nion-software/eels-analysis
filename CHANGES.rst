@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.5.4 (unreleased):
+-------------------
+- Add calibrate spectrum tool.
+
 0.5.3 (2021-03-12):
 -------------------
 - Fix issue with Align ZLP (COM) when using it on empty data.
