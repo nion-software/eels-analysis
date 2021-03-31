@@ -137,8 +137,8 @@ def align_zlp_fit(api: API_1_0.API, window: API_1_0.DocumentWindow):
 
 def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
     class UIHandler:
-        def __init__(self, data_item: API_1_0.DataItem, src_data_item: API_1_0.DataItem, offset_graphic: API_1_0.Graphic, second_graphic: API_1_0.Graphic):
-            self.ev_converter = Converter.PhysicalValueToStringConverter('eV')
+        def __init__(self, data_item: API_1_0.DataItem, src_data_item: API_1_0.DataItem, offset_graphic: API_1_0.Graphic, second_graphic: API_1_0.Graphic, units='eV'):
+            self.ev_converter = Converter.PhysicalValueToStringConverter(units)
             self.property_changed_event = Event.Event()
             self.__data_item = data_item
             self.__src_data_item = src_data_item
@@ -237,7 +237,8 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
             ...
 
         window.show_modeless_dialog(ui.create_modeless_dialog(ui.create_label(text=("This tool cannot be used for the selected type of data.\n"
-                                                                                    "To use it you have to select a data item containing 1-D data or a sequence of 1-D data.")), margin=10),
+                                                                                    "To use it you have to select a data item containing 1-D data or a sequence of 1-D data.")),
+                                                              title="Calibrate Spectrum", margin=10),
                                     handler=DummyHandler)
         return
 
@@ -246,7 +247,8 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
             ...
 
         window.show_modeless_dialog(ui.create_modeless_dialog(ui.create_label(text=("This tool cannot be used on live data.\n"
-                                                                                    "To use it you have to select a data item containing 1-D data or a sequence of 1-D data.")), margin=10),
+                                                                                    "To use it you have to select a data item containing 1-D data or a sequence of 1-D data.")),
+                                                              title="Calibrate Spectrum", margin=10),
                                     handler=DummyHandler)
         return
 
@@ -294,7 +296,7 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
     second_graphic = data_item.add_channel_region((offset_graphic.position + 1.0) * 0.5)
     second_graphic.label = "Scale Point"
 
-    handler = UIHandler(data_item, src_data_item, offset_graphic, second_graphic)
+    handler = UIHandler(data_item, src_data_item, offset_graphic, second_graphic, units=energy_calibration.units)
     dialog = Declarative.construct(window._document_controller.ui, window._document_controller, ui.create_modeless_dialog(column, title="Calibrate Spectrum"), handler)
 
     def wc(w):
