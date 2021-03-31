@@ -198,7 +198,7 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
             offset = self.__offset_energy - self.__offset_graphic.position * len(self.__data_item.display_xdata.data) * scale
             energy_calibration.scale = scale
             energy_calibration.offset = offset
-            dimensional_calibrations = copy.deepcopy(self.__src_data_item.xdata.dimensional_calibrations)
+            dimensional_calibrations = list(self.__src_data_item.xdata.dimensional_calibrations)
             dimensional_calibrations[-1] = energy_calibration
             self.__src_data_item.set_dimensional_calibrations(dimensional_calibrations)
             offset_graphic_position = (self.offset_energy - offset) / scale / len(self.__data_item.display_xdata.data)
@@ -232,9 +232,11 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
     column = ui.create_column(row_1, row_2, row_3, ui.create_stretch(), margin=5, spacing=5)
 
     data_item: API_1_0.DataItem = window.target_data_item
+
+    class DummyHandler:
+        ...
+
     if data_item is None or data_item.xdata is None or not data_item.display_xdata.is_data_1d:
-        class DummyHandler:
-            ...
 
         window.show_modeless_dialog(ui.create_modeless_dialog(ui.create_label(text=("This tool cannot be used for the selected type of data.\n"
                                                                                     "To use it you have to select a data item containing 1-D data or a sequence of 1-D data.")),
@@ -243,8 +245,6 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
         return
 
     if data_item._data_item.is_live:
-        class DummyHandler:
-            ...
 
         window.show_modeless_dialog(ui.create_modeless_dialog(ui.create_label(text=("This tool cannot be used on live data.\n"
                                                                                     "To use it you have to select a data item containing 1-D data or a sequence of 1-D data.")),
@@ -277,16 +277,16 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
 
     # fallback to simple max if everything else failed
     if mx_pos is numpy.nan:
-        mx_pos = numpy.argmax(data_item.display_xdata.data)
+        mx_pos = float(numpy.argmax(data_item.display_xdata.data))
 
     # We need to move the detected maximum by half a pixel because we want to center the calibration and the graphic
     # on the pixel center but the maximum is calculated for the left edge.
     mx_pos += 0.5
 
-    dimensional_calibrations = copy.deepcopy(data_item.display_xdata.dimensional_calibrations)
+    dimensional_calibrations = list(data_item.display_xdata.dimensional_calibrations)
     energy_calibration = dimensional_calibrations[0]
     energy_calibration.offset = -mx_pos * energy_calibration.scale
-    dimensional_calibrations = copy.deepcopy(src_data_item.xdata.dimensional_calibrations)
+    dimensional_calibrations = list(src_data_item.xdata.dimensional_calibrations)
     dimensional_calibrations[-1] = energy_calibration
     src_data_item.set_dimensional_calibrations(dimensional_calibrations)
 
@@ -302,10 +302,11 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
     def wc(w):
         data_item.remove_region(offset_graphic)
         data_item.remove_region(second_graphic)
-        handler.configuration_dialog_close_listener.close()
-        handler.configuration_dialog_close_listener = None
+        getattr(handler, "configuration_dialog_close_listener").close()
+        delattr(handler, "configuration_dialog_close_listener")
 
-    handler.configuration_dialog_close_listener = dialog._window_close_event.listen(wc)
+    # use set handler to pass type checking.
+    setattr(handler, "configuration_dialog_close_listener", dialog._window_close_event.listen(wc))
 
     dialog.show()
 

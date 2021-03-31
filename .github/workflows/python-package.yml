@@ -43,6 +43,7 @@ jobs:
         python -m unittest discover nionswift_plugin -v -p '*_test.py'
         python -m unittest discover nion -v -p '*_test.py'
         mypy --namespace-packages --ignore-missing-imports --follow-imports=silent nion/eels_analysis/BackgroundModel.py
+        mypy --namespace-packages --ignore-missing-imports --follow-imports=silent -p nionswift_plugin.nion_eels_analysis.AlignZLP
         flake8 --max-line-length=160 nion/eels_analysis/BackgroundModel.py
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
