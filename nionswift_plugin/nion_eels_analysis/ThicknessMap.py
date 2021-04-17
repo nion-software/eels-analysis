@@ -8,29 +8,42 @@ from nion.swift import Facade
 from nion.swift.model import Symbolic
 
 
-def sum_zlp(d):
-    # Estimates the ZLP, assuming the peak value is the ZLP and that the ZLP is the only gaussian feature in the data.
-    # This procedure returns a minimum of three channels for the ZLP integration interval.
-    mx_pos = numpy.argmax(d)
-    mx = d[mx_pos]
-    mx_fraction = mx/10
-    left_pos = mx_pos - sum(d[:mx_pos + 1] > mx_fraction)
-    right_pos = mx_pos + (mx_pos - left_pos) + 1
-    s = sum(d[left_pos:right_pos])
-    return left_pos, right_pos, s
+def map_thickness_xdata(src_xdata: DataAndMetadata.DataAndMetadata) -> typing.Optional[DataAndMetadata.DataAndMetadata]:
+    # note: uses an extra copy of src_xdata.
 
+    # make indexes array, useful in a few calculations
+    indexes = numpy.linspace(0, src_xdata.dimensional_shape[-1], src_xdata.dimensional_shape[-1])
 
-def map_thickness_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=None) -> typing.Optional[DataAndMetadata.DataAndMetadata]:
-    data = numpy.empty((src_xdata.data_shape[0:2]), numpy.float32)
-    for row in range(src_xdata.data_shape[0]):
-        if row > 0 and row % 10 == 0:
-            if callable(progress_fn):
-                progress_fn(row)
-        for column in range(src_xdata.data_shape[1]):
-            l, r, s = sum_zlp(src_xdata.data[row, column, :])
-            data[row, column] = numpy.log(numpy.sum(src_xdata.data[row, column, :]) / s)
-    dimensional_calibrations = src_xdata.dimensional_calibrations[0:-1]
-    return DataAndMetadata.new_data_and_metadata(data, dimensional_calibrations=dimensional_calibrations)
+    # find the zero loss peaks by looking for maximum values. get the indexes and the maximum values.
+    zlp_indexes = numpy.argmax(src_xdata.data, axis=-1)
+    zlp_max_array = numpy.amax(src_xdata.data, axis=-1)
+
+    # create a mask which is 1 to the left of the maximum values and 0 elsewhere
+    mask_array = numpy.empty_like(src_xdata.data)
+    mask_array[:] = indexes[numpy.newaxis, numpy.newaxis, ...] < zlp_indexes[..., numpy.newaxis] + 1
+
+    # calculate the index of the left side of the zlp by summing values to the left of the zlp position that are above
+    # the threshold (1/10). this is done by multiplying the source data by the mask and summing, giving a count. then
+    # subtracting that count from the position.
+    left_pos_array = zlp_indexes - numpy.sum(src_xdata.data * mask_array > zlp_max_array[...,numpy.newaxis] / 10, axis=-1)
+
+    # calculate the right position too
+    right_pos_array = zlp_indexes + (zlp_indexes - left_pos_array) + 1
+
+    # calculate the left and right values using a simple threshold. these two arrays have a 1 where the
+    # condition is met; a 0 elsewhere. Multiplied together and then multiplied by the source data results
+    # in only values of source data that fall between the two indexes.
+    mask_array[:] = (left_pos_array[..., numpy.newaxis] <= indexes[numpy.newaxis, numpy.newaxis, ...]) * (
+                indexes[numpy.newaxis, numpy.newaxis, ...] < right_pos_array[..., numpy.newaxis])
+
+    # sum the source data between the two indexes.
+    zlp_area_array = numpy.sum(src_xdata * mask_array, axis=-1)
+
+    # finally, calculate the thickness as log(total counts / zlp counts).
+    thickness_array = numpy.log(numpy.sum(src_xdata.data, axis=-1) / zlp_area_array)
+
+    # return the value.
+    return DataAndMetadata.new_data_and_metadata(thickness_array, dimensional_calibrations=src_xdata.dimensional_calibrations[:-1])
 
 
 class EELSThicknessMapping:
@@ -38,10 +51,7 @@ class EELSThicknessMapping:
         self.computation = computation
 
     def execute(self, spectrum_image_data_item):
-        def progress(row):
-            print(f"Processing row {row} (thickness)")
-
-        self.__mapped_xdata = map_thickness_xdata(spectrum_image_data_item.xdata, progress)
+        self.__mapped_xdata = map_thickness_xdata(spectrum_image_data_item.xdata)
 
     def commit(self):
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)

@@ -3,6 +3,7 @@ Changelog (nionswift-eels-analysis)
 
 0.5.4 (unreleased):
 -------------------
+- Vectorize thickness mapping for significant speed-up.
 - Add calibrate spectrum tool.
 
 0.5.3 (2021-03-12):
