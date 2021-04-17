@@ -37,7 +37,7 @@ def map_thickness_xdata(src_xdata: DataAndMetadata.DataAndMetadata) -> typing.Op
                 indexes[numpy.newaxis, numpy.newaxis, ...] < right_pos_array[..., numpy.newaxis])
 
     # sum the source data between the two indexes.
-    zlp_area_array = numpy.sum(src_xdata * mask_array, axis=-1)
+    zlp_area_array = numpy.sum(src_xdata * mask_array, axis=-1, dtype=numpy.float32)
 
     # finally, calculate the thickness as log(total counts / zlp counts).
     thickness_array = numpy.log(numpy.sum(src_xdata.data, axis=-1) / zlp_area_array)
