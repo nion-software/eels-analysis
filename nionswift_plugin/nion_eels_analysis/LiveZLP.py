@@ -44,7 +44,7 @@ class MeasureZLP:
                 self.computation.set_result("zlp_interval", zlp_interval)
             zlp_interval.interval = start, end
             zlp_interval.graphic_id = "zlp_interval"
-            zlp_interval._graphic.color = "#0F0"
+            zlp_interval._graphic.color = "#CE00AC"
 
 
 def register_measure_zlp_process(api):

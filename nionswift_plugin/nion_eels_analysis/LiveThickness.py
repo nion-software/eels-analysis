@@ -63,7 +63,7 @@ class MeasureThickness:
             thickness_interval.interval = start, end
             thickness_interval.graphic_id = "thickness_interval"
             thickness_interval.label = f"{self.__thickness:0.4f}"
-            thickness_interval._graphic.color = "#0F0"
+            thickness_interval._graphic.color = "#CE00AC"
 
 
 def register_measure_thickness_process(api):

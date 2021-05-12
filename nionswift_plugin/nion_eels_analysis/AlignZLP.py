@@ -293,8 +293,10 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
 
     offset_graphic = data_item.add_channel_region(mx_pos / len(data_item.display_xdata.data))
     offset_graphic.label = "Offset Point"
+    offset_graphic._graphic.color = "#CE00AC"
     second_graphic = data_item.add_channel_region((offset_graphic.position + 1.0) * 0.5)
     second_graphic.label = "Scale Point"
+    second_graphic._graphic.color = "#CE00AC"
 
     handler = UIHandler(data_item, src_data_item, offset_graphic, second_graphic, units=energy_calibration.units)
     dialog = Declarative.construct(window._document_controller.ui, window._document_controller, ui.create_modeless_dialog(column, title="Calibrate Spectrum"), handler)
