@@ -7,7 +7,6 @@ import numpy
 import typing
 
 # local libraries
-from nion.data import Calibration
 from nion.data import Core
 from nion.data import DataAndMetadata
 from nion.utils import Registry
@@ -17,6 +16,26 @@ _ = gettext.gettext
 
 
 BackgroundModelParameters = typing.Dict
+BackgroundInterval = typing.Tuple[float, float]
+
+
+def get_calibrated_interval_slice(spectrum: DataAndMetadata.DataAndMetadata,
+                                  interval: BackgroundInterval) -> DataAndMetadata.DataAndMetadata:
+    assert spectrum.is_datum_1d
+    start_px = int(spectrum.data_shape[-1] * interval[0])
+    stop_px = int(spectrum.data_shape[-1] * interval[1])
+    return spectrum[..., start_px:stop_px]
+
+
+def get_calibrated_interval_domain(spectrum: DataAndMetadata.DataAndMetadata,
+                                   interval: BackgroundInterval) -> DataAndMetadata.DataAndMetadata:
+    calibration = spectrum.dimensional_calibrations[-1]
+    start = calibration.convert_to_calibrated_value(interval[0] * spectrum.data_shape[-1])
+    end = calibration.convert_to_calibrated_value(interval[1] * spectrum.data_shape[-1])
+    start_px = int(spectrum.data_shape[-1] * interval[0])
+    stop_px = int(spectrum.data_shape[-1] * interval[1])
+    return DataAndMetadata.new_data_and_metadata(numpy.linspace(start, end, (stop_px - start_px), endpoint=False),
+                                                 dimensional_calibrations=[calibration])
 
 
 class AbstractBackgroundModel:
@@ -26,15 +45,15 @@ class AbstractBackgroundModel:
         self.package_title = _("EELS Analysis")
 
     def fit_background(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata,
-                       fit_intervals: typing.Sequence[Calibration.CalibratedInterval],
-                       background_interval: Calibration.CalibratedInterval, **kwargs) -> typing.Dict:
+                       fit_intervals: typing.Sequence[BackgroundInterval],
+                       background_interval: BackgroundInterval, **kwargs) -> typing.Dict:
         return {
             "background_model": self.__fit_background(spectrum_xdata, fit_intervals, background_interval),
         }
 
     def integrate_signal(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata,
-                         fit_intervals: typing.Sequence[Calibration.CalibratedInterval],
-                         signal_interval: Calibration.CalibratedInterval, **kwargs) -> typing.Dict:
+                         fit_intervals: typing.Sequence[BackgroundInterval],
+                         signal_interval: BackgroundInterval, **kwargs) -> typing.Dict:
         # set up initial values
         subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata, self.__fit_background(spectrum_xdata, fit_intervals, signal_interval))
         if spectrum_xdata.is_navigable:
@@ -49,26 +68,26 @@ class AbstractBackgroundModel:
             }
 
     def __fit_background(self, spectrum_xdata: DataAndMetadata.DataAndMetadata,
-                         fit_intervals: typing.Sequence[Calibration.CalibratedInterval],
-                         background_interval: Calibration.CalibratedInterval) -> DataAndMetadata.DataAndMetadata:
-        reference_frame = Calibration.ReferenceFrameAxis(spectrum_xdata.datum_dimensional_calibrations[0], spectrum_xdata.datum_dimension_shape[0])
+                         fit_intervals: typing.Sequence[BackgroundInterval],
+                         background_interval: BackgroundInterval) -> DataAndMetadata.DataAndMetadata:
         # fit polynomial to the data
         xs = numpy.concatenate(
-            [Core.get_calibrated_interval_domain(reference_frame, fit_interval) for fit_interval in fit_intervals])
+            [get_calibrated_interval_domain(spectrum_xdata, fit_interval) for fit_interval in fit_intervals])
         if len(fit_intervals) > 1:
             ys = numpy.concatenate(
-                [Core.get_calibrated_interval_slice(spectrum_xdata, reference_frame, fit_interval).data for fit_interval in
+                [get_calibrated_interval_slice(spectrum_xdata, fit_interval).data for fit_interval in
                  fit_intervals])
         else:
-            ys = Core.get_calibrated_interval_slice(spectrum_xdata, reference_frame, fit_intervals[0]).data
+            ys = get_calibrated_interval_slice(spectrum_xdata, fit_intervals[0]).data
         # generate background model data from the series
-        n = reference_frame.convert_to_pixel(background_interval.end).int_value - reference_frame.convert_to_pixel(
-            background_interval.start).int_value
-        interval_start = reference_frame.convert_to_calibrated(background_interval.start).value
-        interval_end = reference_frame.convert_to_calibrated(background_interval.end).value
+        background_interval_start_pixel = int(spectrum_xdata.data_shape[-1] * background_interval[0])
+        background_interval_end_pixel = int(spectrum_xdata.data_shape[-1] * background_interval[1])
+        n = background_interval_end_pixel - background_interval_start_pixel
+        calibration = copy.deepcopy(spectrum_xdata.dimensional_calibrations[-1])
+        interval_start = calibration.convert_to_calibrated_value(background_interval[0])
+        interval_end = calibration.convert_to_calibrated_value(background_interval[1])
         interval_end -= (interval_end - interval_start) / n  # n samples at the left edges of each pixel
-        calibration = copy.deepcopy(spectrum_xdata.datum_dimensional_calibrations[0])
-        calibration.offset = reference_frame.convert_to_calibrated(background_interval.start).value
+        calibration.offset = interval_start
         fs = numpy.linspace(interval_start, interval_end, n)
         if spectrum_xdata.is_navigable:
             calibrations = list(copy.deepcopy(spectrum_xdata.navigation_dimensional_calibrations)) + [calibration]

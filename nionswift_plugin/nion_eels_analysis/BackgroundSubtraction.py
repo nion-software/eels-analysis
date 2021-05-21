@@ -6,9 +6,9 @@ import numpy
 import typing
 
 # local libraries
-from nion.data import Calibration
 from nion.data import Core
 from nion.data import DataAndMetadata
+from nion.eels_analysis import BackgroundModel
 from nion.swift.model import DataStructure
 from nion.swift.model import Symbolic
 from nion.swift.model import Schema
@@ -43,19 +43,12 @@ class EELSBackgroundSubtraction:
             assert spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
             eels_spectrum_xdata = spectrum_xdata
             # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
-            fit_intervals = list()
+            fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
             for fit_interval_graphic in fit_interval_graphics:
-                fit_interval = Calibration.CalibratedInterval(
-                    Calibration.Coordinate(Calibration.CoordinateType.NORMALIZED, fit_interval_graphic.interval[0]),
-                    Calibration.Coordinate(Calibration.CoordinateType.NORMALIZED, fit_interval_graphic.interval[1]))
-                fit_intervals.append(fit_interval)
-            fit_minimum = min([fit_interval.start.value for fit_interval in fit_intervals])
-            signal_interval = Calibration.CalibratedInterval(
-                Calibration.Coordinate(Calibration.CoordinateType.NORMALIZED, fit_minimum),
-                Calibration.Coordinate(Calibration.CoordinateType.NORMALIZED, 1.0))
-            reference_frame = Calibration.ReferenceFrameAxis(eels_spectrum_xdata.datum_dimensional_calibrations[0],
-                                                             eels_spectrum_xdata.datum_dimension_shape[0])
-            signal_xdata = Core.get_calibrated_interval_slice(eels_spectrum_xdata, reference_frame, signal_interval)
+                fit_intervals.append(fit_interval_graphic.interval)
+            fit_minimum = min([fit_interval[0] for fit_interval in fit_intervals])
+            signal_interval = fit_minimum, 1.0
+            signal_xdata = BackgroundModel.get_calibrated_interval_slice(eels_spectrum_xdata, signal_interval)
             background_xdata = None
             subtracted_xdata = None
             if background_model._data_structure.entity:
@@ -105,15 +98,10 @@ class EELSMapping:
             assert spectrum_image_data_item.xdata.datum_dimensional_calibrations[0].units == "eV"
             spectrum_image_xdata = spectrum_image_data_item.xdata
             # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
-            fit_intervals = list()
+            fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
             for fit_interval_graphic in fit_interval_graphics:
-                fit_interval = Calibration.CalibratedInterval(
-                    Calibration.Coordinate(Calibration.CoordinateType.NORMALIZED, fit_interval_graphic.interval[0]),
-                    Calibration.Coordinate(Calibration.CoordinateType.NORMALIZED, fit_interval_graphic.interval[1]))
-                fit_intervals.append(fit_interval)
-            signal_interval = Calibration.CalibratedInterval(
-                Calibration.Coordinate(Calibration.CoordinateType.NORMALIZED, signal_interval_graphic.interval[0]),
-                Calibration.Coordinate(Calibration.CoordinateType.NORMALIZED, signal_interval_graphic.interval[1]))
+                fit_intervals.append(fit_interval_graphic.interval)
+            signal_interval = signal_interval_graphic.interval
             mapped_xdata = None
             if background_model._data_structure.entity:
                 entity_id = background_model._data_structure.entity.entity_type.entity_id

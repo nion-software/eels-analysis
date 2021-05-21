@@ -27,8 +27,7 @@ class AbstractZeroLossPeakModel:
         }
 
     def __fit_zero_loss_peak(self, spectrum_xdata: DataAndMetadata.DataAndMetadata) -> DataAndMetadata.DataAndMetadata:
-        reference_frame = Calibration.ReferenceFrameAxis(spectrum_xdata.datum_dimensional_calibrations[0], spectrum_xdata.datum_dimension_shape[0])
-        z = reference_frame.convert_to_pixel(Calibration.Coordinate(Calibration.CoordinateType.CALIBRATED, 0)).int_value
+        z = int(spectrum_xdata.dimensional_calibrations[-1].convert_from_calibrated_value(0.0))
         calibration = copy.deepcopy(spectrum_xdata.datum_dimensional_calibrations[0])
         ys = spectrum_xdata.data
         if spectrum_xdata.is_navigable:
