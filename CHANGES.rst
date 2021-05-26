@@ -1,8 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
-0.5.4 (unreleased):
+0.5.4 (2021-05-26):
 -------------------
+- Maintenance to reduce dependency on new/unstable niondata features.
+- Improve colors for better visibility in align ZLP, live ZLP, live thickness.
 - Vectorize thickness mapping for significant speed-up.
 - Add calibrate spectrum tool.
 
