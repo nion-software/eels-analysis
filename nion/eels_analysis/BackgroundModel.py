@@ -22,8 +22,8 @@ BackgroundInterval = typing.Tuple[float, float]
 def get_calibrated_interval_slice(spectrum: DataAndMetadata.DataAndMetadata,
                                   interval: BackgroundInterval) -> DataAndMetadata.DataAndMetadata:
     assert spectrum.is_datum_1d
-    start_px = int(spectrum.data_shape[-1] * interval[0])
-    stop_px = int(spectrum.data_shape[-1] * interval[1])
+    start_px = round(spectrum.data_shape[-1] * interval[0])
+    stop_px = round(spectrum.data_shape[-1] * interval[1])
     return spectrum[..., start_px:stop_px]
 
 
@@ -32,8 +32,8 @@ def get_calibrated_interval_domain(spectrum: DataAndMetadata.DataAndMetadata,
     calibration = spectrum.dimensional_calibrations[-1]
     start = calibration.convert_to_calibrated_value(interval[0] * spectrum.data_shape[-1])
     end = calibration.convert_to_calibrated_value(interval[1] * spectrum.data_shape[-1])
-    start_px = int(spectrum.data_shape[-1] * interval[0])
-    stop_px = int(spectrum.data_shape[-1] * interval[1])
+    start_px = round(spectrum.data_shape[-1] * interval[0])
+    stop_px = round(spectrum.data_shape[-1] * interval[1])
     return DataAndMetadata.new_data_and_metadata(numpy.linspace(start, end, (stop_px - start_px), endpoint=False),
                                                  dimensional_calibrations=[calibration])
 
@@ -80,12 +80,12 @@ class AbstractBackgroundModel:
         else:
             ys = get_calibrated_interval_slice(spectrum_xdata, fit_intervals[0]).data
         # generate background model data from the series
-        background_interval_start_pixel = int(spectrum_xdata.data_shape[-1] * background_interval[0])
-        background_interval_end_pixel = int(spectrum_xdata.data_shape[-1] * background_interval[1])
+        background_interval_start_pixel = round(spectrum_xdata.data_shape[-1] * background_interval[0])
+        background_interval_end_pixel = round(spectrum_xdata.data_shape[-1] * background_interval[1])
         n = background_interval_end_pixel - background_interval_start_pixel
         calibration = copy.deepcopy(spectrum_xdata.dimensional_calibrations[-1])
-        interval_start = calibration.convert_to_calibrated_value(background_interval[0])
-        interval_end = calibration.convert_to_calibrated_value(background_interval[1])
+        interval_start = calibration.convert_to_calibrated_value(background_interval_start_pixel)
+        interval_end = calibration.convert_to_calibrated_value(background_interval_end_pixel)
         interval_end -= (interval_end - interval_start) / n  # n samples at the left edges of each pixel
         calibration.offset = interval_start
         fs = numpy.linspace(interval_start, interval_end, n)

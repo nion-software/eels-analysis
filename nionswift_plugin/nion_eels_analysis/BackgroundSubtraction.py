@@ -205,14 +205,14 @@ def use_signal_for_map(api, window):
 Symbolic.register_computation_type("eels.background_subtraction3", EELSBackgroundSubtraction)
 Symbolic.register_computation_type("eels.mapping3", EELSMapping)
 
-BackgroundModel = Schema.entity("background_model", None, None, {})
+BackgroundModelEntity = Schema.entity("background_model", None, None, {})
 
 
 def component_registered(component, component_types):
     if "background-model" in component_types:
         # when a background model is registered, create an empty (for now) entity type, and register it with the data
         # structure so that an entity for use with the UI and computations can be created when the data structure loads.
-        background_model_entity = Schema.entity(component.background_model_id, BackgroundModel, None, {})
+        background_model_entity = Schema.entity(component.background_model_id, BackgroundModelEntity, None, {})
         DataStructure.DataStructure.register_entity(background_model_entity, entity_name=component.title, entity_package_name=component.package_title)
 
 
