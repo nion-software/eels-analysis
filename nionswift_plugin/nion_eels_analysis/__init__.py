@@ -12,6 +12,7 @@ from . import LiveThickness
 from . import LiveZLP
 from . import PeakFitting
 from . import ThicknessMap
+from . import Thermometry
 
 from nion.swift import Facade
 
@@ -55,3 +56,6 @@ class MenuExtension:
         eels_menu.add_menu_item(_("Show Live ZLP Measurement"), functools.partial(LiveZLP.attach_measure_zlp, api, window))
         eels_menu.add_separator()
         eels_menu.add_menu_item(_("Calibrate Spectrum"), functools.partial(AlignZLP.calibrate_spectrum, api, window))
+        eels_menu.add_separator()
+        eels_menu.add_menu_item(_("Measure Temperature"), functools.partial(Thermometry.measure_temperature, api, window))
+        eels_menu.add_separator()

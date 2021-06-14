@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.5.5 (unreleased):
+-------------------
+- Add measure temperature computation.
+
 0.5.4 (2021-05-26):
 -------------------
 - Maintenance to reduce dependency on new/unstable niondata features.
