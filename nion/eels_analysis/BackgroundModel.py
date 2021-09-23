@@ -56,15 +56,18 @@ class AbstractBackgroundModel:
                          signal_interval: BackgroundInterval, **kwargs) -> typing.Dict:
         # set up initial values
         subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata, self.__fit_background(spectrum_xdata, fit_intervals, signal_interval))
+        assert subtracted_xdata
+        subtracted_data = subtracted_xdata.data
+        assert subtracted_data is not None
         if spectrum_xdata.is_navigable:
             return {
                 "integrated": DataAndMetadata.new_data_and_metadata(
-                    numpy.trapz(subtracted_xdata.data),
+                    numpy.trapz(subtracted_data),
                     dimensional_calibrations=spectrum_xdata.navigation_dimensional_calibrations)
             }
         else:
             return {
-                "integrated_value": numpy.trapz(subtracted_xdata.data),
+                "integrated_value": numpy.trapz(subtracted_data),
             }
 
     def __fit_background(self, spectrum_xdata: DataAndMetadata.DataAndMetadata,
@@ -111,8 +114,9 @@ class AbstractBackgroundModel:
         # fs will be an array of x-values with shape (n) representing energies at which to generate fitted data
         # return an ndarray of the fit with shape (m,n)
         # implement at least one of _perform_fits and _perform_fit
-        fit = numpy.empty(yss.shape[:-1] + fs.shape)
-        for index in numpy.ndindex(yss.shape[:-1]):
+        yss_shape = yss.shape[:-1]
+        fit = numpy.empty(yss_shape + fs.shape)
+        for index in numpy.ndindex(*yss_shape):
             fit[index] = self._perform_fit(xs, yss[index], fs)
         return fit
 
