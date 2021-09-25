@@ -21,6 +21,7 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata, progress_fn=None
     if src_xdata.is_datum_1d or (src_xdata.is_datum_2d and not (src_xdata.is_sequence or src_xdata.is_collection)):
         # get the numpy array and create the destination data
         src_data = src_xdata.data
+        assert src_data is not None
 
         d_rank = 1
         src_shape = tuple(src_xdata.data_shape)
