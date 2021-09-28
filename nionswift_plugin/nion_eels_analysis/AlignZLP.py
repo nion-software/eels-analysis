@@ -11,6 +11,7 @@ from nion.typeshed import API_1_0
 from nion.data import DataAndMetadata
 from nion.eels_analysis import ZLP_Analysis
 from nion.ui import Declarative
+from nion.ui import Dialog
 from nion.utils import Converter
 from nion.utils import Event
 
@@ -300,7 +301,9 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
     second_graphic._graphic.color = "#CE00AC"
 
     handler = UIHandler(data_item, src_data_item, offset_graphic, second_graphic, units=energy_calibration.units)
-    dialog = Declarative.construct(window._document_controller.ui, window._document_controller, ui.create_modeless_dialog(column, title="Calibrate Spectrum"), handler)
+    dialog = typing.cast(Dialog.ActionDialog,
+                         Declarative.construct(window._document_controller.ui, window._document_controller,
+                                               ui.create_modeless_dialog(column, title="Calibrate Spectrum"), handler))
 
     def wc(w):
         data_item.remove_region(offset_graphic)
