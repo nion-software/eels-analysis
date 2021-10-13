@@ -11,7 +11,7 @@
 
 imageio
 scipy
-numpy==1.20.3
+numpy==1.21.2
 h5py
 pytz
 tzlocal
