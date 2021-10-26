@@ -52,6 +52,15 @@ class AbstractBackgroundModel:
             "background_model": self.__fit_background(spectrum_xdata, fit_intervals, background_interval),
         }
 
+    def subtract_background(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata,
+                            fit_intervals: typing.Sequence[BackgroundInterval], **kwargs) -> typing.Dict:
+        # set up initial values
+        fit_minimum = min([fit_interval[0] for fit_interval in fit_intervals])
+        signal_interval = fit_minimum, 1.0
+        subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata, self.__fit_background(spectrum_xdata, fit_intervals, signal_interval))
+        assert subtracted_xdata
+        return {"subtracted": subtracted_xdata}
+
     def integrate_signal(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata,
                          fit_intervals: typing.Sequence[BackgroundInterval],
                          signal_interval: BackgroundInterval, **kwargs) -> typing.Dict:
