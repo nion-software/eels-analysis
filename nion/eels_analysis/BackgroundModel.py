@@ -34,8 +34,9 @@ def get_calibrated_interval_domain(spectrum: DataAndMetadata.DataAndMetadata,
     end = calibration.convert_to_calibrated_value(interval[1] * spectrum.data_shape[-1])
     start_px = round(spectrum.data_shape[-1] * interval[0])
     stop_px = round(spectrum.data_shape[-1] * interval[1])
-    return DataAndMetadata.new_data_and_metadata(numpy.linspace(start, end, (stop_px - start_px), endpoint=False),
-                                                 dimensional_calibrations=[calibration])
+    return DataAndMetadata.new_data_and_metadata(
+        numpy.linspace(start, end, (stop_px - start_px), endpoint=False, dtype=numpy.float32),
+        dimensional_calibrations=[calibration])
 
 
 class AbstractBackgroundModel:
@@ -75,7 +76,8 @@ class AbstractBackgroundModel:
                          background_interval: BackgroundInterval) -> DataAndMetadata.DataAndMetadata:
         # fit polynomial to the data
         xs = numpy.concatenate(
-            [get_calibrated_interval_domain(spectrum_xdata, fit_interval) for fit_interval in fit_intervals])
+            [get_calibrated_interval_domain(spectrum_xdata, fit_interval) for fit_interval in fit_intervals],
+            dtype=numpy.float32)
         if len(fit_intervals) > 1:
             ys = numpy.concatenate(
                 [get_calibrated_interval_slice(spectrum_xdata, fit_interval).data for fit_interval in
@@ -91,7 +93,7 @@ class AbstractBackgroundModel:
         interval_end = calibration.convert_to_calibrated_value(background_interval_end_pixel)
         interval_end -= (interval_end - interval_start) / n  # n samples at the left edges of each pixel
         calibration.offset = interval_start
-        fs = numpy.linspace(interval_start, interval_end, n)
+        fs = numpy.linspace(interval_start, interval_end, n, dtype=numpy.float32)
         if spectrum_xdata.is_navigable:
             calibrations = list(copy.deepcopy(spectrum_xdata.navigation_dimensional_calibrations)) + [calibration]
             yss = numpy.reshape(ys, (numpy.product(ys.shape[:-1]),) + (ys.shape[-1],))
