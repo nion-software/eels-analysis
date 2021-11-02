@@ -9,6 +9,7 @@ import typing
 import numpy
 
 # local libraries
+from nion.data import DataAndMetadata
 from nion.data import xdata_1_0 as xd
 from nion.swift import DocumentController
 from nion.swift.model import Connection
@@ -32,7 +33,8 @@ class EELSBackgroundSubtraction:
         signal = eels_analysis.make_signal_like(eels_analysis.extract_original_signal(eels_spectrum_xdata, [fit_interval], signal_interval), eels_spectrum_xdata)
         background_xdata = eels_analysis.make_signal_like(eels_analysis.calculate_background_signal(eels_spectrum_xdata, [fit_interval], signal_interval), eels_spectrum_xdata)
         subtracted_xdata = signal - background_xdata
-        self.__xdata = xd.vstack((eels_spectrum_xdata, background_xdata, subtracted_xdata))
+        # vstack will return a sequence; convert the sequence to an image
+        self.__xdata = xd.redimension(xd.vstack((eels_spectrum_xdata, background_xdata, subtracted_xdata)), DataAndMetadata.DataDescriptor(False, 0, 2))
 
     def commit(self):
         self.computation.set_referenced_xdata("data", self.__xdata)
