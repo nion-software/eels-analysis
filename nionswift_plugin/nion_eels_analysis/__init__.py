@@ -48,6 +48,7 @@ class MenuExtension:
         eels_menu.add_menu_item(_("Subtract Background"), functools.partial(BackgroundSubtraction.subtract_background, api, window))
         eels_menu.add_separator()
         eels_menu.add_menu_item(_("Map Signal"), functools.partial(BackgroundSubtraction.use_signal_for_map, api, window))
+        eels_menu.add_menu_item(_("Map Signal Global"), functools.partial(BackgroundSubtraction.use_signal_for_global_map, api, window))
         eels_menu.add_menu_item(_("Map Thickness"), functools.partial(ThicknessMap.map_thickness, api, window))
         eels_menu.add_separator()
         eels_menu.add_menu_item(_("Align ZLP (max method)"), functools.partial(AlignZLP.align_zlp, api, window))
