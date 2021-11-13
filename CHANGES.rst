@@ -1,10 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
-0.5.5 (unreleased):
+0.6.0 (2021-11-12):
 -------------------
+- Nion Swift 0.16 compatibility.
 - Add measure temperature computation.
-- Add menu item to remove/subtract background of spectrum image.
 
 0.5.4 (2021-05-26):
 -------------------
