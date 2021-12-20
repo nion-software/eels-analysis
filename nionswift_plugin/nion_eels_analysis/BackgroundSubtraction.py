@@ -170,6 +170,61 @@ class EELSMapBackgroundSubtractedSignal:
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)
 
 
+class EELSMapBackgroundSubtractedSignal1:
+    label = _("EELS Map Background Subtracted Signal 1")
+    inputs = {
+        "spectrum_image_data_item": {"label": _("EELS Image")},
+        "eels_spectrum_data_item": {"label": _("EELS Spectrum")},
+        "background_model": {"label": _("Background Model"), "entity_id": "background_model"},
+        "fit_interval_graphics": {"label": _("Fit")},
+        "signal_interval_graphic": {"label": _("Signal")},
+        }
+    outputs = {
+        "map": {"label": _("EELS Signal")},
+    }
+
+    def __init__(self, computation, **kwargs):
+        self.computation = computation
+
+    def execute(self, spectrum_image_data_item: Facade.DataItem, eels_spectrum_data_item: Facade.DataItem, background_model, fit_interval_graphics, signal_interval_graphic):
+        try:
+            assert spectrum_image_data_item.xdata.is_datum_1d
+            assert spectrum_image_data_item.xdata.is_navigable
+            assert spectrum_image_data_item.xdata.datum_dimensional_calibrations[0].units == "eV"
+            spectrum_image_xdata = spectrum_image_data_item.xdata
+            spectrum_xdata = eels_spectrum_data_item.xdata
+            assert spectrum_xdata.is_datum_1d
+            assert spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
+            eels_spectrum_xdata = spectrum_xdata
+            # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
+            fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
+            for fit_interval_graphic in fit_interval_graphics:
+                fit_intervals.append(fit_interval_graphic.interval)
+            signal_interval = signal_interval_graphic.interval
+            mapped_xdata = None
+            if background_model._data_structure.entity:
+                entity_id = background_model._data_structure.entity.entity_type.entity_id
+                for component in Registry.get_components_by_type("background-model"):
+                    if entity_id == component.background_model_id:
+                        # import time
+                        # t0 = time.perf_counter()
+                        integrate_result = component.integrate_signal(spectrum_xdata=spectrum_image_xdata, eels_spectrum_xdata=eels_spectrum_xdata, fit_intervals=fit_intervals, signal_interval=signal_interval)
+                        # t1 = time.perf_counter()
+                        # print(f"{component.background_model_id} {((t1 - t0) * 1000)}ms")
+                        mapped_xdata = integrate_result["integrated"]
+            if mapped_xdata is None:
+                mapped_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros(spectrum_image_xdata.navigation_dimension_shape), dimensional_calibrations=spectrum_image_xdata.navigation_dimensional_calibrations)
+            self.__mapped_xdata = mapped_xdata
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc())
+            print(e)
+            raise
+
+    def commit(self):
+        self.computation.set_referenced_xdata("map", self.__mapped_xdata)
+
+
 def add_background_subtraction_computation(api: Facade.API_1, library: Facade.Library, display_item: Facade.Display, data_item: Facade.DataItem, intervals: typing.Sequence[Facade.Graphic]) -> None:
     background = api.library.create_data_item(title="{} Background".format(data_item.title))
     signal = api.library.create_data_item(title="{} Subtracted".format(data_item.title))
@@ -278,8 +333,46 @@ def use_signal_for_map(api, window):
                     break
 
 
+def use_signal_for_global_map(api, window):
+    target_display = window.target_display
+    target_graphic = target_display.selected_graphics[0] if target_display and len(target_display.selected_graphics) == 1 else None
+    target_interval = target_graphic if target_graphic and target_graphic.graphic_type == "interval-graphic" else None
+    if target_display and target_interval:
+        target_display_item_data_items = target_display._display_item.data_items
+        for computation in api.library._document_model.computations:
+            if computation.processing_id == "eels.background_subtraction3":
+                if computation.get_input("eels_spectrum_data_item") in target_display_item_data_items and computation.get_output("subtracted") in target_display_item_data_items:
+                    eels_spectrum_data_item = computation.get_input("eels_spectrum_data_item")
+                    eels_spectrum_data_item = api._new_api_object(eels_spectrum_data_item)
+                    fit_interval_graphics = computation.get_input("fit_interval_graphics")
+                    fit_interval_graphics = [api._new_api_object(g) for g in fit_interval_graphics]
+                    background_model = computation.get_input("background_model")
+                    background_model = api._new_api_object(background_model)
+                    source_data_items = api.library._document_model.get_source_data_items(eels_spectrum_data_item._data_item)
+                    if len(source_data_items) == 1 and source_data_items[0].xdata.is_navigable and source_data_items[0].datum_dimension_count == 1:
+                        spectrum_image = api._new_api_object(source_data_items[0])
+                        map = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape), title="{} Map".format(spectrum_image.title))
+                        signal_interval_graphic = target_interval
+                        api.library.create_computation(
+                            "eels.global_mapping",
+                            inputs={
+                                "spectrum_image_data_item": spectrum_image,
+                                "eels_spectrum_data_item": eels_spectrum_data_item,
+                                "fit_interval_graphics": fit_interval_graphics,
+                                "signal_interval_graphic": signal_interval_graphic,
+                                "background_model": background_model,
+                            },
+                            outputs={
+                                "map": map
+                            }
+                        )
+                        window.display_data_item(map)
+                    break
+
+
 Symbolic.register_computation_type("eels.background_subtraction3", EELSFitBackground)
 Symbolic.register_computation_type("eels.mapping3", EELSMapBackgroundSubtractedSignal)
+Symbolic.register_computation_type("eels.global_mapping", EELSMapBackgroundSubtractedSignal1)
 Symbolic.register_computation_type("eels.subtract_background", EELSSubtractBackground)
 
 BackgroundModelEntity = Schema.entity("background_model", None, None, {})
