@@ -87,12 +87,13 @@ class AbstractBackgroundModel:
         xs = numpy.concatenate(
             [get_calibrated_interval_domain(spectrum_xdata, fit_interval) for fit_interval in fit_intervals],
             dtype=numpy.float32)
+        ys: numpy.typing.NDArray[typing.Any]
         if len(fit_intervals) > 1:
             ys = numpy.concatenate(
-                [get_calibrated_interval_slice(spectrum_xdata, fit_interval).data for fit_interval in
+                [get_calibrated_interval_slice(spectrum_xdata, fit_interval)._data_ex for fit_interval in
                  fit_intervals])
         else:
-            ys = get_calibrated_interval_slice(spectrum_xdata, fit_intervals[0]).data
+            ys = get_calibrated_interval_slice(spectrum_xdata, fit_intervals[0])._data_ex
         # generate background model data from the series
         background_interval_start_pixel = round(spectrum_xdata.data_shape[-1] * background_interval[0])
         background_interval_end_pixel = round(spectrum_xdata.data_shape[-1] * background_interval[1])
