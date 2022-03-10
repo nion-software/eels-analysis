@@ -63,8 +63,7 @@ def map_thickness(api, window):
     if target_data_item_ and target_display:
         spectrum_image = Facade.DataItem(target_data_item_)
         map = api.library.create_data_item_from_data(numpy.zeros_like(spectrum_image.display_xdata.data), title="{} Thickness Map".format(spectrum_image.title))
-        computation = api.library.create_computation("eels.thickness_mapping", inputs={"spectrum_image_data_item": spectrum_image}, outputs={"map": map})
-        computation._computation.source = spectrum_image._data_item
+        api.library.create_computation("eels.thickness_mapping", inputs={"spectrum_image_data_item": spectrum_image}, outputs={"map": map})
         window.display_data_item(map)
 
 
