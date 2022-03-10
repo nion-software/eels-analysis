@@ -138,8 +138,9 @@ def align_zlp_fit(api: API_1_0.API, window: API_1_0.DocumentWindow):
 
 
 def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
-    class UIHandler:
+    class UIHandler(Declarative.Handler):
         def __init__(self, data_item: API_1_0.DataItem, src_data_item: API_1_0.DataItem, offset_graphic: API_1_0.Graphic, second_graphic: API_1_0.Graphic, units='eV'):
+            super().__init__()
             self.ev_converter = Converter.PhysicalValueToStringConverter(units)
             self.property_changed_event = Event.Event()
             self.__data_item = data_item
@@ -161,6 +162,7 @@ def calibrate_spectrum(api: API_1_0.API, window: API_1_0.DocumentWindow):
             self.__src_data_item = None
             self.__second_graphic = None
             self.__offset_graphic = None
+            super().close()
 
         @property
         def offset_energy(self):
