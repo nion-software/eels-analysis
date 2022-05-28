@@ -1,9 +1,9 @@
 package:
   name: 'nionswift-eels-analysis'
-  version: '0.6.0'
+  version: '0.6.1'
 
 source:
-  git_rev: 0.6.0
+  git_rev: 0.6.1
   git_url: https://github.com/nion-software/eels-analysis.git
 
 build:
@@ -20,6 +20,7 @@ requirements:
   run:
     - python >=3.8
     - nionswift >=0.16.0,<0.17.0
+    - nionui >=0.6.3,<0.7.0
 
 test:
   imports:

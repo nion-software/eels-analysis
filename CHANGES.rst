@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.1 (2022-05-28):
+-------------------
+- Minor changes for improved nionui compatibility.
+
 0.6.0 (2021-11-12):
 -------------------
 - Nion Swift 0.16 compatibility.
