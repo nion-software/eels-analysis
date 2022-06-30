@@ -29,14 +29,15 @@ class FitZeroLossPeak:
         "subtracted": {"label": _("Subtracted")},
     }
 
-    def __init__(self, computation, **kwargs):
+    def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
-        self.__model_xdata = None
-        self.__subtracted_xdata = None
+        self.__model_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
+        self.__subtracted_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
 
-    def execute(self, eels_spectrum_data_item, zlp_model, **kwargs) -> None:
+    def execute(self, eels_spectrum_data_item: Facade.DataItem, zlp_model: Facade.DataStructure, **kwargs: typing.Any) -> None:
         try:
             spectrum_xdata = eels_spectrum_data_item.xdata
+            assert spectrum_xdata
             assert spectrum_xdata.is_datum_1d
             assert spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
             eels_spectrum_xdata = spectrum_xdata
@@ -63,7 +64,9 @@ class FitZeroLossPeak:
             print(e)
             raise
 
-    def commit(self):
+    def commit(self) -> None:
+        assert self.__model_xdata
+        assert self.__subtracted_xdata
         self.computation.set_referenced_xdata("zero_loss_peak", self.__model_xdata)
         self.computation.set_referenced_xdata("subtracted", self.__subtracted_xdata)
 
@@ -99,16 +102,17 @@ def add_peak_fitting_computation(api: Facade.API_1, library: Facade.Library, dis
 def fit_zero_loss_peak(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
     target_data_item = window.target_data_item
     target_display_item = window.target_display
-    if target_data_item:
+    if target_display_item and target_data_item:
         add_peak_fitting_computation(api, window.library, target_display_item, target_data_item)
 
 
-Symbolic.register_computation_type("eels.fit_zlp", FitZeroLossPeak)
+ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
+Symbolic.register_computation_type("eels.fit_zlp", typing.cast(ComputationCallable, FitZeroLossPeak))
 
 ZeroLossPeakModel = Schema.entity("zlp_model", None, None, {})
 
 
-def component_registered(component, component_types):
+def component_registered(component: Registry._ComponentType, component_types: typing.Set[str]) -> None:
     if "zlp-model" in component_types:
         # when a background model is registered, create an empty (for now) entity type, and register it with the data
         # structure so that an entity for use with the UI and computations can be created when the data structure loads.

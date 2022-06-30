@@ -47,24 +47,31 @@ def map_thickness_xdata(src_xdata: DataAndMetadata.DataAndMetadata) -> typing.Op
 
 
 class EELSThicknessMapping:
-    def __init__(self, computation, **kwargs):
+    def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
+        self.__mapped_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
 
-    def execute(self, spectrum_image_data_item):
-        self.__mapped_xdata = map_thickness_xdata(spectrum_image_data_item.xdata)
+    def execute(self, spectrum_image_data_item: Facade.DataItem, **kwargs: typing.Any) -> None:
+        spectrum_image_xdata = spectrum_image_data_item.xdata
+        assert spectrum_image_xdata
+        self.__mapped_xdata = map_thickness_xdata(spectrum_image_xdata)
 
-    def commit(self):
+    def commit(self) -> None:
+        assert self.__mapped_xdata
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)
 
 
-def map_thickness(api, window):
+def map_thickness(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
     target_display = window.target_display
     target_data_item_ = target_display._display_item.data_items[0] if target_display and len(target_display._display_item.data_items) > 0 else None
     if target_data_item_ and target_display:
         spectrum_image = Facade.DataItem(target_data_item_)
-        map = api.library.create_data_item_from_data(numpy.zeros_like(spectrum_image.display_xdata.data), title="{} Thickness Map".format(spectrum_image.title))
-        api.library.create_computation("eels.thickness_mapping", inputs={"spectrum_image_data_item": spectrum_image}, outputs={"map": map})
-        window.display_data_item(map)
+        if spectrum_image:
+            assert spectrum_image.display_xdata
+            map = api.library.create_data_item_from_data(numpy.zeros_like(spectrum_image.display_xdata.data), title="{} Thickness Map".format(spectrum_image.title))
+            api.library.create_computation("eels.thickness_mapping", inputs={"spectrum_image_data_item": spectrum_image}, outputs={"map": map})
+            window.display_data_item(map)
 
 
-Symbolic.register_computation_type("eels.thickness_mapping", EELSThicknessMapping)
+ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
+Symbolic.register_computation_type("eels.thickness_mapping", typing.cast(ComputationCallable, EELSThicknessMapping))

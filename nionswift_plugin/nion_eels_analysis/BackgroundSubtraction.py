@@ -31,14 +31,15 @@ class EELSFitBackground:
         "subtracted": {"label": _("Subtracted")},
     }
 
-    def __init__(self, computation, **kwargs):
+    def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
-        self.__background_xdata = None
-        self.__subtracted_xdata = None
+        self.__background_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
+        self.__subtracted_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
 
-    def execute(self, eels_spectrum_data_item, background_model, fit_interval_graphics, **kwargs) -> None:
+    def execute(self, eels_spectrum_data_item: Facade.DataItem, background_model: Facade.DataStructure, fit_interval_graphics: typing.Sequence[Facade.Graphic], **kwargs: typing.Any) -> None:
         try:
             spectrum_xdata = eels_spectrum_data_item.xdata
+            assert spectrum_xdata
             assert spectrum_xdata.is_datum_1d
             assert spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
             eels_spectrum_xdata = spectrum_xdata
@@ -71,7 +72,9 @@ class EELSFitBackground:
             print(e)
             raise
 
-    def commit(self):
+    def commit(self) -> None:
+        assert self.__background_xdata
+        assert self.__subtracted_xdata
         self.computation.set_referenced_xdata("background", self.__background_xdata)
         self.computation.set_referenced_xdata("subtracted", self.__subtracted_xdata)
 
@@ -87,11 +90,12 @@ class EELSSubtractBackground:
         "subtracted": {"label": _("EELS Background Subtracted")},
     }
 
-    def __init__(self, computation, **kwargs):
+    def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
 
-    def execute(self, spectrum_image_data_item: Facade.DataItem, background_model, fit_interval_graphics):
+    def execute(self, spectrum_image_data_item: Facade.DataItem, background_model: Facade.DataStructure, fit_interval_graphics: typing.Sequence[Facade.Graphic], **kwargs: typing.Any) -> None:
         try:
+            assert spectrum_image_data_item.xdata
             assert spectrum_image_data_item.xdata.is_datum_1d
             assert spectrum_image_data_item.xdata.is_navigable
             assert spectrum_image_data_item.xdata.datum_dimensional_calibrations[0].units == "eV"
@@ -116,7 +120,7 @@ class EELSSubtractBackground:
             print(e)
             raise
 
-    def commit(self):
+    def commit(self) -> None:
         self.computation.set_referenced_xdata("subtracted", self.__subtracted_xdata)
 
 
@@ -132,11 +136,12 @@ class EELSMapBackgroundSubtractedSignal:
         "map": {"label": _("EELS Signal")},
     }
 
-    def __init__(self, computation, **kwargs):
+    def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
 
-    def execute(self, spectrum_image_data_item: Facade.DataItem, background_model, fit_interval_graphics, signal_interval_graphic):
+    def execute(self, spectrum_image_data_item: Facade.DataItem, background_model: Facade.DataStructure, fit_interval_graphics: typing.Sequence[Facade.Graphic], signal_interval_graphic: Facade.Graphic, **kwargs: typing.Any) -> None:
         try:
+            assert spectrum_image_data_item.xdata
             assert spectrum_image_data_item.xdata.is_datum_1d
             assert spectrum_image_data_item.xdata.is_navigable
             assert spectrum_image_data_item.xdata.datum_dimensional_calibrations[0].units == "eV"
@@ -166,7 +171,7 @@ class EELSMapBackgroundSubtractedSignal:
             print(e)
             raise
 
-    def commit(self):
+    def commit(self) -> None:
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)
 
 
@@ -205,12 +210,14 @@ def add_background_subtraction_computation(api: Facade.API_1, library: Facade.Li
 def subtract_background_from_signal(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
     target_data_item = window.target_data_item
     target_display_item = window.target_display
-    target_intervals = [graphic for graphic in target_display_item.selected_graphics if graphic.graphic_type == "interval-graphic"]
-    if target_data_item and target_intervals:
-        add_background_subtraction_computation(api, window.library, target_display_item, target_data_item, target_intervals)
+    if target_display_item and target_data_item:
+        target_intervals = [graphic for graphic in target_display_item.selected_graphics if
+                            graphic.graphic_type == "interval-graphic"]
+        if target_intervals:
+            add_background_subtraction_computation(api, window.library, target_display_item, target_data_item, target_intervals)
 
 
-def subtract_background(api, window):
+def subtract_background(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
     target_display = window.target_display
     if target_display:
         target_display_item_data_items = target_display._display_item.data_items
@@ -224,25 +231,28 @@ def subtract_background(api, window):
                     background_model = computation.get_input("background_model")
                     background_model = api._new_api_object(background_model)
                     source_data_items = api.library._document_model.get_source_data_items(eels_spectrum_data_item._data_item)
-                    if len(source_data_items) == 1 and source_data_items[0].xdata.is_navigable and source_data_items[0].datum_dimension_count == 1:
-                        spectrum_image = api._new_api_object(source_data_items[0])
-                        subtracted = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape), title="{} Background Removed".format(spectrum_image.title))
-                        api.library.create_computation(
-                            "eels.subtract_background",
-                            inputs={
-                                "spectrum_image_data_item": spectrum_image,
-                                "fit_interval_graphics": fit_interval_graphics,
-                                "background_model": background_model,
-                            },
-                            outputs={
-                                "subtracted": subtracted
-                            }
-                        )
-                        window.display_data_item(subtracted)
+                    if len(source_data_items) == 1:
+                        source_xdata = source_data_items[0].xdata
+                        assert source_xdata
+                        if source_xdata.is_navigable and source_data_items[0].datum_dimension_count == 1:
+                            spectrum_image = api._new_api_object(source_data_items[0])
+                            subtracted = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape), title="{} Background Removed".format(spectrum_image.title))
+                            api.library.create_computation(
+                                "eels.subtract_background",
+                                inputs={
+                                    "spectrum_image_data_item": spectrum_image,
+                                    "fit_interval_graphics": fit_interval_graphics,
+                                    "background_model": background_model,
+                                },
+                                outputs={
+                                    "subtracted": subtracted
+                                }
+                            )
+                            window.display_data_item(subtracted)
                     break
 
 
-def use_signal_for_map(api, window):
+def use_signal_for_map(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
     target_display = window.target_display
     target_graphic = target_display.selected_graphics[0] if target_display and len(target_display.selected_graphics) == 1 else None
     target_interval = target_graphic if target_graphic and target_graphic.graphic_type == "interval-graphic" else None
@@ -258,34 +268,38 @@ def use_signal_for_map(api, window):
                     background_model = computation.get_input("background_model")
                     background_model = api._new_api_object(background_model)
                     source_data_items = api.library._document_model.get_source_data_items(eels_spectrum_data_item._data_item)
-                    if len(source_data_items) == 1 and source_data_items[0].xdata.is_navigable and source_data_items[0].datum_dimension_count == 1:
-                        spectrum_image = api._new_api_object(source_data_items[0])
-                        map = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape), title="{} Map".format(spectrum_image.title))
-                        signal_interval_graphic = target_interval
-                        api.library.create_computation(
-                            "eels.mapping3",
-                            inputs={
-                                "spectrum_image_data_item": spectrum_image,
-                                "fit_interval_graphics": fit_interval_graphics,
-                                "signal_interval_graphic": signal_interval_graphic,
-                                "background_model": background_model,
-                            },
-                            outputs={
-                                "map": map
-                            }
-                        )
-                        window.display_data_item(map)
+                    if len(source_data_items) == 1:
+                        source_xdata = source_data_items[0].xdata
+                        assert source_xdata
+                        if source_xdata.is_navigable and source_data_items[0].datum_dimension_count == 1:
+                            spectrum_image = api._new_api_object(source_data_items[0])
+                            map = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape), title="{} Map".format(spectrum_image.title))
+                            signal_interval_graphic = target_interval
+                            api.library.create_computation(
+                                "eels.mapping3",
+                                inputs={
+                                    "spectrum_image_data_item": spectrum_image,
+                                    "fit_interval_graphics": fit_interval_graphics,
+                                    "signal_interval_graphic": signal_interval_graphic,
+                                    "background_model": background_model,
+                                },
+                                outputs={
+                                    "map": map
+                                }
+                            )
+                            window.display_data_item(map)
                     break
 
 
-Symbolic.register_computation_type("eels.background_subtraction3", EELSFitBackground)
-Symbolic.register_computation_type("eels.mapping3", EELSMapBackgroundSubtractedSignal)
-Symbolic.register_computation_type("eels.subtract_background", EELSSubtractBackground)
+ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
+Symbolic.register_computation_type("eels.background_subtraction3", typing.cast(ComputationCallable, EELSFitBackground))
+Symbolic.register_computation_type("eels.mapping3", typing.cast(ComputationCallable, EELSMapBackgroundSubtractedSignal))
+Symbolic.register_computation_type("eels.subtract_background", typing.cast(ComputationCallable, EELSSubtractBackground))
 
 BackgroundModelEntity = Schema.entity("background_model", None, None, {})
 
 
-def component_registered(component, component_types):
+def component_registered(component: Registry._ComponentType, component_types: typing.Set[str]) -> None:
     if "background-model" in component_types:
         # when a background model is registered, create an empty (for now) entity type, and register it with the data
         # structure so that an entity for use with the UI and computations can be created when the data structure loads.

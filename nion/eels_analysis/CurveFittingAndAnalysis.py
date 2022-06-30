@@ -5,6 +5,12 @@
 """
 
 import numpy
+import numpy.typing
+import typing
+
+
+DataArrayType = numpy.typing.NDArray[typing.Any]
+
 
 class MultipleCurveFit:
     """A class for performing multiple linear regression on arrays of 1D data (i.e. curves or spectra).
@@ -24,19 +30,22 @@ class MultipleCurveFit:
         get_fit_curves - fit curve array (for direct comparison with input data curves)
     """
 
-    def __init__(self, model_curves: numpy.ndarray):
+    def __init__(self, model_curves: DataArrayType) -> None:
         """
             model_curves - 1D array of 1D model curves (i.e. 2D NumPy ndarray), where the model data extends along the last dimension.
         """
         assert model_curves.ndim == 2
+
+        self._normalized_fit_coefficients: DataArrayType = numpy.zeros((0,))
+
         self.sample_count = model_curves.shape[-1]
 
         # Determine the RMS value of each model curve and normalize by this factor to help ensure a well-conditioned solution matrix
         # Note that a model curve with RMS value 0 is meaningless and results in a failed assertion
-        self._model_rms_values = numpy.sqrt(numpy.sum(numpy.square(model_curves), -1, keepdims = True) / self.sample_count)
+        self._model_rms_values: DataArrayType = numpy.sqrt(numpy.sum(numpy.square(model_curves), -1, keepdims = True) / self.sample_count)
         assert numpy.amin(self._model_rms_values) > 0
-        self._normalized_model_curves = model_curves / self._model_rms_values
-        self._normalized_model_integrals = self._normalized_model_curves.sum(-1, keepdims = True)
+        self._normalized_model_curves: DataArrayType = model_curves / self._model_rms_values
+        self._normalized_model_integrals: DataArrayType = self._normalized_model_curves.sum(-1, keepdims = True)
 
         # Generate singular value decomposition of normalized model curve matrix
         u, s, v = numpy.linalg.svd(self._normalized_model_curves.T, full_matrices = False)
@@ -52,7 +61,7 @@ class MultipleCurveFit:
         # Track whether a fit has been computed for a specific data set
         self._have_computed_fit_for_data = False
 
-    def compute_fit_for_data(self, data_values: numpy.ndarray) -> numpy.ndarray:
+    def compute_fit_for_data(self, data_values: DataArrayType) -> None:
         """
             data_values - array of 1D data curves (single spectrum, line scan, or area scan), at x values matching those of the model curves.
         """
@@ -60,19 +69,19 @@ class MultipleCurveFit:
         self._normalized_fit_coefficients = numpy.einsum('ij, ...j', self._normalized_fit_matrix, data_values)
         self._have_computed_fit_for_data = True
 
-    def get_fit_coefficients(self) -> numpy.ndarray:
+    def get_fit_coefficients(self) -> DataArrayType:
         assert self._have_computed_fit_for_data
         fit_coefficients = self._normalized_fit_coefficients / self._model_rms_values.T
         return fit_coefficients
 
-    def get_fit_integrals(self) -> numpy.ndarray:
+    def get_fit_integrals(self) -> DataArrayType:
         assert self._have_computed_fit_for_data
-        fit_integrals = numpy.einsum('ij, ...i', self._normalized_model_integrals, self._normalized_fit_coefficients)
+        fit_integrals: DataArrayType = numpy.einsum('ij, ...i', self._normalized_model_integrals, self._normalized_fit_coefficients)
         return fit_integrals
 
-    def get_fit_curves(self) -> numpy.ndarray:
+    def get_fit_curves(self) -> DataArrayType:
         assert self._have_computed_fit_for_data
-        fit_curves = numpy.einsum('ij, ...i', self._normalized_model_curves, self._normalized_fit_coefficients)
+        fit_curves: DataArrayType = numpy.einsum('ij, ...i', self._normalized_model_curves, self._normalized_fit_coefficients)
         return fit_curves
 
 
@@ -94,7 +103,7 @@ class PolynomialCurveFit:
     In this case, all the data values must be strictly greater than 0.
     """
 
-    def _compute_polynomial_model(self, x_values: numpy.ndarray) -> numpy.ndarray:
+    def _compute_polynomial_model(self, x_values: DataArrayType) -> DataArrayType:
         """Prepare polynomial model array for the current polynomial order and log-scale settings.
         """
         polynomial_model = numpy.ones([self._polynomial_order + 1, x_values.size], x_values.dtype)
@@ -113,7 +122,7 @@ class PolynomialCurveFit:
 
         return polynomial_model
 
-    def __init__(self, x_values: numpy.ndarray, polynomial_order: int = 1, fit_log_x: bool = False):
+    def __init__(self, x_values: DataArrayType, polynomial_order: int = 1, fit_log_x: bool = False):
         """
             x_values - a 1D NumPy array containing the x coordinates corresponding to each entry in the data arrays passed to compute_fit_for_data.
             polynomial_order - non-negative integer value specifying fit polynomial order, e.g. 0 = constant, 1 = line, 2 = parabola, etc.
@@ -128,7 +137,7 @@ class PolynomialCurveFit:
 
         self._multicurve_fit = MultipleCurveFit(self._compute_polynomial_model(x_values))
 
-    def compute_fit_for_data(self, data_values: numpy.ndarray, fit_log_data: bool = False) -> numpy.ndarray:
+    def compute_fit_for_data(self, data_values: DataArrayType, fit_log_data: bool = False) -> None:
         """
             data_values - array of 1D data curves (single spectrum, line scan, or area scan), at x values specified at fit initialization.
             fit_log_data - boolean value specifying whether fit should be to log of y values, e.g. exponential, Gaussian, or power-law.
@@ -145,11 +154,11 @@ class PolynomialCurveFit:
 
         self._multicurve_fit.compute_fit_for_data(y_values)
 
-    def get_fit_coefficients(self) -> numpy.ndarray:
+    def get_fit_coefficients(self) -> DataArrayType:
         return self._multicurve_fit.get_fit_coefficients()
 
-    def evaluate_fit_at(self, x_values) -> numpy.ndarray:
-        evaluated_fit = numpy.einsum('ij, ...i', self._compute_polynomial_model(x_values), self._multicurve_fit.get_fit_coefficients())
+    def evaluate_fit_at(self, x_values: DataArrayType) -> DataArrayType:
+        evaluated_fit: DataArrayType = numpy.einsum('ij, ...i', self._compute_polynomial_model(x_values), self._multicurve_fit.get_fit_coefficients())
         if self._fit_log_y:
             evaluated_fit = numpy.exp(evaluated_fit)
         return evaluated_fit
@@ -172,22 +181,22 @@ class RangeSliceConverter:
         self._origin = coordinate_at_0
         self._step = coordinate_step
 
-    def get_slice(self, range_for_slice: numpy.ndarray) -> slice:
+    def get_slice(self, range_for_slice: DataArrayType) -> slice:
         assert range_for_slice.ndim == 1
         assert range_for_slice.size == 2
         slice_start = round((range_for_slice[0] - self._origin) / self._step)
         slice_stop = round((range_for_slice[1] - self._origin) / self._step)
         return slice(int(slice_start), int(slice_stop))
 
-    def get_range(self, slice_for_range: slice) -> numpy.ndarray:
+    def get_range(self, slice_for_range: slice) -> DataArrayType:
         range_start = self._origin + slice_for_range.start * self._step
         range_end = self._origin + slice_for_range.stop * self._step
         return numpy.array([range_start, range_end])
 
 
-def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: numpy.ndarray, signal_x_range: numpy.ndarray,
-                                                background_fit_x_ranges: numpy.ndarray, polynomial_order: int = 1,
-                                                fit_log_data: bool = False, fit_log_x: bool = False) -> tuple:
+def signal_from_polynomial_background(data_values: DataArrayType, data_x_range: DataArrayType, signal_x_range: DataArrayType,
+                                                background_fit_x_ranges: DataArrayType, polynomial_order: int = 1,
+                                                fit_log_data: bool = False, fit_log_x: bool = False) -> typing.Tuple[DataArrayType, DataArrayType, DataArrayType, DataArrayType]:
     """Extracts signal from polynomial background fitted to an array of uniformly sampled 1D data curves, returning both the signal and background arrays.
 
     Primary inputs:
@@ -228,8 +237,8 @@ def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: 
     assert background_fit_x_ranges.ndim <= 2
     assert background_fit_x_ranges.shape[-1] == 2
     assert numpy.all(background_fit_x_ranges[..., 0] <= background_fit_x_ranges[..., 1])
-    assert background_fit_x_ranges.min() >= data_x_range[0]
-    assert background_fit_x_ranges.max() <= data_x_range[1]
+    assert numpy.amin(background_fit_x_ranges) >= data_x_range[0]
+    assert numpy.amax(background_fit_x_ranges) <= data_x_range[1]
 
     # Distill the fit ranges so that they are ordered, consolidated, and non-overlapping
     sorted_fit_ranges = numpy.atleast_2d(background_fit_x_ranges)
@@ -263,20 +272,19 @@ def signal_from_polynomial_background(data_values: numpy.ndarray, data_x_range: 
 
     # Establish the net profile range, i.e. the contiguous union of fit and signal ranges
     profile_range = numpy.zeros_like(signal_x_range)
-    profile_range[0] = min(signal_x_range[0], clean_fit_ranges.min())
-    profile_range[1] = max(signal_x_range[1], clean_fit_ranges.max())
+    profile_range[0] = min(signal_x_range[0], numpy.amin(clean_fit_ranges))
+    profile_range[1] = max(signal_x_range[1], numpy.amax(clean_fit_ranges))
     profile_slice = data_range_converter.get_slice(profile_range)
 
     # Evaluate background model over the net profile range
     background_model = background_fit.evaluate_fit_at(x_values[profile_slice])
 
     # Compute the net signal profile
-    signal_profile = data_values[..., profile_slice] - background_model
+    signal_profile: DataArrayType = data_values[..., profile_slice] - background_model
 
     # Compute the net signal integral over the specified signal range
     profile_range_converter = RangeSliceConverter(profile_range[0], x_step)
     signal_slice = profile_range_converter.get_slice(signal_x_range)
-    signal_integral = numpy.trapz(signal_profile[..., signal_slice], dx = x_step)
+    signal_integral: DataArrayType = numpy.trapz(signal_profile[..., signal_slice], dx = x_step)
 
     return signal_integral, signal_profile, background_model, profile_range
-

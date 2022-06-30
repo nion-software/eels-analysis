@@ -8,9 +8,10 @@
 
 # standard libraries
 import copy
+import numpy
+import numpy.typing
 import typing
 
-import numpy
 from nion.eels_analysis import CurveFitting
 from nion.eels_analysis import EELS_CrossSections
 from nion.eels_analysis import EELS_DataAnalysis
@@ -19,8 +20,17 @@ from nion.data import DataAndMetadata
 from nion.utils import Registry
 
 
-def extract_signal_from_polynomial_background_data(data, signal_range, fit_ranges, first_x = 0.0, delta_x = 1.0,
-                                                polynomial_order = 1, fit_log_data = False, fit_log_x = False):
+DataArrayType = numpy.typing.NDArray[typing.Any]
+
+
+def extract_signal_from_polynomial_background_data(data: DataArrayType,
+                                                   signal_range: DataArrayType,
+                                                   fit_ranges: DataArrayType,
+                                                   first_x: float = 0.0,
+                                                   delta_x: float = 1.0,
+                                                   polynomial_order: int = 1,
+                                                   fit_log_data: bool = False,
+                                                   fit_log_x: bool = False) -> DataArrayType:
 
     """A function for performing generic polynomial background subtraction on 1-D spectral data arrays.
 
@@ -64,8 +74,8 @@ def extract_signal_from_polynomial_background_data(data, signal_range, fit_range
 
     # check validity of abscissa value inputs
     if have_x_array:
-        min_x = x_values.min()
-        max_x = x_values.max()
+        min_x = numpy.amin(x_values)
+        max_x = numpy.amax(x_values)
     else:
         min_x = first_x
         max_x = first_x + data_size * delta_x
@@ -146,8 +156,14 @@ def extract_signal_from_polynomial_background_data(data, signal_range, fit_range
     return net_signal
 
 
-def extract_signal_from_polynomial_background(data_and_metadata, signal_range, fit_ranges, first_x = 0.0, delta_x = 1.0,
-                                                polynomial_order = 1, fit_log_data = False, fit_log_x = False):
+def extract_signal_from_polynomial_background(data_and_metadata: DataAndMetadata.DataAndMetadata,
+                                              signal_range: DataArrayType,
+                                              fit_ranges: DataArrayType,
+                                              first_x: float = 0.0,
+                                              delta_x: float = 1.0,
+                                              polynomial_order: int = 1,
+                                              fit_log_data: bool = False,
+                                              fit_log_x: bool = False) -> DataAndMetadata.DataAndMetadata:
     signal_range = numpy.asarray(signal_range) * data_and_metadata.data_shape[0]
     fit_ranges = numpy.asarray(fit_ranges) * data_and_metadata.data_shape[0]
     data = extract_signal_from_polynomial_background_data(data_and_metadata.data, signal_range, fit_ranges, first_x, delta_x, polynomial_order, fit_log_data,
@@ -155,7 +171,7 @@ def extract_signal_from_polynomial_background(data_and_metadata, signal_range, f
     return DataAndMetadata.new_data_and_metadata(data, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
-def stacked_fit_linear_background(data: numpy.ndarray, signal_index: int, rcond=1e-10) -> numpy.ndarray:
+def stacked_fit_linear_background(data: DataArrayType, signal_index: int, rcond: float = 1e-10) -> DataArrayType:
     """Return the linear background using least squares for an ndarray with signal in last index.
 
     The outline for this implementation comes from:
@@ -177,10 +193,10 @@ def stacked_fit_linear_background(data: numpy.ndarray, signal_index: int, rcond=
     inv_s = numpy.zeros_like(s)
     inv_s[s >= s_min] = 1 / s[s >= s_min]
     x = numpy.einsum('...ji,...j->...i', v, inv_s * numpy.einsum('...ji,...j->...i', u, data.conj()))
-    return numpy.conj(x, x)
+    return typing.cast(DataArrayType, numpy.conj(x, x))
 
 
-def stacked_linear_background(data: numpy.ndarray, signal_index: int) -> numpy.ndarray:
+def stacked_linear_background(data: DataArrayType, signal_index: int) -> DataArrayType:
     """Return the linear background using least squares for an ndarray with signal in last index."""
 
     assert signal_index == -1
@@ -193,10 +209,10 @@ def stacked_linear_background(data: numpy.ndarray, signal_index: int) -> numpy.n
     p = stacked_fit_linear_background(data, signal_index)
 
     # calculate the background by multiply and add
-    return (p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
+    return typing.cast(DataArrayType, p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
 
 
-def slow_fit_linear_background(data: numpy.ndarray, signal_index: int) -> numpy.ndarray:
+def slow_fit_linear_background(data: DataArrayType, signal_index: int) -> DataArrayType:
     """Return the linear background as m, c using least squares for an ndarray with signal in last index.
 
     This implementaton also demonstrates how to convert a 1-d function to a stacked function.
@@ -222,7 +238,7 @@ def slow_fit_linear_background(data: numpy.ndarray, signal_index: int) -> numpy.
     return p.reshape(data.shape[:signal_index] + (2,))
 
 
-def slow_linear_background(data: numpy.ndarray, signal_index: int) -> numpy.ndarray:
+def slow_linear_background(data: DataArrayType, signal_index: int) -> DataArrayType:
     """Return the linear background using least squares for an ndarray with signal in last index."""
 
     assert signal_index == -1
@@ -235,14 +251,14 @@ def slow_linear_background(data: numpy.ndarray, signal_index: int) -> numpy.ndar
     p = slow_fit_linear_background(data, signal_index)
 
     # calculate the background by multiply and add
-    return (p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
+    return typing.cast(DataArrayType, p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
 
 
-def linear_background(data: numpy.ndarray, signal_index: int) -> numpy.ndarray:
+def linear_background(data: DataArrayType, signal_index: int) -> DataArrayType:
     return stacked_linear_background(data, signal_index)
 
 
-def subtract_linear_background(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range, signal_range) -> DataAndMetadata.DataAndMetadata:
+def subtract_linear_background(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_range: DataArrayType, signal_range: DataArrayType) -> DataAndMetadata.DataAndMetadata:
     """Subtract linear background from data and metadata with signal in last index."""
     signal_index = -1
 
@@ -262,7 +278,7 @@ def subtract_linear_background(data_and_metadata: DataAndMetadata.DataAndMetadat
     return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 
 
-def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_ranges, signal_range) -> DataAndMetadata.DataAndMetadata:
+def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_ranges: typing.Sequence[DataArrayType], signal_range: DataArrayType) -> DataAndMetadata.DataAndMetadata:
     """Calculate background from data and metadata with signal in first index."""
     signal_index = -1
 
@@ -271,9 +287,6 @@ def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetada
     signal_range = (numpy.asarray(signal_range) * signal_length).astype(float)
 
     data = data_and_metadata.data
-
-    if len(data_and_metadata.dimensional_calibrations) == 0:
-        return None
 
     # Fit within fit_range; calculate background within signal_range; subtract from source signal range
     signal_calibration = data_and_metadata.dimensional_calibrations[signal_index]
@@ -291,9 +304,9 @@ def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetada
     max_channel = int(round(max([fit_range[1] * signal_length for fit_range in fit_ranges] + [signal_range[1]])))
     min_channel = int(round(min([fit_range[0] * signal_length for fit_range in fit_ranges] + [signal_range[0]])))
 
-    data_shape = list(data_and_metadata.data_shape)
-    data_shape[signal_index] = max_channel - min_channel
-    data_shape = tuple(data_shape)
+    data_shape_list = list(data_and_metadata.data_shape)
+    data_shape_list[signal_index] = max_channel - min_channel
+    data_shape = tuple(data_shape_list)
     dimensional_calibrations = copy.deepcopy(data_and_metadata.dimensional_calibrations)
     dimensional_calibrations[signal_index].offset = signal_calibration.convert_to_calibrated_value(min_channel)
     dimensional_calibrations[signal_index].scale = (signal_calibration.convert_to_calibrated_value(max_channel) - dimensional_calibrations[signal_index].offset) / data_shape[signal_index]
@@ -301,7 +314,7 @@ def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetada
     return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, dimensional_calibrations)
 
 
-def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_ranges, signal_range) -> DataAndMetadata.DataAndMetadata:
+def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, fit_ranges: typing.Sequence[DataArrayType], signal_range: DataArrayType) -> DataAndMetadata.DataAndMetadata:
     signal_index = -1
 
     signal_length = data_and_metadata.dimensional_shape[signal_index]
@@ -313,9 +326,9 @@ def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, 
 
     result = data_and_metadata.data[..., min_channel:max_channel]
 
-    data_shape = list(data_and_metadata.data_shape)
-    data_shape[signal_index] = max_channel - min_channel
-    data_shape = tuple(data_shape)
+    data_shape_list = list(data_and_metadata.data_shape)
+    data_shape_list[signal_index] = max_channel - min_channel
+    data_shape = tuple(data_shape_list)
     dimensional_calibrations = copy.deepcopy(data_and_metadata.dimensional_calibrations)
     original_calibration = copy.deepcopy(dimensional_calibrations[signal_index])
     dimensional_calibrations[signal_index].offset = original_calibration.convert_to_calibrated_value(min_channel)
@@ -324,7 +337,7 @@ def extract_original_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, 
     return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, dimensional_calibrations)
 
 
-def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, data_and_metadata_dst: DataAndMetadata.DataAndMetadata):
+def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, data_and_metadata_dst: DataAndMetadata.DataAndMetadata) -> typing.Optional[DataAndMetadata.DataAndMetadata]:
     signal_index = -1
     if not data_and_metadata_src.dimensional_calibrations or not data_and_metadata_dst.dimensional_calibrations:
         return None
@@ -345,7 +358,7 @@ def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, dat
     return DataAndMetadata.new_data_and_metadata(data, data_and_metadata_dst.intensity_calibration, data_and_metadata_dst.dimensional_calibrations)
 
 
-def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, electron_shell: typing.Optional[PeriodicTable.ElectronShell], fit_ranges, signal_range) -> DataAndMetadata.DataAndMetadata:
+def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndMetadata, electron_shell: typing.Optional[PeriodicTable.ElectronShell], fit_ranges: typing.Sequence[DataArrayType], signal_range: DataArrayType) -> DataAndMetadata.DataAndMetadata:
     """Subtract si_k background from data and metadata with signal in first index."""
     signal_index = -1
 
@@ -384,7 +397,7 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
 
 
 def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au: float,
-                                    atomic_number: int, shell_number: int, subshell_index: int) -> numpy.ndarray:
+                                    atomic_number: int, shell_number: int, subshell_index: int) -> DataArrayType:
     """Return the generalized oscillator strength as an ndarray.
 
     energy is in eV.
@@ -397,9 +410,16 @@ def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au:
     pass
 
 
+class P1(typing.Protocol):
+    def energy_diff_cross_section_nm2_per_ev(self, atomic_number: int, shell_number: int, subshell_index: int,
+                                             edge_onset_ev: float, edge_delta_ev: float, beam_energy_ev: float,
+                                             convergence_angle_rad: float,
+                                             collection_angle_rad: float) -> DataArrayType: ...
+
+
 def energy_diff_cross_section_nm2_per_ev(atomic_number: int, shell_number: int, subshell_index: int,
                                          edge_onset_ev: float, edge_delta_ev: float, beam_energy_ev: float,
-                                         convergence_angle_rad: float, collection_angle_rad: float) -> numpy.ndarray:
+                                         convergence_angle_rad: float, collection_angle_rad: float) -> DataArrayType:
     """Return the energy differential cross section for the specified electron shell and experimental parameters.
 
     The returned differential cross-section value is in units of nm * nm / eV.
@@ -407,14 +427,15 @@ def energy_diff_cross_section_nm2_per_ev(atomic_number: int, shell_number: int, 
     energy_diff_sigma = None
     eels_analysis_service = Registry.get_component("eels_analysis_service")
     if energy_diff_sigma is None and hasattr(eels_analysis_service, "energy_diff_cross_section_nm2_per_ev"):
-        energy_diff_sigma = eels_analysis_service.energy_diff_cross_section_nm2_per_ev(atomic_number=atomic_number,
-                                                                                       shell_number=shell_number,
-                                                                                       subshell_index=subshell_index,
-                                                                                       edge_onset_ev=edge_onset_ev,
-                                                                                       edge_delta_ev=edge_delta_ev,
-                                                                                       beam_energy_ev=beam_energy_ev,
-                                                                                       convergence_angle_rad=convergence_angle_rad,
-                                                                                       collection_angle_rad=collection_angle_rad)
+        energy_diff_sigma = typing.cast(P1, eels_analysis_service).energy_diff_cross_section_nm2_per_ev(
+            atomic_number=atomic_number,
+            shell_number=shell_number,
+            subshell_index=subshell_index,
+            edge_onset_ev=edge_onset_ev,
+            edge_delta_ev=edge_delta_ev,
+            beam_energy_ev=beam_energy_ev,
+            convergence_angle_rad=convergence_angle_rad,
+            collection_angle_rad=collection_angle_rad)
     if energy_diff_sigma is None and shell_number == 1 and subshell_index == 1:
         # k edges only
         energy_diff_sigma = EELS_CrossSections.energy_diff_cross_section_nm2_per_ev(atomic_number, shell_number,
@@ -423,7 +444,14 @@ def energy_diff_cross_section_nm2_per_ev(atomic_number: int, shell_number: int, 
                                                                                     beam_energy_ev,
                                                                                     convergence_angle_rad,
                                                                                     collection_angle_rad)
+    assert energy_diff_sigma is not None
     return energy_diff_sigma
+
+
+class P2(typing.Protocol):
+    def partial_cross_section_nm2(self, atomic_number: int, shell_number: int, subshell_index: int,
+                                  edge_onset_ev: float, edge_delta_ev: float, beam_energy_ev: float,
+                                  convergence_angle_rad: float, collection_angle_rad: float) -> float: ...
 
 
 def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_index: int,
@@ -436,14 +464,14 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
     cross_section = None
     eels_analysis_service = Registry.get_component("eels_analysis_service")
     if cross_section is None and hasattr(eels_analysis_service, "partial_cross_section_nm2"):
-        cross_section = eels_analysis_service.partial_cross_section_nm2(atomic_number=atomic_number,
-                                                                        shell_number=shell_number,
-                                                                        subshell_index=subshell_index,
-                                                                        edge_onset_ev=edge_onset_ev,
-                                                                        edge_delta_ev=edge_delta_ev,
-                                                                        beam_energy_ev=beam_energy_ev,
-                                                                        convergence_angle_rad=convergence_angle_rad,
-                                                                        collection_angle_rad=collection_angle_rad)
+        cross_section = typing.cast(P2, eels_analysis_service).partial_cross_section_nm2(atomic_number=atomic_number,
+                                                                                         shell_number=shell_number,
+                                                                                         subshell_index=subshell_index,
+                                                                                         edge_onset_ev=edge_onset_ev,
+                                                                                         edge_delta_ev=edge_delta_ev,
+                                                                                         beam_energy_ev=beam_energy_ev,
+                                                                                         convergence_angle_rad=convergence_angle_rad,
+                                                                                         collection_angle_rad=collection_angle_rad)
 
     if cross_section is None:
         energy_diff_sigma = energy_diff_cross_section_nm2_per_ev(atomic_number=atomic_number,
@@ -469,6 +497,7 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
         elif abs(edge_delta_ev - 200) < 3:
             cross_section = 1.40e-7
 
+    assert cross_section is not None
     return cross_section
 
 
@@ -500,7 +529,7 @@ def edge_onset_energy_eV(atomic_number: int, shell_number: int, subshell_index: 
     pass
 
 
-def edges_near_energy_eV(energy_loss_eV: float, energy_loss_delta_eV: float) -> list:
+def edges_near_energy_eV(energy_loss_eV: float, energy_loss_delta_eV: float) -> typing.Sequence[float]:
     """Return a list of edges near the energy_loss.
     """
     pass

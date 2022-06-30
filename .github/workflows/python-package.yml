@@ -35,13 +35,13 @@ jobs:
     - name: Install Test Dependencies
       run: |
         pip install -r test-requirements.txt
-        python -m pip install mypy==0.960
+        python -m pip install mypy
         python -m pip install flake8
         mypy --version
     - name: Typing
       run: |
-        mypy --namespace-packages --ignore-missing-imports --follow-imports=silent nion/eels_analysis/BackgroundModel.py
-        mypy --namespace-packages --ignore-missing-imports --follow-imports=silent -p nionswift_plugin.nion_eels_analysis.AlignZLP
+        mypy --namespace-packages --ignore-missing-imports --follow-imports=silent -p nion.eels_analysis
+        mypy --namespace-packages --ignore-missing-imports --follow-imports=silent -p nionswift_plugin.nion_eels_analysis
         flake8 --max-line-length=160 nion/eels_analysis/BackgroundModel.py
     - name: Test
       run: |
