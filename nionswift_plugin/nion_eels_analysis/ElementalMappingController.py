@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # standard libraries
 import collections
 import copy
@@ -6,41 +8,50 @@ import gettext
 import typing
 
 # third party libraries
+import uuid
+
 import numpy
 
 # local libraries
 from nion.data import DataAndMetadata
 from nion.data import xdata_1_0 as xd
+from nion.eels_analysis import eels_analysis
+from nion.eels_analysis import PeriodicTable
 from nion.swift import DocumentController
+from nion.swift import Facade
 from nion.swift.model import Connection
 from nion.swift.model import DataItem
+from nion.swift.model import DataStructure
 from nion.swift.model import DisplayItem
 from nion.swift.model import DocumentModel
 from nion.swift.model import Graphics
 from nion.swift.model import Symbolic
-from nion.eels_analysis import eels_analysis
-from nion.eels_analysis import PeriodicTable
+from nion.utils import Geometry
 
 _ = gettext.gettext
 
+DataArrayType = numpy.typing.NDArray[typing.Any]
+
 
 class EELSBackgroundSubtraction:
-    def __init__(self, computation, **kwargs):
+    def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
 
-    def execute(self, eels_xdata, region, fit_interval, signal_interval):
+    def execute(self, eels_xdata: DataAndMetadata.DataAndMetadata, region: Facade.Graphic, fit_interval: DataArrayType, signal_interval: DataArrayType, **kwargs: typing.Any) -> None:
         eels_spectrum_xdata = xd.sum_region(eels_xdata, region.mask_xdata_with_shape(eels_xdata.data_shape[0:2]))
         signal = eels_analysis.make_signal_like(eels_analysis.extract_original_signal(eels_spectrum_xdata, [fit_interval], signal_interval), eels_spectrum_xdata)
         background_xdata = eels_analysis.make_signal_like(eels_analysis.calculate_background_signal(eels_spectrum_xdata, [fit_interval], signal_interval), eels_spectrum_xdata)
+        assert signal
+        assert background_xdata
         subtracted_xdata = signal - background_xdata
         # vstack will return a sequence; convert the sequence to an image
         self.__xdata = xd.redimension(xd.vstack((eels_spectrum_xdata, background_xdata, subtracted_xdata)), DataAndMetadata.DataDescriptor(False, 0, 2))
 
-    def commit(self):
+    def commit(self) -> None:
         self.computation.set_referenced_xdata("data", self.__xdata)
 
 
-async def pick_new_edge(document_controller, model_data_item, edge) -> None:
+async def pick_new_edge(document_controller: DocumentController.DocumentController, model_data_item: DataItem.DataItem, edge: ElementalMappingEdge) -> None:
     """Set up a new edge pick from the model data item and the given edge.
 
     The library will have the following new components and connections:
@@ -56,8 +67,9 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
     document_model = document_controller.document_model
     project = document_model._project
     model_display_item = document_model.get_display_item_for_data_item(model_data_item)
+    assert model_display_item
     pick_region = Graphics.RectangleGraphic()
-    pick_region.size = min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1])
+    pick_region.size = Geometry.FloatSize(min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1]))
     pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
     model_display_item.add_graphic(pick_region)
 
@@ -67,6 +79,7 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
     eels_data_item.title = "{} EELS Data of {}".format(pick_region.label, model_data_item.title)
     eels_data_item.source = pick_region
     eels_display_item = document_model.get_display_item_for_data_item(eels_data_item)
+    assert eels_display_item
     eels_display_item.display_type = "line_plot"
     eels_display_item._set_display_layer_properties(0, label=_("Signal"), data_row=2, fill_color="#0F0")
     eels_display_item._add_display_layer_for_data_item(eels_data_item, label=_("Background"), data_row=1, fill_color="rgba(255, 0, 0, 0.3)")
@@ -110,11 +123,12 @@ async def pick_new_edge(document_controller, model_data_item, edge) -> None:
     document_model.append_data_structure(data_structure)
 
     # display it
+    assert eels_data_item.xdata
     eels_display_item.view_to_intervals(eels_data_item.xdata, [edge.data_structure.fit_interval, edge.data_structure.signal_interval])
     document_controller.show_display_item(eels_display_item)
 
 
-async def change_edge(document_controller: DocumentController.DocumentController, model_data_item: DataItem.DataItem, eels_data_item: DataItem.DataItem, edge: "ElementalMappingEdge") -> None:
+async def change_edge(document_controller: DocumentController.DocumentController, model_data_item: DataItem.DataItem, eels_data_item: DataItem.DataItem, edge: ElementalMappingEdge) -> None:
     """Change the eels data item and associated items to display new edge.
 
     The library will be changed in the following way:
@@ -128,7 +142,7 @@ async def change_edge(document_controller: DocumentController.DocumentController
     document_model = document_controller.document_model
     project = document_model._project
 
-    computation = None  # type: Symbolic.Computation
+    computation: typing.Optional[Symbolic.Computation] = None
     for computation_ in document_model.computations:
         if computation_.source == eels_data_item and computation_.processing_id == "eels.background_subtraction11":
             computation = computation_
@@ -152,7 +166,8 @@ async def change_edge(document_controller: DocumentController.DocumentController
 
     pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
 
-    for connection in copy.copy(document_model.connections):
+    for connection_ in copy.copy(document_model.connections):
+        connection = typing.cast(typing.Any, connection_)
         if connection.parent == eels_data_item and connection.source_property in ("fit_interval", "signal_interval"):
             source_property = connection.source_property
             target_property = connection.target_property
@@ -166,7 +181,8 @@ async def change_edge(document_controller: DocumentController.DocumentController
 
     eels_data_item.title = "{} EELS Data of {}".format(pick_region.label, model_data_item.title)
 
-    for connection in copy.copy(document_model.connections):
+    for connection_ in copy.copy(document_model.connections):
+        connection = typing.cast(typing.Any, connection_)
         if connection.parent == eels_data_item and connection.source_property in ("fit_interval", "signal_interval"):
             source_property = connection.source_property
             target_property = connection.target_property
@@ -181,14 +197,16 @@ async def change_edge(document_controller: DocumentController.DocumentController
     # the eels item will need the initial computation results to display properly (view to intervals)
     await document_model.compute_immediate(document_controller.event_loop, computation)
     eels_display_item = document_model.get_display_item_for_data_item(eels_data_item)
+    assert eels_display_item
+    assert eels_data_item.xdata
     eels_display_item.view_to_intervals(eels_data_item.xdata, [edge.fit_interval, edge.signal_interval])
 
 
 class EELSMapping:
-    def __init__(self, computation, **kwargs):
+    def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
 
-    def execute(self, **kwargs):
+    def execute(self, **kwargs: typing.Any) -> None:
         spectrum_image_xdata = kwargs["spectrum_image_xdata"]
         fit_interval = kwargs["fit_interval"]
         signal_interval = kwargs["signal_interval"]
@@ -200,11 +218,11 @@ class EELSMapping:
             electron_shell = PeriodicTable.ElectronShell(atomic_number, shell_number, subshell_index)
         self.__mapped_xdata = eels_analysis.map_background_subtracted_signal(spectrum_image_xdata, electron_shell, [fit_interval], signal_interval)
 
-    def commit(self):
+    def commit(self) -> None:
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)
 
 
-async def map_new_edge(document_controller, model_data_item, edge) -> None:
+async def map_new_edge(document_controller: DocumentController.DocumentController, model_data_item: DataItem.DataItem, edge: ElementalMappingEdge) -> None:
     document_model = document_controller.document_model
     project = document_model._project
 
@@ -229,11 +247,15 @@ async def map_new_edge(document_controller, model_data_item, edge) -> None:
     await document_model.compute_immediate(document_controller.event_loop, computation)
 
     map_display_item = document_model.get_display_item_for_data_item(map_data_item)
+    assert map_display_item
     document_controller.show_display_item(map_display_item)
 
 
 class ElementalMappingEdge:
-    def __init__(self, *, data_structure=None, electron_shell: PeriodicTable.ElectronShell=None, fit_interval=None, signal_interval=None):
+    def __init__(self, *, data_structure: typing.Optional[DataStructure.DataStructure] = None,
+                 electron_shell: typing.Optional[PeriodicTable.ElectronShell] = None,
+                 fit_interval: typing.Optional[typing.Tuple[float, float]] = None,
+                 signal_interval: typing.Optional[typing.Tuple[float, float]] = None) -> None:
         self.__data_structure = data_structure
         self.__fit_interval = fit_interval
         self.__signal_interval = signal_interval
@@ -242,10 +264,11 @@ class ElementalMappingEdge:
             self.read(self.__data_structure)
 
     @property
-    def data_structure(self):
+    def data_structure(self) -> DataStructure.DataStructure:
+        assert self.__data_structure
         return self.__data_structure
 
-    def read(self, data_structure) -> None:
+    def read(self, data_structure: DataStructure.DataStructure) -> None:
         atomic_number = data_structure.get_property_value("atomic_number")
         shell_number = data_structure.get_property_value("shell_number")
         subshell_index = data_structure.get_property_value("subshell_index")
@@ -253,15 +276,15 @@ class ElementalMappingEdge:
         self.__fit_interval = data_structure.get_property_value("fit_interval", (0.4, 0.5))
         self.__signal_interval = data_structure.get_property_value("signal_interval", (0.5, 0.6))
 
-    def write(self, data_structure) -> None:
+    def write(self, data_structure: DataStructure.DataStructure) -> None:
         self.__write_electron_shell(data_structure)
         self.__write_fit_interval(data_structure)
         self.__write_signal_interval(data_structure)
 
-    def matches(self, data_structure) -> bool:
+    def matches(self, data_structure: DataStructure.DataStructure) -> bool:
         return self.__data_structure is not None and self.__data_structure.uuid == data_structure.uuid
 
-    def __write_electron_shell(self, data_structure):
+    def __write_electron_shell(self, data_structure: DataStructure.DataStructure) -> None:
         if self.__electron_shell:
             data_structure.set_property_value("atomic_number", self.__electron_shell.atomic_number)
             data_structure.set_property_value("shell_number", self.__electron_shell.shell_number)
@@ -271,70 +294,78 @@ class ElementalMappingEdge:
             data_structure.remove_property_value("shell_number")
             data_structure.remove_property_value("subshell_index")
 
-    def __write_signal_interval(self, data_structure):
+    def __write_signal_interval(self, data_structure: DataStructure.DataStructure) -> None:
         if self.__signal_interval is not None:
             data_structure.set_property_value("signal_interval", copy.copy(self.__signal_interval))
         else:
             data_structure.remove_property_value("signal_interval")
 
-    def __write_fit_interval(self, data_structure):
+    def __write_fit_interval(self, data_structure: DataStructure.DataStructure) -> None:
         if self.__fit_interval is not None:
             data_structure.set_property_value("fit_interval", copy.copy(self.__fit_interval))
         else:
             data_structure.remove_property_value("fit_interval")
 
     @property
-    def electron_shell(self):
+    def electron_shell(self) -> PeriodicTable.ElectronShell:
+        assert self.__electron_shell
         return self.__electron_shell
 
     @electron_shell.setter
-    def electron_shell(self, value):
+    def electron_shell(self, value: PeriodicTable.ElectronShell) -> None:
         if self.__electron_shell != value:
             self.__electron_shell = value
+            assert self.__data_structure
             self.__write_electron_shell(self.__data_structure)
 
     @property
-    def fit_interval(self):
+    def fit_interval(self) -> typing.Tuple[float, float]:
+        assert self.__fit_interval is not None
         return self.__fit_interval
 
     @fit_interval.setter
-    def fit_interval(self, value):
+    def fit_interval(self, value: typing.Tuple[float, float]) -> None:
         if self.__fit_interval != value:
             self.__fit_interval = value
+            assert self.__data_structure
             self.__write_fit_interval(self.__data_structure)
 
     @property
-    def signal_interval(self):
+    def signal_interval(self) -> typing.Tuple[float, float]:
+        assert self.__signal_interval is not None
         return self.__signal_interval
 
     @signal_interval.setter
-    def signal_interval(self, value):
+    def signal_interval(self, value: typing.Tuple[float, float]) -> None:
         if self.__signal_interval != value:
             self.__signal_interval = value
+            assert self.__data_structure
             self.__write_signal_interval(self.__data_structure)
 
+
+EdgeBundle = collections.namedtuple("EdgeBundle", ["electron_shell_str", "selected", "select_action", "pick_action", "map_action", "delete_action"])
 
 class ElementalMappingController:
     def __init__(self, document_model: DocumentModel.DocumentModel):
         self.__document_model = document_model
 
-        self.__current_data_item = None
-        self.__model_data_item = None
-        self.__edge_data_structure = None
+        self.__current_data_item: typing.Optional[DataItem.DataItem] = None
+        self.__model_data_item: typing.Optional[DataItem.DataItem] = None
+        self.__edge_data_structure: typing.Optional[DataStructure.DataStructure] = None
 
-        self.__explorer_interval = None
+        self.__explorer_interval: typing.Optional[typing.Tuple[float, float]] = None
 
-        self.__explorer_property_changed_listeners = dict()  # typing.Dict[uuid.UUID, Any]
+        self.__explorer_property_changed_listeners: typing.Dict[uuid.UUID, typing.Any] = dict()
 
-        self.__energy_intervals = dict()  # typing.Dict[uuid.UUID, typing.Tuple[float, float]]
+        self.__energy_intervals: typing.Dict[uuid.UUID, typing.Tuple[float, float]] = dict()
 
-        def item_inserted(key, value, before_index):
+        def item_inserted(key: str, value: DataItem.DataItem, before_index: int) -> None:
             if key == "data_item":
                 data_item = value
                 if self.__is_explorer(document_model, data_item):
                     self.__connect_explorer_interval(document_model, data_item)
 
-        def item_removed(key, value, index):
+        def item_removed(key: str, value: DataItem.DataItem, index: int) -> None:
             if key == "data_item":
                 data_item = value
                 self.__disconnect_explorer_interval(data_item)
@@ -345,13 +376,13 @@ class ElementalMappingController:
         for index, data_item in enumerate(document_model.data_items):
             item_inserted("data_item", data_item, index)
 
-    def close(self):
+    def close(self) -> None:
         self.__item_inserted_listener.close()
-        self.__item_inserted_listener = None
+        self.__item_inserted_listener = typing.cast(typing.Any, None)
         self.__item_removed_listener.close()
-        self.__item_removed_listener = None
+        self.__item_removed_listener = typing.cast(typing.Any, None)
 
-    def set_current_data_item(self, data_item):
+    def set_current_data_item(self, data_item: DataItem.DataItem) -> None:
         """Set the current data item.
 
         If the data item is an explorer, update the explorer interval, otherwise cleaar it.
@@ -377,30 +408,30 @@ class ElementalMappingController:
                     self.__edge_data_structure = data_structure.get_referenced_object("edge")
                     self.__model_data_item = data_structure.get_referenced_object("spectrum_image")
             if is_explorer:
-                self.__model_data_item = data_item.source
+                self.__model_data_item = typing.cast(DataItem.DataItem, data_item.source)
 
     @property
-    def model_data_item(self):
+    def model_data_item(self) -> typing.Optional[DataItem.DataItem]:
         return self.__model_data_item
 
     @property
-    def edge(self):
+    def edge(self) -> typing.Optional[ElementalMappingEdge]:
         return ElementalMappingEdge(data_structure=self.__edge_data_structure) if self.__edge_data_structure else None
 
-    def __explorer_interval_changed(self, data_item, interval) -> None:
+    def __explorer_interval_changed(self, data_item: DataItem.DataItem, interval: typing.Tuple[float, float]) -> None:
         if data_item == self.__current_data_item:
             self.__explorer_interval = interval
 
     @property
-    def explorer_interval(self):
+    def explorer_interval(self) -> typing.Optional[typing.Tuple[float, float]]:
         return self.__explorer_interval
 
-    def __is_model(self, data_item) -> bool:
+    def __is_model(self, data_item: DataItem.DataItem) -> bool:
         if isinstance(data_item, DataItem.DataItem):
             return data_item.is_data_3d
         return False
 
-    def __is_explorer(self, document_model, data_item) -> bool:
+    def __is_explorer(self, document_model: DocumentModel.DocumentModel, data_item: DataItem.DataItem) -> bool:
         if isinstance(data_item, DataItem.DataItem):
             if data_item.is_data_1d:
                 for display_item in document_model.get_display_items_for_data_item(data_item):
@@ -409,18 +440,21 @@ class ElementalMappingController:
                             return True
         return False
 
-    def __is_calibrated_map(self, data_item) -> bool:
+    def __is_calibrated_map(self, data_item: DataItem.DataItem) -> bool:
         if isinstance(data_item, DataItem.DataItem):
-            if data_item.is_data_2d:
+            if data_item.is_data_2d and data_item.intensity_calibration:
                 return data_item.title.startswith("Map") and data_item.intensity_calibration.units.startswith("~")
         return False
 
-    async def explore_edges(self, document_controller):
+    async def explore_edges(self, document_controller: DocumentController.DocumentController) -> None:
         document_model = document_controller.document_model
         model_data_item = self.__model_data_item
+        assert model_data_item
         model_display_item = document_model.get_display_item_for_data_item(model_data_item)
+        assert model_display_item
+        assert model_display_item.data_item
         pick_region = Graphics.RectangleGraphic()
-        pick_region.size = min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1])
+        pick_region.size = Geometry.FloatSize(min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1]))
         pick_region.label = _("Explore")
         model_display_item.add_graphic(pick_region)
         pick_data_item = document_model.get_pick_region_new(model_display_item, model_display_item.data_item, pick_region=pick_region)
@@ -431,12 +465,15 @@ class ElementalMappingController:
             explore_interval.graphic_id = "explore"
             pick_data_item.source = model_data_item
             pick_display_item = document_model.get_display_item_for_data_item(pick_data_item)
+            assert pick_display_item
             pick_display_item.add_graphic(explore_interval)
             document_controller.show_display_item(pick_display_item)
-            await self.__document_model.compute_immediate(document_controller.event_loop, document_model.get_data_item_computation(pick_data_item))  # need the data to make connect_explorer_interval work; so do this here. ugh.
+            computation = document_model.get_data_item_computation(pick_data_item)
+            assert computation
+            await self.__document_model.compute_immediate(document_controller.event_loop, computation)  # need the data to make connect_explorer_interval work; so do this here. ugh.
             self.__connect_explorer_interval(document_model, pick_data_item)
 
-    def __add_edge(self, data_item, electron_shell, fit_interval, signal_interval) -> ElementalMappingEdge:
+    def __add_edge(self, data_item: DataItem.DataItem, electron_shell: PeriodicTable.ElectronShell, fit_interval: typing.Tuple[float, float], signal_interval: typing.Tuple[float, float]) -> ElementalMappingEdge:
         project = self.__document_model._project
         data_structure = self.__document_model.create_data_structure(structure_type="elemental_mapping_edge", source=data_item)
         self.__document_model.append_data_structure(data_structure)
@@ -449,7 +486,7 @@ class ElementalMappingController:
             if data_structure.source == self.__model_data_item and edge.matches(data_structure):
                 self.__document_model.remove_data_structure(data_structure)
 
-    def graphic_property_changed(self, graphic, data_item, dimensional_shape, dimensional_calibrations, key):
+    def graphic_property_changed(self, graphic: Graphics.IntervalGraphic, data_item: DataItem.DataItem, dimensional_shape: DataAndMetadata.ShapeType, dimensional_calibrations: DataAndMetadata.CalibrationListType, key: str) -> None:
         if key == "interval":
             value = graphic.interval
             ss = value[0] * dimensional_shape[-1]
@@ -459,7 +496,7 @@ class ElementalMappingController:
             self.__energy_intervals[data_item.uuid] = s, e
             self.__explorer_interval_changed(data_item, (s, e))
 
-    def __connect_explorer_interval(self, document_model, data_item):
+    def __connect_explorer_interval(self, document_model: DocumentModel.DocumentModel, data_item: DataItem.DataItem) -> None:
         if data_item.is_data_1d:
             for display_item in document_model.get_display_items_for_data_item(data_item):
                 for graphic in display_item.graphics:
@@ -469,7 +506,7 @@ class ElementalMappingController:
                         self.__explorer_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, graphic, data_item, dimensional_shape, dimensional_calibrations))
                         self.graphic_property_changed(graphic, data_item, dimensional_shape, dimensional_calibrations, "interval")
 
-    def __disconnect_explorer_interval(self, data_item):
+    def __disconnect_explorer_interval(self, data_item: DataItem.DataItem) -> None:
         listener = self.__explorer_property_changed_listeners.get(data_item.uuid)
         if listener:
             listener.close()
@@ -498,15 +535,13 @@ class ElementalMappingController:
     def remove_edge(self, edge: ElementalMappingEdge) -> None:
         self.__remove_edge(edge)
 
-    def build_edge_bundles(self, document_controller):
+    def build_edge_bundles(self, document_controller: DocumentController.DocumentController) -> typing.List[EdgeBundle]:
         document_model = self.__document_model
         model_data_item = self.__model_data_item
         current_data_item = self.__current_data_item
         edge_data_structure = self.__edge_data_structure
 
-        EdgeBundle = collections.namedtuple("EdgeBundle", ["electron_shell_str", "selected", "select_action", "pick_action", "map_action", "delete_action"])
-
-        edge_bundles = list()
+        edge_bundles: typing.List[EdgeBundle] = list()
 
         edges = list()
         for data_structure in copy.copy(document_model.data_structures):
@@ -516,16 +551,20 @@ class ElementalMappingController:
 
         for index, edge in enumerate(edges):
 
-            def change_edge_action(edge):
+            def change_edge_action(edge: ElementalMappingEdge) -> None:
+                assert model_data_item
+                assert current_data_item
                 document_controller.event_loop.create_task(change_edge(document_controller, model_data_item, current_data_item, edge))
 
-            def pick_edge_action(edge):
+            def pick_edge_action(edge: ElementalMappingEdge) -> None:
+                assert model_data_item
                 document_controller.event_loop.create_task(pick_new_edge(document_controller, model_data_item, edge))
 
-            def map_edge_action(edge):
+            def map_edge_action(edge: ElementalMappingEdge) -> None:
+                assert model_data_item
                 document_controller.event_loop.create_task(map_new_edge(document_controller, model_data_item, edge))
 
-            def delete_edge_action(edge):
+            def delete_edge_action(edge: ElementalMappingEdge) -> None:
                 self.__remove_edge(edge)
 
             edge_bundle = EdgeBundle(electron_shell_str=edge.electron_shell.to_long_str(),
@@ -539,7 +578,7 @@ class ElementalMappingController:
 
         return edge_bundles
 
-    def build_multiprofile(self, document_controller):
+    def build_multiprofile(self, document_controller: DocumentController.DocumentController) -> None:
         document_model = document_controller.document_model
         model_data_item = self.__model_data_item
         if not model_data_item:
@@ -553,6 +592,8 @@ class ElementalMappingController:
         for index, dependent_data_item in enumerate(document_model.get_dependent_data_items(model_data_item)):
             if self.__is_calibrated_map(dependent_data_item):
                 dependent_display_item = document_model.get_display_item_for_data_item(dependent_data_item)
+                assert dependent_display_item
+                assert dependent_display_item.data_item
                 if not multiprofile_display_item:
                     multiprofile_display_item = DisplayItem.DisplayItem()
                     multiprofile_display_item.title = _("Multi-profile")
@@ -560,10 +601,9 @@ class ElementalMappingController:
                     multiprofile_display_item.set_display_property("legend_position", "top-right")
                     document_model.append_display_item(multiprofile_display_item)
                 line_profile_data_item = document_model.get_line_profile_new(dependent_display_item, dependent_display_item.data_item)
-                line_profile_display_item = document_model.get_display_item_for_data_item(line_profile_data_item)
-                line_profile_display_data_channel = line_profile_display_item.get_display_data_channel_for_data_item(line_profile_data_item)
-                line_profile_region = dependent_display_item.graphics[0]
-                line_profile_region.vector = (0.5, 0.2), (0.5, 0.8)
+                assert line_profile_data_item
+                line_profile_region = typing.cast(Graphics.LineProfileGraphic, dependent_display_item.graphics[0])
+                line_profile_region.vector = Geometry.FloatPoint(0.5, 0.2), Geometry.FloatPoint(0.5, 0.8)
                 line_profile_regions.append(line_profile_region)
                 multiprofile_display_item.append_display_data_channel_for_data_item(line_profile_data_item)
                 layer_label = dependent_data_item.title[dependent_data_item.title.index(" of ") + 4:]
@@ -574,5 +614,6 @@ class ElementalMappingController:
                 document_model.append_connection(Connection.PropertyConnection(line_profile_regions[0], "width", line_profile_region, "width", parent=multiprofile_display_item))
             document_controller.show_display_item(multiprofile_display_item)
 
-Symbolic.register_computation_type("eels.background_subtraction11", EELSBackgroundSubtraction)
-Symbolic.register_computation_type("eels.mapping", EELSMapping)
+ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
+Symbolic.register_computation_type("eels.background_subtraction11", typing.cast(ComputationCallable, EELSBackgroundSubtraction))
+Symbolic.register_computation_type("eels.mapping", typing.cast(ComputationCallable, EELSMapping))

@@ -47,8 +47,8 @@ def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_
     phiE = 1 - numpy.sqrt(1 - 2 * epsilon * (beamGamma - epsilon / 2) / (beamGamma ** 2 * beamBeta2))
 
     # Generate thetaTerm array = 4sin(theta/2)^2 for requested collection angle
-    thetaTerm = numpy.linspace(0, collection_angle_rad, thetaSampleCount, dtype = numpy.float64)
-    thetaTerm = 4 * numpy.sin(thetaTerm / 2) ** 2
+    thetaTermL = numpy.linspace(0, collection_angle_rad, thetaSampleCount, dtype = numpy.float64)
+    thetaTerm = 4 * numpy.sin(thetaTermL / 2) ** 2
 
     # Generate Q^2 map = K0^2[phiE^2 + 4(1-phiE)sin(theta/2)^2], where
     # Q = qa0, K0 = k0a0 = gamma0*beta0/alpha, and alpha = fine structure constant.

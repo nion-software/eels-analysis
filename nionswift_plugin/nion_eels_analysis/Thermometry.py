@@ -1,4 +1,6 @@
 import gettext
+import numpy
+import typing
 
 import numpy as np
 from scipy.optimize import curve_fit
@@ -7,11 +9,14 @@ from scipy.interpolate import interp1d
 from nion.swift.model import DataItem
 from nion.swift.model import Graphics
 from nion.swift.model import Symbolic
+from nion.swift import Facade
 from nion.data import DataAndMetadata
 from nion.data import Calibration
 from nion.typeshed import API_1_0 as API
 
 _ = gettext.gettext
+
+DataArrayType = numpy.typing.NDArray[typing.Any]
 
 kb = 8.617333e-5 # eV/Kelvin
 
@@ -29,19 +34,21 @@ class MeasureTemperature:
         "difference_data_item": {"label": _("Difference Near - Far")}
                }
 
-    def __init__(self, computation, **kwargs):
+    def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
-        self.__gain_fit_xdata = None
-        self.__gain_xdata = None
-        self.__difference_xdata = None
-        self.__fit = None
+        self.__gain_fit_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
+        self.__gain_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
+        self.__difference_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
+        self.__fit: typing.Optional[DataAndMetadata.DataAndMetadata] = None
 
-    def execute(self, near_data_item: DataItem.DataItem, far_data_item: DataItem.DataItem, fit_interval_graphic: Graphics.IntervalGraphic):
+    def execute(self, near_data_item: DataItem.DataItem, far_data_item: DataItem.DataItem, fit_interval_graphic: Graphics.IntervalGraphic, **kwargs: typing.Any) -> None:
         try:
+            assert near_data_item.xdata
             assert near_data_item.xdata.is_data_1d
+            assert far_data_item.xdata
             assert far_data_item.xdata.is_data_1d
             # Only allow data of same shape for now. A future version could crop to the smaller size of the two.
-            assert len(near_data_item.data) == len(far_data_item.data)
+            assert near_data_item.data is not None and far_data_item.data is not None and len(near_data_item.data) == len(far_data_item.data)
             near_xdata = near_data_item.xdata
             far_xdata = far_data_item.xdata
             # For now only allow near and far having the same calibration. A future version could allow different
@@ -59,14 +66,14 @@ class MeasureTemperature:
             weights = 1 + np.sqrt(np.abs(near_xdata.data[gain_slice][::-1]) + np.abs(far_xdata[gain_slice][::-1]))
 
             result_calibration = Calibration.Calibration(offset=calibration.convert_to_calibrated_value(zero_index), scale=calibration.scale, units=calibration.units)
-            x_data = result_calibration.convert_to_calibrated_value(np.arange(len(loss_data)))
+            x_data = np.arange(len(loss_data)) * result_calibration.scale + result_calibration.offset
             interpolator = interp1d(x_data, loss_data)
 
-            def gain_fit(x, T, dx):
-                return interpolator(x + 2 * dx) / np.exp((x + dx) / (kb * T))
+            def gain_fit(x: DataArrayType, T: DataArrayType, dx: DataArrayType) -> DataArrayType:
+                return typing.cast(DataArrayType, interpolator(x + 2 * dx) / np.exp((x + dx) / (kb * T)))
 
-            fit_slice = slice(int(max(0, fit_interval_graphic.start * len(difference_xdata.data) - zero_index)),
-                              int(min(len(gain_data), fit_interval_graphic.end * len(difference_xdata.data) - zero_index)))
+            fit_slice = slice(max(0, typing.cast(int, fit_interval_graphic.start * len(difference_xdata.data) - zero_index)),
+                              min(len(gain_data), typing.cast(int, fit_interval_graphic.end * len(difference_xdata.data) - zero_index)))
 
             popt, pcov = curve_fit(gain_fit, x_data[fit_slice], gain_data[fit_slice], sigma=weights[fit_slice], p0=(300.0, 0.0))
             self.__fit = popt
@@ -85,7 +92,11 @@ class MeasureTemperature:
             print(e)
             raise
 
-    def commit(self):
+    def commit(self) -> None:
+        assert self.__gain_xdata
+        assert self.__gain_fit_xdata
+        assert self.__difference_xdata
+        assert self.__fit
         self.computation.set_referenced_xdata("gain_data_item", self.__gain_xdata)
         self.computation.set_referenced_xdata("gain_fit_data_item", self.__gain_fit_xdata)
         self.computation.set_referenced_xdata("difference_data_item", self.__difference_xdata)
@@ -93,11 +104,11 @@ class MeasureTemperature:
         gain_fit_display_item._set_display_layer_properties(0, label=_(f"Fit T = {self.__fit[0] - 273.15:.0f} °C \nZLP shift = {self.__fit[1]*1000.0:.2f} meV"))
 
 
+ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
+Symbolic.register_computation_type("eels.measure_temperature", typing.cast(ComputationCallable, MeasureTemperature))
 
-Symbolic.register_computation_type("eels.measure_temperature", MeasureTemperature)
 
-
-def measure_temperature(api: API.API, window: API.DocumentWindow):
+def measure_temperature(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
     selected_display_items = window._document_controller._get_two_data_sources()
     document_model = window._document_controller.document_model
     error_msg = "Select two data items each containing one EEL spectrum in order to use this computation."
@@ -105,6 +116,8 @@ def measure_temperature(api: API.API, window: API.DocumentWindow):
     assert selected_display_items[1][0] is not None, error_msg
     assert selected_display_items[0][0].data_item is not None, error_msg
     assert selected_display_items[1][0].data_item is not None, error_msg
+    assert selected_display_items[0][0].data_item.data is not None, error_msg
+    assert selected_display_items[1][0].data_item.data is not None, error_msg
     assert selected_display_items[0][0].data_item.is_data_1d, error_msg
     assert selected_display_items[1][0].data_item.is_data_1d, error_msg
 
@@ -117,6 +130,8 @@ def measure_temperature(api: API.API, window: API.DocumentWindow):
         near_data_item = selected_display_items[0][0].data_item
 
     # Now we need to calculate the difference and display it so that we have a place to put the interval on
+    assert near_data_item.xdata
+    assert far_data_item.xdata
     difference_xdata = near_data_item.xdata - far_data_item.xdata
     difference_data_item = api.library.create_data_item_from_data_and_metadata(difference_xdata, title=f"Difference (Near - Far), ({near_data_item.title} - {far_data_item.title})")
     window.display_data_item(difference_data_item)
@@ -143,8 +158,9 @@ def measure_temperature(api: API.API, window: API.DocumentWindow):
     window.display_data_item(gain_data_item)
     window.display_data_item(gain_fit_data_item)
     gain_fit_display_item = document_model.get_display_item_for_data_item(gain_fit_data_item._data_item)
-    gain_fit_display_item.append_display_data_channel_for_data_item(gain_data_item._data_item)
-    gain_fit_display_item._set_display_layer_properties(0, label=_("Fit"), fill_color=None, stroke_color="#F00")
-    gain_fit_display_item._set_display_layer_properties(1, label=_("Gain"), fill_color="#1E90FF")
-    gain_fit_display_item.set_display_property("legend_position", "top-right")
-    gain_fit_display_item.title = "Temperature Measurement Fit"
+    if gain_fit_display_item:
+        gain_fit_display_item.append_display_data_channel_for_data_item(gain_data_item._data_item)
+        gain_fit_display_item._set_display_layer_properties(0, label=_("Fit"), fill_color=None, stroke_color="#F00")
+        gain_fit_display_item._set_display_layer_properties(1, label=_("Gain"), fill_color="#1E90FF")
+        gain_fit_display_item.set_display_property("legend_position", "top-right")
+        gain_fit_display_item.title = "Temperature Measurement Fit"
