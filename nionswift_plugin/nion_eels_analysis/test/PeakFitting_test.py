@@ -19,10 +19,10 @@ Facade.initialize()
 
 class TestBackgroundSubtraction(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.app = Application.Application(TestUI.UserInterface(), set_global=True)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         pass
 
     def __create_spectrum(self) -> DataItem.DataItem:
@@ -33,7 +33,7 @@ class TestBackgroundSubtraction(unittest.TestCase):
         xdata = DataAndMetadata.new_data_and_metadata(data, intensity_calibration=intensity_calibration, dimensional_calibrations=dimensional_calibrations, data_descriptor=data_descriptor)
         return DataItem.new_data_item(xdata)
 
-    def test_add_peak_fitting_computation_and_remove(self):
+    def test_add_peak_fitting_computation_and_remove(self) -> None:
         with TestContext.create_memory_context() as profile_context:
             document_controller = profile_context.create_document_controller_with_application()
             document_model = document_controller.document_model
@@ -57,7 +57,7 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(0, len(document_model.data_structures))
             self.assertEqual(0, len(document_model.computations))
 
-    def test_peak_fitting_computation_is_removed_when_peak_removed(self):
+    def test_peak_fitting_computation_is_removed_when_peak_removed(self) -> None:
         with TestContext.create_memory_context() as profile_context:
             document_controller = profile_context.create_document_controller_with_application()
             document_model = document_controller.document_model
@@ -81,7 +81,7 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(0, len(document_model.data_structures))
             self.assertEqual(0, len(document_model.computations))
 
-    def test_peak_fitting_computation_is_removed_when_subtracted_removed(self):
+    def test_peak_fitting_computation_is_removed_when_subtracted_removed(self) -> None:
         with TestContext.create_memory_context() as profile_context:
             document_controller = profile_context.create_document_controller_with_application()
             document_model = document_controller.document_model
@@ -105,7 +105,7 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(0, len(document_model.data_structures))
             self.assertEqual(0, len(document_model.computations))
 
-    def test_peak_fitting_computation_is_removed_when_all_peak_displays_removed(self):
+    def test_peak_fitting_computation_is_removed_when_all_peak_displays_removed(self) -> None:
         with TestContext.create_memory_context() as profile_context:
             document_controller = profile_context.create_document_controller_with_application()
             document_model = document_controller.document_model

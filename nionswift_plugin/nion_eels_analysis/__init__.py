@@ -1,5 +1,6 @@
 import functools
 import gettext
+import typing
 
 # ensure background models are registered
 from nion.eels_analysis import BackgroundModel
@@ -14,7 +15,9 @@ from . import PeakFitting
 from . import ThicknessMap
 from . import Thermometry
 
+from nion.swift import DocumentController
 from nion.swift import Facade
+from nion.swift.model import PlugInManager
 
 _ = gettext.gettext
 
@@ -24,7 +27,7 @@ class MenuExtension:
     # required for Swift to recognize this as an extension class.
     extension_id = "nion.eels_analysis"
 
-    def __init__(self, api_broker):
+    def __init__(self, api_broker: PlugInManager.APIBroker) -> None:
         # grab the api object.
         self.__api = api_broker.get_api(version="~1.0")
         self.__api.application._application.register_menu_handler(self.__build_menus)
@@ -32,10 +35,10 @@ class MenuExtension:
         LiveThickness.register_measure_thickness_process(self.__api)
         LiveZLP.register_measure_zlp_process(self.__api)
 
-    def close(self):
+    def close(self) -> None:
         self.__api.application._application.unregister_menu_handler(self.__build_menus)
 
-    def __build_menus(self, document_window):
+    def __build_menus(self, document_window: DocumentController.DocumentController) -> None:
         api = self.__api
         window = Facade.DocumentWindow(document_window)
 
@@ -57,7 +60,7 @@ class MenuExtension:
         eels_menu.add_menu_item(_("Show Live Thickness Measurement"), functools.partial(LiveThickness.attach_measure_thickness, api, window))
         eels_menu.add_menu_item(_("Show Live ZLP Measurement"), functools.partial(LiveZLP.attach_measure_zlp, api, window))
         eels_menu.add_separator()
-        eels_menu.add_menu_item(_("Calibrate Spectrum"), functools.partial(AlignZLP.calibrate_spectrum, api, window))
+        eels_menu.add_menu_item(_("Calibrate Spectrum"), functools.partial(typing.cast(typing.Callable[[], None], AlignZLP.calibrate_spectrum), api, window))
         eels_menu.add_separator()
         eels_menu.add_menu_item(_("Measure Temperature"), functools.partial(Thermometry.measure_temperature, api, window))
         eels_menu.add_separator()

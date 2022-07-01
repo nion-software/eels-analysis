@@ -2,23 +2,28 @@
 A library of functions for finding and characterizing the zero-loss peak
 """
 import logging
+import math
 import numpy
 import scipy.interpolate
 import scipy.ndimage
 import scipy.optimize
 import scipy.interpolate
+import typing
 
 
-def gaussian(x, a, b, c):
-    return a*numpy.e**(-(x-b)**2/(2*c**2))
+DataArrayType = numpy.typing.NDArray[typing.Any]
 
 
-def jac_gaussian(x, a, b, c):
-    exp = numpy.e**(-(-b + x)**2/(2*c**2))
-    return numpy.swapaxes(numpy.array((exp, -a*(2*b - 2*x)*exp/(2*c**2), a*(-b + x)**2*exp/c**3)), 0, 1)
+def gaussian(x: DataArrayType, a: DataArrayType, b: DataArrayType, c: DataArrayType) -> DataArrayType:
+    return typing.cast(DataArrayType, a * numpy.e ** (-(x - b) ** 2 / (2 * c ** 2)))
 
 
-def estimate_zlp_amplitude_position_width_fit_spline(d):
+def jac_gaussian(x: DataArrayType, a: DataArrayType, b: DataArrayType, c: DataArrayType) -> DataArrayType:
+    exp = math.e ** (-(-b + x) ** 2 / (2 * c ** 2))
+    return numpy.swapaxes(numpy.array((exp, -a * (2 * b - 2 * x) * exp / (2 * c ** 2), a * (-b + x) ** 2 * exp / c ** 3)), 0, 1)
+
+
+def estimate_zlp_amplitude_position_width_fit_spline(d: DataArrayType) -> typing.Tuple[float, float, float]:
     assert len(d.shape) == 1
     # estimate the ZLP, assumes the peak value is the ZLP and that the ZLP is the only gaussian feature in the data
     #gaussian = lambda x, a, b, c: a*numpy.exp(-(x-b)**2/(2*c**2))
@@ -39,15 +44,14 @@ def estimate_zlp_amplitude_position_width_fit_spline(d):
         except RuntimeError as e:
             logging.error(str(e))
         else:
-            return popt
+            return typing.cast(typing.Tuple[float, float, float], popt)
     return numpy.nan, numpy.nan, numpy.nan
 
 
-def estimate_zlp_amplitude_position_width_com(d):
-
+def estimate_zlp_amplitude_position_width_com(d: DataArrayType) -> typing.Tuple[float, float, float, float]:
     # estimate the ZLP, assumes the peak value is the ZLP and that the ZLP is the only gaussian feature in the data
     assert len(d.shape) == 1
-    mx_pos = numpy.argmax(d)
+    mx_pos = typing.cast(int, numpy.argmax(d))
     mx = d[mx_pos]
     quarter_max = mx * 0.25
     left_pos = mx_pos - numpy.sum(d[:mx_pos] > quarter_max) * 3

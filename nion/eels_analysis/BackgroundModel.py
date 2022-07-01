@@ -17,6 +17,7 @@ _ = gettext.gettext
 
 BackgroundModelParameters = typing.Dict
 BackgroundInterval = typing.Tuple[float, float]
+DataArrayType = numpy.typing.NDArray[typing.Any]
 
 
 def get_calibrated_interval_slice(spectrum: DataAndMetadata.DataAndMetadata,
@@ -40,20 +41,20 @@ def get_calibrated_interval_domain(spectrum: DataAndMetadata.DataAndMetadata,
 
 
 class AbstractBackgroundModel:
-    def __init__(self, background_model_id: str, title: str = None):
+    def __init__(self, background_model_id: str, title: typing.Optional[str] = None) -> None:
         self.background_model_id = background_model_id
         self.title = title
         self.package_title = _("EELS Analysis")
 
     def fit_background(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata,
                        fit_intervals: typing.Sequence[BackgroundInterval],
-                       background_interval: BackgroundInterval, **kwargs) -> typing.Dict:
+                       background_interval: BackgroundInterval, **kwargs: typing.Any) -> typing.Dict[str, typing.Any]:
         return {
             "background_model": self.__fit_background(spectrum_xdata, fit_intervals, background_interval),
         }
 
     def subtract_background(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata,
-                            fit_intervals: typing.Sequence[BackgroundInterval], **kwargs) -> typing.Dict:
+                            fit_intervals: typing.Sequence[BackgroundInterval], **kwargs: typing.Any) -> typing.Dict[str, typing.Any]:
         # set up initial values
         fit_minimum = min([fit_interval[0] for fit_interval in fit_intervals])
         signal_interval = fit_minimum, 1.0
@@ -63,7 +64,7 @@ class AbstractBackgroundModel:
 
     def integrate_signal(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata,
                          fit_intervals: typing.Sequence[BackgroundInterval],
-                         signal_interval: BackgroundInterval, **kwargs) -> typing.Dict:
+                         signal_interval: BackgroundInterval, **kwargs: typing.Any) -> typing.Dict[str, typing.Any]:
         # set up initial values
         subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata, self.__fit_background(spectrum_xdata, fit_intervals, signal_interval))
         assert subtracted_xdata
@@ -120,7 +121,7 @@ class AbstractBackgroundModel:
                                                                      intensity_calibration=spectrum_xdata.intensity_calibration)
         return background_xdata
 
-    def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
+    def _perform_fits(self, xs: DataArrayType, yss: DataArrayType, fs: DataArrayType) -> DataArrayType:
         # xs will be a set of x-values with shape (L) representing the energies at which to fit
         # ys will be an array of y-values with shape (m,L)
         # fs will be an array of x-values with shape (n) representing energies at which to generate fitted data
@@ -132,7 +133,7 @@ class AbstractBackgroundModel:
             fit[index] = self._perform_fit(xs, yss[index], fs)
         return fit
 
-    def _perform_fit(self, xs: numpy.ndarray, ys: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
+    def _perform_fit(self, xs: DataArrayType, ys: DataArrayType, fs: DataArrayType) -> DataArrayType:
         # xs will be a set of x-values with shape (L) representing the energies at which to fit
         # ys will be an array of y-values with shape (L)
         # fs will be an array of x-values with shape (n) representing energies at which to generate fitted data
@@ -143,24 +144,27 @@ class AbstractBackgroundModel:
 
 class PolynomialBackgroundModel(AbstractBackgroundModel):
 
-    def __init__(self, background_model_id: str, deg: int, transform=None, untransform=None, title: str = None):
+    def __init__(self, background_model_id: str, deg: int,
+                 transform: typing.Optional[typing.Callable[[DataArrayType], DataArrayType]] = None,
+                 untransform: typing.Optional[typing.Callable[[DataArrayType], DataArrayType]] = None,
+                 title: typing.Optional[str] = None) -> None:
         super().__init__(background_model_id, title)
         self.deg = deg
         self.transform = transform
         self.untransform = untransform
 
-    def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
+    def _perform_fits(self, xs: DataArrayType, yss: DataArrayType, fs: DataArrayType) -> DataArrayType:
         transform_data = self.transform or (lambda x: x)
         untransform_data = self.untransform or (lambda x: x)
-        coefficients = numpy.polynomial.polynomial.polyfit(transform_data(xs), transform_data(yss.transpose()), self.deg)
-        fit = untransform_data(numpy.polynomial.polynomial.polyval(transform_data(fs), coefficients))
+        coefficients = numpy.polynomial.polynomial.polyfit(transform_data(xs), transform_data(yss.transpose()), self.deg)  # type: ignore
+        fit = untransform_data(numpy.polynomial.polynomial.polyval(transform_data(fs), coefficients))  # type: ignore
         return numpy.where(numpy.isfinite(fit), fit, 0)
 
-    def __unused_perform_fit(self, xs: numpy.ndarray, ys: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
+    def __unused_perform_fit(self, xs: DataArrayType, ys: DataArrayType, fs: DataArrayType) -> DataArrayType:
         # here an an example of using numpy.polynomial.polynomial.Polynomial.fit for when it supports evaluating arrays
         transform_data = self.transform or (lambda x: x)
         untransform_data = self.untransform or (lambda x: x)
-        series = typing.cast(typing.Any, numpy.polynomial.polynomial.Polynomial.fit(xs, transform_data(ys), self.deg))
+        series = typing.cast(typing.Any, numpy.polynomial.polynomial.Polynomial.fit(xs, transform_data(ys), self.deg))  # type: ignore
         return untransform_data(series(fs))
 
 
@@ -170,15 +174,16 @@ class TwoAreaBackgroundModel(AbstractBackgroundModel):
 
     def __init__(self,
                  background_model_id: str,
-                 params_func: typing.Callable[[numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.ndarray, float, float, float],
-                                              typing.Tuple[numpy.ndarray, numpy.ndarray]],
-                 model_func: typing.Callable[[numpy.ndarray, numpy.ndarray, numpy.ndarray], numpy.ndarray],
-                 title: str = None):
+                 params_func: typing.Callable[
+                     [DataArrayType, DataArrayType, DataArrayType, DataArrayType, float, float, float],
+                     typing.Tuple[DataArrayType, DataArrayType]],
+                 model_func: typing.Callable[[DataArrayType, DataArrayType, DataArrayType], DataArrayType],
+                 title: typing.Optional[str] = None) -> None:
         super().__init__(background_model_id, title)
         self.model_func = model_func
         self.params_func = params_func
 
-    def _perform_fits(self, xs: numpy.ndarray, yss: numpy.ndarray, fs: numpy.ndarray) -> numpy.ndarray:
+    def _perform_fits(self, xs: DataArrayType, yss: DataArrayType, fs: DataArrayType) -> DataArrayType:
         half_interval = len(xs) // 2
         x_interval_1 = xs[:half_interval]
         x_interval_2 = xs[half_interval:2 * half_interval]
@@ -189,36 +194,36 @@ class TwoAreaBackgroundModel(AbstractBackgroundModel):
         x_end = xs[-1]
         params = self.params_func(x_interval_1, x_interval_2, y_interval_1, y_interval_2, x_start, x_center, x_end)
         xs_tiled = numpy.transpose(numpy.tile(fs, (len(yss), 1)))
-        series = typing.cast(typing.Any, numpy.transpose(self.model_func(xs_tiled, *params)))
+        series = numpy.transpose(self.model_func(xs_tiled, *params))
         return series
 
 
-def power_law_params(x_interval_1: numpy.ndarray,
-                     x_interval_2: numpy.ndarray,
-                     y_interval_1: numpy.ndarray,
-                     y_interval_2: numpy.ndarray,
+def power_law_params(x_interval_1: DataArrayType,
+                     x_interval_2: DataArrayType,
+                     y_interval_1: DataArrayType,
+                     y_interval_2: DataArrayType,
                      x_start: float,
                      x_center: float,
-                     x_end: float) -> typing.Tuple[numpy.ndarray, numpy.ndarray]:
-    areas_1 = typing.cast(numpy.ndarray, numpy.trapz(y_interval_1, x_interval_1, axis=1))
-    areas_2 = typing.cast(numpy.ndarray, numpy.trapz(y_interval_2, x_interval_2, axis=1))
+                     x_end: float) -> typing.Tuple[DataArrayType, DataArrayType]:
+    areas_1 = typing.cast(DataArrayType, numpy.trapz(y_interval_1, x_interval_1, axis=1))
+    areas_2 = typing.cast(DataArrayType, numpy.trapz(y_interval_2, x_interval_2, axis=1))
     r = 2 * (numpy.log(areas_1) - numpy.log(areas_2)) / (numpy.log(x_end) - numpy.log(x_start))
     k = 1 - r
     A = k * areas_2 / (x_end ** k - x_center ** k)
     return A, r
 
 
-def power_law_func(x: numpy.ndarray, A: numpy.ndarray, r: numpy.ndarray) -> numpy.ndarray:
-    return A * x ** -r
+def power_law_func(x: DataArrayType, A: DataArrayType, r: DataArrayType) -> DataArrayType:
+    return typing.cast(DataArrayType, A * x ** -r)
 
 
-def exponential_params(x_interval_1: numpy.ndarray,
-                       x_interval_2: numpy.ndarray,
-                       y_interval_1: numpy.ndarray,
-                       y_interval_2: numpy.ndarray,
+def exponential_params(x_interval_1: DataArrayType,
+                       x_interval_2: DataArrayType,
+                       y_interval_1: DataArrayType,
+                       y_interval_2: DataArrayType,
                        x_start: float,
                        x_center: float,
-                       x_end: float) -> typing.Tuple[numpy.ndarray, numpy.ndarray]:
+                       x_end: float) -> typing.Tuple[DataArrayType, DataArrayType]:
     y_log_1 = numpy.log(y_interval_1)
     y_log_2 = numpy.log(y_interval_2)
     geo_mean_1 = numpy.exp(numpy.mean(y_log_1))
@@ -230,8 +235,8 @@ def exponential_params(x_interval_1: numpy.ndarray,
     return A, tau
 
 
-def exponential_func(x: numpy.ndarray, A: numpy.ndarray, tau: numpy.ndarray) -> numpy.ndarray:
-    return A * numpy.exp(-x / tau)
+def exponential_func(x: DataArrayType, A: DataArrayType, tau: DataArrayType) -> DataArrayType:
+    return typing.cast(DataArrayType, A * numpy.exp(-x / tau))
 
 
 # register background models with the registry.

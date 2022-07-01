@@ -5,11 +5,12 @@
 
 """
 
-# standard libraries
 import gettext
-
-# third party libraries
 import numpy
+import typing
+
+
+DataArrayType = numpy.typing.NDArray[typing.Any]
 
 _ = gettext.gettext
 
@@ -24,23 +25,24 @@ class MultipleLinearRegression1D(object):
     x values are immaterial), and another that allows explicit provision of arbitrarily sampled x values.
     """
 
-    def __init__(self, data, x_values = None):
+    def __init__(self, data: DataArrayType, x_values: typing.Optional[DataArrayType] = None) -> None:
         """Initialize with measured data and corresponding x values in 1-D arrays.
 
         If no x values are supplied, then the data are assumed to be equispaced over -1 to 1, inclusive.
         """
-        self.data = data.copy()
+        self.data = numpy.copy(data)
         if x_values == None:
             self.x_values = numpy.linspace(-1.0, 1.0, num = data.shape[0])
         else:
-            self.x_values = x_values.copy()
+            assert x_values is not None
+            self.x_values = numpy.copy(x_values)
 
-    def fit_function_set(self, function_set):
+    def fit_function_set(self, function_set: DataArrayType) -> DataArrayType:
         """Fit data with a linear combination of the passed function set, returning both the coefficient and fit data arrays."""
-        assert function_set.shape[0] == data.shape[0]
+        assert function_set.shape[0] == self.data.shape[0]
         return self.data
 
-    def fit_polynomial(self, poynomial_order = 1):
+    def fit_polynomial(self, poynomial_order: int = 1) -> DataArrayType:
         """Fit data with a polynomial of the specified order, returning both the coefficient and fit data arrays."""
         return self.data
 
@@ -57,7 +59,7 @@ class PolynomialFit1D(object):
     Exponential, Gaussian, and power-law fits are supported via log-scale flags for the y and x dimensions.
     """
 
-    def __init__(self, y_values: numpy.ndarray, x_values: numpy.ndarray = None, first_x: float = 0, delta_x: float = 1, polynomial_order: int = 1,
+    def __init__(self, y_values: DataArrayType, x_values: typing.Optional[DataArrayType] = None, first_x: float = 0, delta_x: float = 1, polynomial_order: int = 1,
                  y_log_scale: bool = False, x_log_scale: bool = False):
         """
             Required: y_values - a 1D NumPy array containing the measured data (ordinate) values.
@@ -113,17 +115,17 @@ class PolynomialFit1D(object):
 
         self.__set_polynomial_order(polynomial_order)
 
-    def __get_polynomial_order(self):
+    def __get_polynomial_order(self) -> int:
         """The order of the fit polynomial, e.g. 1 = line, 2 = parabola, 3 = cubic, etc."""
-        return self.fit_polynomial.o
+        return typing.cast(int, self.fit_polynomial.o)  # typing is wrong; needs fixing.
 
-    def __set_polynomial_order(self, polynomial_order):
+    def __set_polynomial_order(self, polynomial_order: int) -> None:
         assert polynomial_order >= 0
         self.fit_polynomial = numpy.poly1d(numpy.polyfit(self.__fit_abscissae, self.__fit_ordinates, polynomial_order))
 
     polynomial_order = property(__get_polynomial_order, __set_polynomial_order)
 
-    def compute_fit_for_values(self, values):
+    def compute_fit_for_values(self, values: DataArrayType) -> DataArrayType:
         if self.__x_log_scale:
             assert values.min() > 0
             abscissae = numpy.log(values)
@@ -136,7 +138,7 @@ class PolynomialFit1D(object):
             computed_fit = numpy.exp(computed_fit)
         return computed_fit
 
-    def compute_fit_for_range(self, fit_range, point_count):
-        assert fit_range.min() > 0
+    def compute_fit_for_range(self, fit_range: DataArrayType, point_count: int) -> DataArrayType:
+        assert numpy.amin(fit_range) > 0
         values = numpy.linspace(fit_range[0], fit_range[1], point_count)
         return self.compute_fit_for_values(values)

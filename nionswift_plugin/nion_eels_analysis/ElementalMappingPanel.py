@@ -7,8 +7,14 @@ import operator
 # None
 
 # local libraries
+import typing
+
+from nion.swift import DocumentController
 from nion.swift import Panel
 from nion.swift import Workspace
+from nion.swift.model import DataItem
+from nion.swift.model import DisplayItem
+from nion.swift.model import Persistence
 from nion.eels_analysis import PeriodicTable
 from nionswift_plugin.nion_eels_analysis import ElementalMappingController
 
@@ -17,7 +23,7 @@ _ = gettext.gettext
 
 class ElementalMappingPanel(Panel.Panel):
 
-    def __init__(self, document_controller, panel_id, properties):
+    def __init__(self, document_controller: DocumentController.DocumentController, panel_id: str, properties: Persistence.PersistentDictType) -> None:
         super().__init__(document_controller, panel_id, _("Elemental Mappings"))
 
         document_model = document_controller.document_model
@@ -71,7 +77,7 @@ class ElementalMappingPanel(Panel.Panel):
 
         explore_column.add(explore_row)
 
-        def data_item_changed(data_item) -> None:
+        def data_item_changed(data_item: typing.Optional[DataItem.DataItem]) -> None:
             self.__elemental_mapping_controller.set_current_data_item(data_item)
             current_data_item = data_item
             model_data_item = self.__elemental_mapping_controller.model_data_item
@@ -82,14 +88,14 @@ class ElementalMappingPanel(Panel.Panel):
                 self.__button_group.close()
                 self.__button_group = None
             if model_data_item:
-                def explore_pressed():
+                def explore_pressed() -> None:
                     document_controller.event_loop.create_task(self.__elemental_mapping_controller.explore_edges(document_controller))
 
                 explore_button_widget.on_clicked = explore_pressed
                 multiprofile_button_widget.on_clicked = functools.partial(self.__elemental_mapping_controller.build_multiprofile, document_controller)
                 self.__button_group = ui.create_button_group()
                 for index, edge_bundle in enumerate(self.__elemental_mapping_controller.build_edge_bundles(document_controller)):
-                    def delete_pressed():
+                    def delete_pressed() -> None:
                         edge_bundle.delete_action()
                         data_item_changed(current_data_item)  # TODO: this should be automatic
 
@@ -98,7 +104,7 @@ class ElementalMappingPanel(Panel.Panel):
                     label = None
                     if edge:
                         radio_button = ui.create_radio_button_widget(edge_bundle.electron_shell_str)
-                        self.__button_group.add_button(radio_button, index)
+                        self.__button_group.add_button(radio_button, str(index))
                         radio_button.checked = edge_bundle.selected
                         radio_button.on_clicked = edge_bundle.select_action
                     else:
@@ -156,14 +162,15 @@ class ElementalMappingPanel(Panel.Panel):
                 add_edge_column.add(edge_row)
                 add_edge_column.add(add_button_row)
 
-                def add_edge_current():
+                def add_edge_current() -> None:
+                    assert edge_widget.current_item
                     self.__elemental_mapping_controller.add_edge(edge_widget.current_item[0])
                     data_item_changed(model_data_item)
                     data_item_changed(data_item)
 
                 add_button_widget.on_clicked = add_edge_current
 
-                def atomic_number_changed(item):
+                def atomic_number_changed(item: typing.Any) -> None:
                     edge_widget.items = PeriodicTable.PeriodicTable().get_edges_list(item[0])
 
                 atomic_number_widget.on_current_item_changed = atomic_number_changed
@@ -181,7 +188,7 @@ class ElementalMappingPanel(Panel.Panel):
                 add_grid.add(col2)
                 add_grid.add_stretch()
 
-                def update_add_buttons():
+                def update_add_buttons() -> None:
                     col1.remove_all()
                     col2.remove_all()
                     explore_interval = self.__elemental_mapping_controller.explorer_interval
@@ -189,7 +196,7 @@ class ElementalMappingPanel(Panel.Panel):
                         edges = PeriodicTable.PeriodicTable().find_edges_in_energy_interval(explore_interval)
                         for i, edge in enumerate(edges[0:4]):
                             button = ui.create_push_button_widget(edge.to_long_str())
-                            def add_edge(model_data_item, edge, data_item):
+                            def add_edge(model_data_item: DataItem.DataItem, edge: PeriodicTable.ElectronShell, data_item: DataItem.DataItem) -> None:
                                 self.__elemental_mapping_controller.add_edge(edge)
                                 data_item_changed(model_data_item)
                                 data_item_changed(data_item)
@@ -216,7 +223,7 @@ class ElementalMappingPanel(Panel.Panel):
 
                 add_edge_column.add(add_row)
 
-        def display_item_changed(display_item):
+        def display_item_changed(display_item: DisplayItem.DisplayItem) -> None:
             data_item = display_item.data_item if display_item else None
             data_item_changed(data_item)
 
@@ -224,12 +231,12 @@ class ElementalMappingPanel(Panel.Panel):
         selected_data_item = document_controller.selected_data_item
         data_item_changed(selected_data_item)
 
-    def close(self):
+    def close(self) -> None:
         self.__focused_display_item_changed_event_listener.close()
-        self.__focused_display_item_changed_event_listener = None
+        self.__focused_display_item_changed_event_listener = typing.cast(typing.Any, None)
         if self.__elemental_mapping_controller:
             self.__elemental_mapping_controller.close()
-            self.__elemental_mapping_controller = None
+            self.__elemental_mapping_controller = typing.cast(typing.Any, None)
         if self.__button_group:
             self.__button_group.close()
             self.__button_group = None

@@ -14,18 +14,18 @@ from nion.eels_analysis import PeriodicTable
 
 class TestLibrary(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Common code for all tests can go here."""
         pass
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Common code for all tests can go here."""
         pass
 
-    def test_subshell_label(self):
+    def test_subshell_label(self) -> None:
         # Test all possible labels up to f-states
         subshell_labels = [None, "s", "p", "p", "d", "d", "f", "f"]
-        spin_numerators = [None, 1, 1, 3, 3, 5, 5, 7]
+        spin_numerators = [0, 1, 1, 3, 3, 5, 5, 7]
         for subshell_index in range(len(subshell_labels))[1:]:
             electron_shell = PeriodicTable.ElectronShell(99, 4, subshell_index)
             self.assertEqual(electron_shell.subshell_label, subshell_labels[subshell_index])

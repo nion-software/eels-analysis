@@ -7,21 +7,22 @@ import numpy
 import typing
 
 # local libraries
-from nion.data import Calibration
 from nion.data import DataAndMetadata
 from nion.utils import Registry
 
+
+DataArrayType = numpy.typing.NDArray[typing.Any]
 
 _ = gettext.gettext
 
 
 class AbstractZeroLossPeakModel:
-    def __init__(self, zero_loss_peak_model_id: str, title: str = None):
+    def __init__(self, zero_loss_peak_model_id: str, title: typing.Optional[str] = None) -> None:
         self.zero_loss_peak_model_id = zero_loss_peak_model_id
         self.title = title
         self.package_title = _("EELS Analysis")
 
-    def fit_zero_loss_peak(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata, **kwargs) -> typing.Dict:
+    def fit_zero_loss_peak(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata, **kwargs: typing.Any) -> typing.Dict[str, typing.Any]:
         return {
             "zero_loss_peak_model": self.__fit_zero_loss_peak(spectrum_xdata),
         }
@@ -47,7 +48,7 @@ class AbstractZeroLossPeakModel:
                                                                 intensity_calibration=spectrum_xdata.intensity_calibration)
         return model_xdata
 
-    def _perform_fits(self, yss: numpy.ndarray, z: int) -> numpy.ndarray:
+    def _perform_fits(self, yss: DataArrayType, z: int) -> DataArrayType:
         # ys will be an array of y-values with shape (m,L)
         # z is the index of the column of 0eV
         # return an ndarray of the fit with shape (m,L)
@@ -57,7 +58,7 @@ class AbstractZeroLossPeakModel:
             fit[index] = self._perform_fit(yss[index], z)
         return fit
 
-    def _perform_fit(self, ys: numpy.ndarray, z: int) -> numpy.ndarray:
+    def _perform_fit(self, ys: DataArrayType, z: int) -> DataArrayType:
         # ys will be an array of y-values with shape (L)
         # z is the index of the column of 0eV
         # return an ndarray of the fit with shape (L)
@@ -67,10 +68,10 @@ class AbstractZeroLossPeakModel:
 
 class SimpleZeroLossPeakModel(AbstractZeroLossPeakModel):
 
-    def __init__(self, zero_loss_peak_model: str, title: str = None):
+    def __init__(self, zero_loss_peak_model: str, title: typing.Optional[str] = None) -> None:
         super().__init__(zero_loss_peak_model, title)
 
-    def _perform_fits(self, yss: numpy.ndarray, z: int) -> numpy.ndarray:
+    def _perform_fits(self, yss: DataArrayType, z: int) -> DataArrayType:
         left = max(0, z - 3)
         right = min(yss.shape[-1], z + 3)
         result = numpy.zeros(yss.shape)

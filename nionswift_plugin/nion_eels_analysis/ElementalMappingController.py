@@ -382,7 +382,7 @@ class ElementalMappingController:
         self.__item_removed_listener.close()
         self.__item_removed_listener = typing.cast(typing.Any, None)
 
-    def set_current_data_item(self, data_item: DataItem.DataItem) -> None:
+    def set_current_data_item(self, data_item: typing.Optional[DataItem.DataItem]) -> None:
         """Set the current data item.
 
         If the data item is an explorer, update the explorer interval, otherwise cleaar it.
@@ -391,6 +391,7 @@ class ElementalMappingController:
 
         is_explorer = self.__is_explorer(self.__document_model, data_item)
         if is_explorer:
+            assert data_item
             self.__explorer_interval = self.__energy_intervals.get(data_item.uuid)
         else:
             self.__explorer_interval = None
@@ -426,12 +427,12 @@ class ElementalMappingController:
     def explorer_interval(self) -> typing.Optional[typing.Tuple[float, float]]:
         return self.__explorer_interval
 
-    def __is_model(self, data_item: DataItem.DataItem) -> bool:
+    def __is_model(self, data_item: typing.Optional[DataItem.DataItem]) -> bool:
         if isinstance(data_item, DataItem.DataItem):
             return data_item.is_data_3d
         return False
 
-    def __is_explorer(self, document_model: DocumentModel.DocumentModel, data_item: DataItem.DataItem) -> bool:
+    def __is_explorer(self, document_model: DocumentModel.DocumentModel, data_item: typing.Optional[DataItem.DataItem]) -> bool:
         if isinstance(data_item, DataItem.DataItem):
             if data_item.is_data_1d:
                 for display_item in document_model.get_display_items_for_data_item(data_item):

@@ -28,10 +28,10 @@ Facade.initialize()
 
 class TestElementalMappingController(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.app = Application.Application(TestUI.UserInterface(), set_global=False)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         pass
 
     def __create_spectrum_image(self) -> DataItem.DataItem:
@@ -81,7 +81,7 @@ class TestElementalMappingController(unittest.TestCase):
             document_controller.periodic()
             time.sleep(1/50)
 
-    def test_explore_creates_initial_line_plot(self):
+    def test_explore_creates_initial_line_plot(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -99,7 +99,7 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(1, len(explorer_data_item.dimensional_shape))
             self.assertEqual("explore", explorer_display_item.graphics[-1].graphic_id)
 
-    def test_explore_adds_edge(self):
+    def test_explore_adds_edge(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -133,7 +133,7 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(2, edge_data_struct.get_property_value("shell_number"))
             self.assertEqual(3, edge_data_struct.get_property_value("subshell_index"))
 
-    def test_adding_multiple_edges(self):
+    def test_adding_multiple_edges(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -145,7 +145,7 @@ class TestElementalMappingController(unittest.TestCase):
             elemental_mapping_controller.add_edge(PeriodicTable.ElectronShell(14, 1, 1))  # Si-K
             self.assertEqual(2, len(document_model.data_structures))
 
-    def test_removing_edges(self):
+    def test_removing_edges(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -162,7 +162,7 @@ class TestElementalMappingController(unittest.TestCase):
             elemental_mapping_controller.remove_edge(si_edge)
             self.assertEqual(0, len(document_model.data_structures))
 
-    def test_controller_has_proper_edge_bundles_when_explorer_selected(self):
+    def test_controller_has_proper_edge_bundles_when_explorer_selected(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -179,7 +179,7 @@ class TestElementalMappingController(unittest.TestCase):
             edge_bundle = elemental_mapping_controller.build_edge_bundles(document_controller)
             self.assertEqual(1, len(edge_bundle))
 
-    def test_picking_edge_produces_properly_configured_composite(self):
+    def test_picking_edge_produces_properly_configured_composite(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -199,7 +199,7 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual("elemental_mapping_edge_ref", document_model.data_structures[1].structure_type)
             self.assertEqual(document_model.data_structures[0], document_model.data_structures[1].get_referenced_object("edge"))
 
-    def test_deleting_pick_also_deletes_computation(self):
+    def test_deleting_pick_also_deletes_computation(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -220,7 +220,7 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(1, len(document_model.data_items))
             self.assertEqual(1, len(document_model.data_structures))
 
-    def test_deleting_pick_region_also_deletes_pick_composition(self):
+    def test_deleting_pick_region_also_deletes_pick_composition(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -243,7 +243,7 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(1, len(document_model.data_items))
             self.assertEqual(1, len(document_model.data_structures))
 
-    def test_selecting_composite_updates_edge_value(self):
+    def test_selecting_composite_updates_edge_value(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -261,7 +261,7 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(model_data_item, elemental_mapping_controller.model_data_item)
             self.assertEqual(si_edge.data_structure, elemental_mapping_controller.edge.data_structure)
 
-    def test_background_subtraction_computation_functions_reasonably(self):
+    def test_background_subtraction_computation_functions_reasonably(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller_with_application()
             document_model = document_controller.document_model
@@ -284,7 +284,7 @@ class TestElementalMappingController(unittest.TestCase):
             document_controller.periodic()
             self.assertEqual(2, len(document_model.data_items))
 
-    def test_changing_edge_configures_other_items_correctly(self):
+    def test_changing_edge_configures_other_items_correctly(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -335,7 +335,7 @@ class TestElementalMappingController(unittest.TestCase):
             # and the edge reference
             self.assertEqual(new_edge_data_structure, edge_ref_data_structure.get_referenced_object("edge"))
 
-    def test_mapping_edge_produces_properly_configured_map(self):
+    def test_mapping_edge_produces_properly_configured_map(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -354,7 +354,7 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual("eels.mapping", document_model.computations[0].processing_id)
             self.assertEqual(mapped_data_item.dimensional_calibrations, model_data_item.dimensional_calibrations[0:2])
 
-    def test_multiprofile_of_two_maps_builds_two_line_profiles(self):
+    def test_multiprofile_of_two_maps_builds_two_line_profiles(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -379,7 +379,7 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertIn(line_profile1_data_item, composite_display_item.data_items)
             self.assertIn(line_profile2_data_item, composite_display_item.data_items)
 
-    def test_multiprofile_of_two_maps_connects_line_profiles(self):
+    def test_multiprofile_of_two_maps_connects_line_profiles(self) -> None:
         with TestContext.create_memory_context() as test_context:
             document_controller = test_context.create_document_controller()
             document_model = document_controller.document_model
@@ -408,7 +408,7 @@ class TestElementalMappingController(unittest.TestCase):
             self.assertEqual(line_region1.vector, line_region2.vector)
             self.assertEqual(line_region1.width, line_region2.width)
 
-    def test_map_background_subtracted_signal_keeps_input_dtype(self):
+    def test_map_background_subtracted_signal_keeps_input_dtype(self) -> None:
         si_xdata_32 = self.__create_spectrum_image_xdata(dtype=numpy.float32)
         si_xdata_64 = self.__create_spectrum_image_xdata(dtype=numpy.float64)
         mapped_xdata_32 = eels_analysis.map_background_subtracted_signal(si_xdata_32, None, [(0.2, 0.3)], (0.4, 0.5))
@@ -416,7 +416,7 @@ class TestElementalMappingController(unittest.TestCase):
         self.assertEqual(numpy.float32, mapped_xdata_32.data.dtype)
         self.assertEqual(numpy.float64, mapped_xdata_64.data.dtype)
 
-    def test_align_zlp_keeps_input_dtype(self):
+    def test_align_zlp_keeps_input_dtype(self) -> None:
         si_xdata_32 = self.__create_spectrum_image_xdata(dtype=numpy.float32)
         si_xdata_64 = self.__create_spectrum_image_xdata(dtype=numpy.float64)
         mapped_xdata_32 = AlignZLP.align_zlp_xdata(si_xdata_32)[0]
@@ -424,7 +424,7 @@ class TestElementalMappingController(unittest.TestCase):
         self.assertEqual(numpy.float32, mapped_xdata_32.data.dtype)
         self.assertEqual(numpy.float64, mapped_xdata_64.data.dtype)
 
-    def test_map_thickness_is_always_float32(self):
+    def test_map_thickness_is_always_float32(self) -> None:
         si_xdata_32 = self.__create_spectrum_image_xdata(dtype=numpy.float32)
         si_xdata_64 = self.__create_spectrum_image_xdata(dtype=numpy.float64)
         mapped_xdata_32 = ThicknessMap.map_thickness_xdata(si_xdata_32)

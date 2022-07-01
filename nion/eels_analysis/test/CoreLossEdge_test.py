@@ -17,15 +17,15 @@ from nion.eels_analysis import EELS_DataAnalysis as analyzer
 
 class TestLibrary(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Common code for all tests can go here."""
         pass
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Common code for all tests can go here."""
         pass
 
-    def test_power_law_background_1d(self):
+    def test_power_law_background_1d(self) -> None:
         # this edge in Swift:
         # 10 * pow(linspace(1,10,1000), -4)
         scale = 1E4
@@ -42,7 +42,7 @@ class TestLibrary(unittest.TestCase):
         self.assertLess(abs(numpy.amax(bkgd_model) - numpy.amax(signal_background)), numpy.ptp(signal_background) / 100.0)
         self.assertLess(numpy.average(bkgd_model - signal_background), scale * 0.0001)
 
-    def test_power_law_background_1d_with_negative_values(self):
+    def test_power_law_background_1d_with_negative_values(self) -> None:
         # tests only that it can handle negative values; not that it is accurate
         shape = 1000
         background = 10000 * numpy.power(numpy.linspace(1,10,shape), -4)  # 0 -> 10000
@@ -55,7 +55,7 @@ class TestLibrary(unittest.TestCase):
         bkgd_range = numpy.array([fit_range.start, fit_range.stop])
         analyzer.core_loss_edge(background, spectral_range, edge_onset, edge_delta, bkgd_range)
 
-    def test_core_loss_edge_1d(self):
+    def test_core_loss_edge_1d(self) -> None:
         # this edge in Swift:
         # 10 * pow(linspace(1,10,1000), -4) + 0.01 * rescale(gammapdf(linspace(0, 1, 1000), 1.3, 0.5, 0.01))
         scale = 1E4

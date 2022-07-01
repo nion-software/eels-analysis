@@ -6,12 +6,17 @@
 
 # third party libraries
 import numpy
+import typing
 
 # local libraries
 from . import CurveFittingAndAnalysis
 from . import EELS_CrossSections
 
-def zero_loss_peak(low_loss_spectra: numpy.ndarray, low_loss_range_eV: numpy.ndarray) -> tuple:
+
+DataArrayType = numpy.typing.NDArray[typing.Any]
+
+
+def zero_loss_peak(low_loss_spectra: DataArrayType, low_loss_range_eV: DataArrayType) -> typing.Tuple[float, DataArrayType, DataArrayType]:
     """Isolate the zero-loss peak from low-loss spectra and return the zero-loss count, zero-loss peak, and loss-spectrum arrays.
 
     Returns:
@@ -21,8 +26,8 @@ def zero_loss_peak(low_loss_spectra: numpy.ndarray, low_loss_range_eV: numpy.nda
     """
     pass
 
-def core_loss_edge(core_loss_spectra: numpy.ndarray, core_loss_range_eV: numpy.ndarray, edge_onset_eV: float, edge_delta_eV: float,
-                    background_ranges_eV: numpy.ndarray, background_model_ID: int = 0) -> tuple:
+def core_loss_edge(core_loss_spectra: DataArrayType, core_loss_range_eV: DataArrayType, edge_onset_eV: float, edge_delta_eV: float,
+                    background_ranges_eV: DataArrayType, background_model_ID: int = 0) -> typing.Tuple[DataArrayType, DataArrayType, DataArrayType, DataArrayType]:
     """Isolate an edge signal from background in core-loss spectra and return the edge integral, edge profile, and background arrays.
 
     Returns:
@@ -44,9 +49,9 @@ def core_loss_edge(core_loss_spectra: numpy.ndarray, core_loss_range_eV: numpy.n
     return CurveFittingAndAnalysis.signal_from_polynomial_background(core_loss_spectra, core_loss_range_eV, edge_range,
                                                                         background_ranges_eV, poly_order, fit_log_y, fit_log_x)
 
-def relative_atomic_abundance(core_loss_spectra: numpy.ndarray, core_loss_range_eV: numpy.ndarray, background_ranges_eV: numpy.ndarray,
+def relative_atomic_abundance(core_loss_spectra: DataArrayType, core_loss_range_eV: DataArrayType, background_ranges_eV: DataArrayType,
                                 atomic_number: int, edge_onset_eV: float, edge_delta_eV: float,
-                                beam_energy_eV: float, convergence_angle_rad: float, collection_angle_rad: float) -> numpy.ndarray:
+                                beam_energy_eV: float, convergence_angle_rad: float, collection_angle_rad: float) -> DataArrayType:
     """Isolate the specified edge signal from the core-loss spectra and compute a relative atomic concentration value.
 
     Returns:
@@ -63,10 +68,10 @@ def relative_atomic_abundance(core_loss_spectra: numpy.ndarray, core_loss_range_
     atomic_abundance = edge_data[0] / cross_section
     return atomic_abundance
 
-def atomic_areal_density_nm2(core_loss_spectra: numpy.ndarray, core_loss_range_eV: numpy.ndarray, background_ranges_eV: numpy.ndarray,
-                                low_loss_spectra: numpy.ndarray, low_loss_range_eV: numpy.ndarray,
+def atomic_areal_density_nm2(core_loss_spectra: DataArrayType, core_loss_range_eV: DataArrayType, background_ranges_eV: DataArrayType,
+                                low_loss_spectra: DataArrayType, low_loss_range_eV: DataArrayType,
                                 atomic_number: int, edge_onset_eV: float, edge_delta_eV: float,
-                                beam_energy_eV: float, convergence_angle_rad: float, collection_angle_rad: float) -> numpy.ndarray:
+                                beam_energy_eV: float, convergence_angle_rad: float, collection_angle_rad: float) -> DataArrayType:
     """Isolate the specified edge signal from the core-loss spectra and compute the implied atomic areal density.
 
     Returns:

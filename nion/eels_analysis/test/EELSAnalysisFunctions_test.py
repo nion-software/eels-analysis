@@ -23,15 +23,15 @@ from nion.eels_analysis import eels_analysis
 
 class TestEELSAnalysisFunctions(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Common code for all tests can go here."""
         pass
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Common code for all tests can go here."""
         pass
 
-    def test_slow_linear_background(self):
+    def test_slow_linear_background(self) -> None:
         height, width, depth = 4, 5, 6
         data = numpy.zeros((height, width, depth))
         for row in range(height):
@@ -45,7 +45,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         self.assertTrue(numpy.all(linear_background_subtracted < 1))
         self.assertTrue(numpy.all(linear_background_subtracted > -1))
 
-    def test_stacked_linear_background(self):
+    def test_stacked_linear_background(self) -> None:
         height, width, depth = 4, 5, 6
         data = numpy.zeros((height, width, depth))
         for row in range(height):
@@ -59,7 +59,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         self.assertTrue(numpy.all(linear_background_subtracted < 1))
         self.assertTrue(numpy.all(linear_background_subtracted > -1))
 
-    def test_subtract_linear_background(self):
+    def test_subtract_linear_background(self) -> None:
         height, width, depth = 6, 8, 80
         data = numpy.zeros((height, width, depth))
         for row in range(height):
@@ -73,7 +73,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         self.assertTrue(numpy.all(numpy.less(background_subtracted.data, 1)))
         self.assertTrue(numpy.all(numpy.greater(background_subtracted.data, -1)))
 
-    def test_subtract_linear_background_with_different_signal_and_fit(self):
+    def test_subtract_linear_background_with_different_signal_and_fit(self) -> None:
         height, width, depth = 6, 8, 80
         data = numpy.zeros((height, width, depth))
         for row in range(height):
@@ -87,7 +87,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         self.assertTrue(numpy.all(numpy.less(background_subtracted.data[..., 54:72], 1)))
         self.assertTrue(numpy.all(numpy.greater(background_subtracted.data[..., 54:72], -1)))
 
-    def test_signal_and_background_shape_are_consistent_1d(self):
+    def test_signal_and_background_shape_are_consistent_1d(self) -> None:
         calibration = Calibration.Calibration(418.92, 0.97, 'eV')
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((2048, ), float), dimensional_calibrations=[calibration])
         fit_range = 0.2, 0.3
@@ -97,7 +97,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         self.assertEqual(signal.data_shape, signal.data.shape)
         self.assertEqual(background.data_shape, background.data.shape)
 
-    def test_extracted_signal_has_correct_calibration_and_data(self):
+    def test_extracted_signal_has_correct_calibration_and_data(self) -> None:
         calibration = Calibration.Calibration(200.0, 2.0, 'eV')
         spectrum_length = 1000
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data((numpy.random.randn(spectrum_length) * 100).astype(numpy.int32), dimensional_calibrations=[calibration])
@@ -108,7 +108,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         self.assertEqual(signal.dimensional_calibrations[0].units, calibration.units)
         self.assertTrue(numpy.array_equal(signal.data, data_and_metadata.data[200:500]))
 
-    def test_background_signal_has_correct_calibration_offset(self):
+    def test_background_signal_has_correct_calibration_offset(self) -> None:
         calibration = Calibration.Calibration(200.0, 2.0, 'eV')
         spectrum_length = 1000
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length,), float), dimensional_calibrations=[calibration])
@@ -118,7 +118,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         self.assertAlmostEqual(background.dimensional_calibrations[0].scale, calibration.scale)
         self.assertEqual(background.dimensional_calibrations[0].units, calibration.units)
 
-    def test_make_signal_like_puts_data_in_correct_place(self):
+    def test_make_signal_like_puts_data_in_correct_place(self) -> None:
         calibration = Calibration.Calibration(200.0, 2.0, 'eV')
         spectrum_length = 1000
         data_and_metadata = DataAndMetadata.DataAndMetadata.from_data(numpy.ones((spectrum_length,), float), dimensional_calibrations=[calibration])
@@ -130,7 +130,7 @@ class TestEELSAnalysisFunctions(unittest.TestCase):
         self.assertTrue(numpy.array_equal(expanded.data[200:500], numpy.ones((300, ))))
         self.assertTrue(numpy.array_equal(expanded.data[500:1000], numpy.zeros((500, ))))
 
-    def test_map_background_subtracted_signal_produces_correct_calibrations(self):
+    def test_map_background_subtracted_signal_produces_correct_calibrations(self) -> None:
         calibration = Calibration.Calibration(200.0, 2.0, 'eV')
         calibration_y = Calibration.Calibration(101.0, 1.5, 'nm')
         calibration_x = Calibration.Calibration(102.0, 2.5, 'nm')

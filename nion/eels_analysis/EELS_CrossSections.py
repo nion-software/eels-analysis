@@ -5,10 +5,14 @@
 """
 
 import numpy
+import typing
+
+
+DataArrayType = numpy.typing.NDArray[typing.Any]
 
 
 def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_eV: float,
-                            beam_energy_eV: float, collection_angle_rad: float) -> numpy.ndarray:
+                            beam_energy_eV: float, collection_angle_rad: float) -> DataArrayType:
     """Return the K-shell generalized oscillator strength (GOS) calculated on the hydrogenic model as an ndarray.
 
     This algorithm is based on the hydrogenic model formulation given by Egerton in chapter 3 of his book
@@ -105,7 +109,7 @@ def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_
 
 
 def generalized_oscillator_strength(atomic_number: int, shell_number: int, subshell_index: int, edge_onset_eV: float, edge_delta_eV: float,
-                                        beam_energy_eV: float, collection_angle_rad: float) -> numpy.ndarray:
+                                        beam_energy_eV: float, collection_angle_rad: float) -> DataArrayType:
     """Return the generalized oscillator strength (GOS) for the specified electron shell as an ndarray.
 
     In order for the angular portion of any subsequent cross-section computation to be carried out via straightforward
@@ -129,7 +133,7 @@ def generalized_oscillator_strength(atomic_number: int, shell_number: int, subsh
     return gos
 
 
-def kohl_collection_efficiency(theta_rad: numpy.ndarray, alpha_rad: float, beta_rad: float) -> numpy.ndarray:
+def kohl_collection_efficiency(theta_rad: DataArrayType, alpha_rad: float, beta_rad: float) -> DataArrayType:
     """Return the Kohl collection efficiency for events with scattering angles (in radians) given by the theta array.
 
     alpha_rad is the convergence semi-angle of the incident beam in radians.
@@ -182,7 +186,7 @@ def kohl_collection_efficiency(theta_rad: numpy.ndarray, alpha_rad: float, beta_
 
 def energy_diff_cross_section_nm2_per_ev(atomic_number: int, shell_number: int, subshell_index: int,
                                          edge_onset_eV: float, edge_delta_eV: float, beam_energy_eV: float,
-                                         convergence_angle_rad: float, collection_angle_rad: float) -> numpy.ndarray:
+                                         convergence_angle_rad: float, collection_angle_rad: float) -> DataArrayType:
     """Return the energy differential cross section for the specified electron shell and experimental parameters.
 
     Uses generalized_oscillator_strength and kohl_collection_efficiency functions.
@@ -243,7 +247,7 @@ def energy_diff_cross_section_nm2_per_ev(atomic_number: int, shell_number: int, 
     collection_efficiency = kohl_collection_efficiency(theta_rad, convergence_angle_rad, collection_angle_rad)
     dSigma *= 2 * numpy.pi * theta_rad.reshape(thetaSampleCount, 1) * collection_efficiency.reshape(thetaSampleCount, 1)
     theta_step = max_scattering_angle_rad / (thetaSampleCount - 1)
-    energyDiffSigma = numpy.trapz(dSigma, dx = theta_step, axis = 0)
+    energyDiffSigma = typing.cast(DataArrayType, numpy.trapz(dSigma, dx = theta_step, axis = 0))
 
     return energyDiffSigma
 
@@ -266,6 +270,6 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
     # Integrate over energy window to get partial cross-section
     energySampleCount = energyDiffSigma.shape[0]
     energy_step = edge_delta_eV / (energySampleCount - 1)
-    partialCrossSection = numpy.trapz(energyDiffSigma, dx = energy_step)
+    partialCrossSection = typing.cast(float, numpy.trapz(energyDiffSigma, dx = energy_step))
 
     return partialCrossSection
