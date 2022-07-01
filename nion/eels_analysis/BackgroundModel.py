@@ -85,10 +85,10 @@ class AbstractBackgroundModel:
                          fit_intervals: typing.Sequence[BackgroundInterval],
                          background_interval: BackgroundInterval) -> DataAndMetadata.DataAndMetadata:
         # fit polynomial to the data
-        xs = numpy.concatenate(
+        xs: DataArrayType = numpy.concatenate(
             [get_calibrated_interval_domain(spectrum_xdata, fit_interval) for fit_interval in fit_intervals],
             dtype=numpy.float32)
-        ys: numpy.typing.NDArray[typing.Any]
+        ys: DataArrayType
         if len(fit_intervals) > 1:
             ys = numpy.concatenate(
                 [get_calibrated_interval_slice(spectrum_xdata, fit_interval)._data_ex for fit_interval in

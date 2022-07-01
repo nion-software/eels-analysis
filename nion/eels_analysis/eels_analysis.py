@@ -87,7 +87,7 @@ def extract_signal_from_polynomial_background_data(data: DataArrayType,
     assert fit_ranges.shape[range_dimension_count - 1] == 2
 
     # distill the fit ranges so that they are ordered, consolidated, and non-overlapping
-    fit_ranges_clean = numpy.atleast_2d(numpy.sort(fit_ranges))
+    fit_ranges_clean: DataArrayType = numpy.atleast_2d(numpy.sort(fit_ranges))
     fit_range_order = numpy.argsort(fit_ranges_clean, 0)[:, 0]
     fit_ranges_clean = fit_ranges_clean[fit_range_order]
     range_index = 1
@@ -138,7 +138,7 @@ def extract_signal_from_polynomial_background_data(data: DataArrayType,
     assert signal_range_clean[0] >= min_x and signal_range_clean[1] <= max_x
 
     # compute background model and subtract from data over contiguous union of fit and signal ranges
-    bkgd_range = numpy.array([min(fit_ranges_clean[0, 0], signal_range_clean[0]), max(fit_ranges_clean[range_count - 1, 1], signal_range_clean[1])])
+    bkgd_range: DataArrayType = numpy.array([min(fit_ranges_clean[0, 0], signal_range_clean[0]), max(fit_ranges_clean[range_count - 1, 1], signal_range_clean[1])])
 
     # compute the net signal
     if have_x_array:
@@ -184,7 +184,7 @@ def stacked_fit_linear_background(data: DataArrayType, signal_index: int, rcond:
     # using equation y = Ap where A = [[x 1]] and p = [[m], [c]], solve for p.
     linear = numpy.arange(signal_length)
     ones = numpy.ones((signal_length,))
-    A = numpy.vstack([linear, ones]).T
+    A: DataArrayType = numpy.vstack([linear, ones]).T
 
     # solve for p using svd. p will have the shape (n, 2) where n is the dimensions of the non-signal indexes of the data.
     u, s, v = numpy.linalg.svd(A, full_matrices=False)
@@ -229,10 +229,10 @@ def slow_fit_linear_background(data: DataArrayType, signal_index: int) -> DataAr
     # using equation y = Ap where A = [[x 1]] and p = [[m], [c]], solve for p.
     linear = numpy.arange(signal_length)
     ones = numpy.ones((signal_length,))
-    A = numpy.vstack([linear, ones]).T
+    A: DataArrayType = numpy.vstack([linear, ones]).T
 
     # solve for p. p will have the shape (n, 2) where n is the dimensions of the non-signal indexes of the data.
-    p = numpy.array([numpy.linalg.lstsq(A, reshaped_data[k, ...], rcond=-1)[0] for k in range(reshaped_data.shape[0])])
+    p: DataArrayType = numpy.array([numpy.linalg.lstsq(A, reshaped_data[k, ...], rcond=-1)[0] for k in range(reshaped_data.shape[0])])
 
     # reshape and return
     return p.reshape(data.shape[:signal_index] + (2,))
@@ -290,11 +290,11 @@ def calculate_background_signal(data_and_metadata: DataAndMetadata.DataAndMetada
 
     # Fit within fit_range; calculate background within signal_range; subtract from source signal range
     signal_calibration = data_and_metadata.dimensional_calibrations[signal_index]
-    spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(signal_length)])
+    spectral_range: DataArrayType = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(signal_length)])
     edge_onset = signal_calibration.convert_to_calibrated_value(signal_range[0])
     edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
     # bkgd_range = numpy.array([signal_calibration.convert_to_calibrated_value(fit_range0[0]), signal_calibration.convert_to_calibrated_value(fit_range0[1])])
-    bkgd_ranges = numpy.array([numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0] * signal_length), signal_calibration.convert_to_calibrated_value(fit_range[1] * signal_length)]) for fit_range in fit_ranges])
+    bkgd_ranges: DataArrayType = numpy.array([numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0] * signal_length), signal_calibration.convert_to_calibrated_value(fit_range[1] * signal_length)]) for fit_range in fit_ranges])
     # print("d {} s {} e {} d {} b {}".format(data.shape if data is not None else None, spectral_range, edge_onset, edge_delta, bkgd_range))
     edge_map, edge_profile, bkgd_model, profile_range = EELS_DataAnalysis.core_loss_edge(data, spectral_range, edge_onset, edge_delta, bkgd_ranges)
 
@@ -350,7 +350,7 @@ def make_signal_like(data_and_metadata_src: DataAndMetadata.DataAndMetadata, dat
     if data_and_metadata_src.dimensional_calibrations[signal_index].convert_to_calibrated_value(data_and_metadata_src.data_shape[signal_index]) > data_and_metadata_dst.dimensional_calibrations[signal_index].convert_to_calibrated_value(data_and_metadata_dst.data_shape[signal_index]):
         return None
 
-    data = numpy.copy(data_and_metadata_dst.data)
+    data: DataArrayType = numpy.copy(data_and_metadata_dst.data)
     index = int(data_and_metadata_dst.dimensional_calibrations[signal_index].convert_from_calibrated_value(data_and_metadata_src.dimensional_calibrations[signal_index].convert_to_calibrated_value(0)))
     data[:] = 0
     data[index:index + data_and_metadata_src.data_shape[signal_index]] = data_and_metadata_src.data
@@ -367,10 +367,10 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
     signal_range = (numpy.asarray(signal_range) * signal_length).astype(float)
 
     signal_calibration = data_and_metadata.dimensional_calibrations[signal_index]
-    spectral_range = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(data_and_metadata.dimensional_shape[signal_index])])
+    spectral_range: DataArrayType = numpy.array([signal_calibration.convert_to_calibrated_value(0), signal_calibration.convert_to_calibrated_value(data_and_metadata.dimensional_shape[signal_index])])
     edge_onset = signal_calibration.convert_to_calibrated_value(signal_range[0])
     edge_delta = signal_calibration.convert_to_calibrated_value(signal_range[1]) - edge_onset
-    bkgd_ranges = numpy.array([numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0] * signal_length), signal_calibration.convert_to_calibrated_value(fit_range[1] * signal_length)]) for fit_range in fit_ranges])
+    bkgd_ranges: DataArrayType = numpy.array([numpy.array([signal_calibration.convert_to_calibrated_value(fit_range[0] * signal_length), signal_calibration.convert_to_calibrated_value(fit_range[1] * signal_length)]) for fit_range in fit_ranges])
 
     cross_section = None
     if electron_shell is not None:

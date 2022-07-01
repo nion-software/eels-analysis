@@ -44,7 +44,7 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata,
 
         flat_src_data = numpy.reshape(src_data, (-1,) + d_shape)
         flat_dst_data = numpy.zeros_like(flat_src_data)
-        flat_pos_data = numpy.zeros(flat_src_data.shape[0], dtype=numpy.float32)
+        flat_pos_data: DataArrayType = numpy.zeros(flat_src_data.shape[0], dtype=numpy.float32)
 
         get_position_fn: typing.Callable[[DataArrayType], typing.Tuple[typing.Optional[float], ...]]
         if method == "com":
