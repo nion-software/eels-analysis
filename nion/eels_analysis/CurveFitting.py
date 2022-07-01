@@ -30,7 +30,7 @@ class MultipleLinearRegression1D(object):
 
         If no x values are supplied, then the data are assumed to be equispaced over -1 to 1, inclusive.
         """
-        self.data = numpy.copy(data)
+        self.data: DataArrayType = numpy.copy(data)
         if x_values == None:
             self.x_values = numpy.linspace(-1.0, 1.0, num = data.shape[0])
         else:
@@ -91,7 +91,7 @@ class PolynomialFit1D(object):
             # x value array must match y value array in size
             assert len(x_values.shape) == 1
             assert x_values.shape[0] == sample_count
-            self.__fit_abscissae = numpy.copy(x_values)
+            self.__fit_abscissae: DataArrayType = numpy.copy(x_values)
             self.__fit_abscissa_min = numpy.amin(self.__fit_abscissae)
             self.__fit_abscissa_max = numpy.amax(self.__fit_abscissae)
         else:
@@ -117,7 +117,7 @@ class PolynomialFit1D(object):
 
     def __get_polynomial_order(self) -> int:
         """The order of the fit polynomial, e.g. 1 = line, 2 = parabola, 3 = cubic, etc."""
-        return typing.cast(int, self.fit_polynomial.o)  # typing is wrong; needs fixing.
+        return self.fit_polynomial.o
 
     def __set_polynomial_order(self, polynomial_order: int) -> None:
         assert polynomial_order >= 0
@@ -133,7 +133,7 @@ class PolynomialFit1D(object):
             abscissae = values
 
         abscissae = self.__fit_abscissa_scale * (abscissae - self.__fit_abscissa_min) - 1
-        computed_fit = self.fit_polynomial(abscissae)
+        computed_fit: DataArrayType = self.fit_polynomial(abscissae)
         if self.__y_log_scale:
             computed_fit = numpy.exp(computed_fit)
         return computed_fit

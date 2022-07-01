@@ -105,7 +105,7 @@ def k_shell_hydrogenic_gos(atomic_number: int, edge_onset_eV: float, edge_delta_
 
     gos *= gosFactor
 
-    return gos
+    return typing.cast(DataArrayType, gos)
 
 
 def generalized_oscillator_strength(atomic_number: int, shell_number: int, subshell_index: int, edge_onset_eV: float, edge_delta_eV: float,

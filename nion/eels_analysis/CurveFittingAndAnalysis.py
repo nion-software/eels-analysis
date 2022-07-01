@@ -106,7 +106,7 @@ class PolynomialCurveFit:
     def _compute_polynomial_model(self, x_values: DataArrayType) -> DataArrayType:
         """Prepare polynomial model array for the current polynomial order and log-scale settings.
         """
-        polynomial_model = numpy.ones([self._polynomial_order + 1, x_values.size], x_values.dtype)
+        polynomial_model: DataArrayType = numpy.ones([self._polynomial_order + 1, x_values.size], x_values.dtype)
         if self._polynomial_order > 0:
             if self._fit_log_x:
                 # For log x fit, all x values must be positive
@@ -241,10 +241,10 @@ def signal_from_polynomial_background(data_values: DataArrayType, data_x_range: 
     assert numpy.amax(background_fit_x_ranges) <= data_x_range[1]
 
     # Distill the fit ranges so that they are ordered, consolidated, and non-overlapping
-    sorted_fit_ranges = numpy.atleast_2d(background_fit_x_ranges)
+    sorted_fit_ranges: DataArrayType = numpy.atleast_2d(background_fit_x_ranges)
     fit_range_order = numpy.argsort(sorted_fit_ranges, 0)[:, 0]
     sorted_fit_ranges = sorted_fit_ranges[fit_range_order]
-    clean_fit_ranges = numpy.atleast_2d(sorted_fit_ranges[0])
+    clean_fit_ranges: DataArrayType = numpy.atleast_2d(sorted_fit_ranges[0])
     for range_index in range(1, sorted_fit_ranges.shape[0]):
         if clean_fit_ranges[-1, 1] > sorted_fit_ranges[range_index, 0]:
             clean_fit_ranges[-1, 1] = max(clean_fit_ranges[-1, 1], sorted_fit_ranges[range_index, 1])
@@ -257,7 +257,7 @@ def signal_from_polynomial_background(data_values: DataArrayType, data_x_range: 
     x_origin = data_x_range[0]
     x_step = (data_x_range[1] - x_origin) / data_values.shape[-1]
     data_range_converter = RangeSliceConverter(x_origin, x_step)
-    x_values = numpy.arange(x_origin, data_x_range[1], x_step, dtype=numpy.float32)
+    x_values: DataArrayType = numpy.arange(x_origin, data_x_range[1], x_step, dtype=numpy.float32)
     next_slice = data_range_converter.get_slice(clean_fit_ranges[0])
     x_values_for_fit = x_values[next_slice]
     data_values_for_fit = numpy.maximum(data_values[..., next_slice], 1)
