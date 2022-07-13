@@ -128,6 +128,7 @@ class EELSMapBackgroundSubtractedSignal:
     label = _("EELS Map Background Subtracted Signal")
     inputs = {
         "spectrum_image_data_item": {"label": _("EELS Image")},
+        "eels_spectrum_data_item": {"label": _("EELS Spectrum")},
         "background_model": {"label": _("Background Model"), "entity_id": "background_model"},
         "fit_interval_graphics": {"label": _("Fit")},
         "signal_interval_graphic": {"label": _("Signal")},
@@ -139,13 +140,24 @@ class EELSMapBackgroundSubtractedSignal:
     def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
 
-    def execute(self, spectrum_image_data_item: Facade.DataItem, background_model: Facade.DataStructure, fit_interval_graphics: typing.Sequence[Facade.Graphic], signal_interval_graphic: Facade.Graphic, **kwargs: typing.Any) -> None:
+    def execute(self, **kwargs: typing.Any) -> None:
+        spectrum_image_data_item = typing.cast(Facade.DataItem, kwargs["spectrum_image_data_item"])
+        background_model = typing.cast(Facade.DataStructure, kwargs["background_model"])
+        fit_interval_graphics = typing.cast(typing.Sequence[Facade.Graphic], kwargs["fit_interval_graphics"])
+        signal_interval_graphic = typing.cast(Facade.Graphic, kwargs["signal_interval_graphic"])
+        eels_spectrum_data_item = typing.cast(typing.Optional[Facade.DataItem], kwargs.get("eels_spectrum_data_item"))
         try:
             assert spectrum_image_data_item.xdata
             assert spectrum_image_data_item.xdata.is_datum_1d
             assert spectrum_image_data_item.xdata.is_navigable
             assert spectrum_image_data_item.xdata.datum_dimensional_calibrations[0].units == "eV"
             spectrum_image_xdata = spectrum_image_data_item.xdata
+            eels_spectrum_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
+            if eels_spectrum_data_item:
+                eels_spectrum_xdata = eels_spectrum_data_item.xdata
+                assert eels_spectrum_xdata
+                assert eels_spectrum_xdata.is_datum_1d
+                assert eels_spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
             # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
             fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
             for fit_interval_graphic in fit_interval_graphics:
@@ -156,11 +168,7 @@ class EELSMapBackgroundSubtractedSignal:
                 entity_id = background_model._data_structure.entity.entity_type.entity_id
                 for component in Registry.get_components_by_type("background-model"):
                     if entity_id == component.background_model_id:
-                        # import time
-                        # t0 = time.perf_counter()
-                        integrate_result = component.integrate_signal(spectrum_xdata=spectrum_image_xdata, fit_intervals=fit_intervals, signal_interval=signal_interval)
-                        # t1 = time.perf_counter()
-                        # print(f"{component.background_model_id} {((t1 - t0) * 1000)}ms")
+                        integrate_result = component.integrate_signal(spectrum_xdata=spectrum_image_xdata, eels_spectrum_xdata=eels_spectrum_xdata, fit_intervals=fit_intervals, signal_interval=signal_interval)
                         mapped_xdata = integrate_result["integrated"]
             if mapped_xdata is None:
                 mapped_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros(spectrum_image_xdata.navigation_dimension_shape), dimensional_calibrations=spectrum_image_xdata.navigation_dimensional_calibrations)
@@ -279,6 +287,7 @@ def use_signal_for_map(api: Facade.API_1, window: Facade.DocumentWindow) -> None
                                 "eels.mapping3",
                                 inputs={
                                     "spectrum_image_data_item": spectrum_image,
+                                    "eels_spectrum_data_item": eels_spectrum_data_item,
                                     "fit_interval_graphics": fit_interval_graphics,
                                     "signal_interval_graphic": signal_interval_graphic,
                                     "background_model": background_model,

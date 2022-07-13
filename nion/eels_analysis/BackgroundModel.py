@@ -2,8 +2,10 @@ from __future__ import annotations
 
 # imports
 import copy
+import functools
 import gettext
 import numpy
+import scipy
 import typing
 
 # local libraries
@@ -50,7 +52,7 @@ class AbstractBackgroundModel:
                        fit_intervals: typing.Sequence[BackgroundInterval],
                        background_interval: BackgroundInterval, **kwargs: typing.Any) -> typing.Dict[str, typing.Any]:
         return {
-            "background_model": self.__fit_background(spectrum_xdata, fit_intervals, background_interval),
+            "background_model": self.__fit_background(spectrum_xdata, None, fit_intervals, background_interval),
         }
 
     def subtract_background(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata,
@@ -58,15 +60,18 @@ class AbstractBackgroundModel:
         # set up initial values
         fit_minimum = min([fit_interval[0] for fit_interval in fit_intervals])
         signal_interval = fit_minimum, 1.0
-        subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata, self.__fit_background(spectrum_xdata, fit_intervals, signal_interval))
+        subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata, self.__fit_background(spectrum_xdata, None, fit_intervals, signal_interval))
         assert subtracted_xdata
         return {"subtracted": subtracted_xdata}
 
-    def integrate_signal(self, *, spectrum_xdata: DataAndMetadata.DataAndMetadata,
+    def integrate_signal(self, *,
+                         spectrum_xdata: DataAndMetadata.DataAndMetadata,
                          fit_intervals: typing.Sequence[BackgroundInterval],
-                         signal_interval: BackgroundInterval, **kwargs: typing.Any) -> typing.Dict[str, typing.Any]:
+                         signal_interval: BackgroundInterval,
+                         eels_spectrum_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None,
+                         **kwargs: typing.Any) -> typing.Dict[str, typing.Any]:
         # set up initial values
-        subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata, self.__fit_background(spectrum_xdata, fit_intervals, signal_interval))
+        subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata, self.__fit_background(spectrum_xdata, eels_spectrum_xdata, fit_intervals, signal_interval))
         assert subtracted_xdata
         subtracted_data = subtracted_xdata.data
         assert subtracted_data is not None
@@ -81,7 +86,9 @@ class AbstractBackgroundModel:
                 "integrated_value": numpy.trapz(subtracted_data),
             }
 
-    def __fit_background(self, spectrum_xdata: DataAndMetadata.DataAndMetadata,
+    def __fit_background(self,
+                         spectrum_xdata: DataAndMetadata.DataAndMetadata,
+                         eels_spectrum_xdata: typing.Optional[DataAndMetadata.DataAndMetadata],
                          fit_intervals: typing.Sequence[BackgroundInterval],
                          background_interval: BackgroundInterval) -> DataAndMetadata.DataAndMetadata:
         # fit polynomial to the data
@@ -95,6 +102,15 @@ class AbstractBackgroundModel:
                  fit_intervals])
         else:
             ys = get_calibrated_interval_slice(spectrum_xdata, fit_intervals[0])._data_ex
+        es: typing.Optional[DataArrayType]
+        if eels_spectrum_xdata:
+            if len(fit_intervals) > 1:
+                es = numpy.concatenate(
+                    [get_calibrated_interval_slice(eels_spectrum_xdata, fit_interval).data for fit_interval in fit_intervals])
+            else:
+                es = get_calibrated_interval_slice(eels_spectrum_xdata, fit_intervals[0]).data
+        else:
+            es = None
         # generate background model data from the series
         background_interval_start_pixel = round(spectrum_xdata.data_shape[-1] * background_interval[0])
         background_interval_end_pixel = round(spectrum_xdata.data_shape[-1] * background_interval[1])
@@ -108,7 +124,7 @@ class AbstractBackgroundModel:
         if spectrum_xdata.is_navigable:
             calibrations = list(copy.deepcopy(spectrum_xdata.navigation_dimensional_calibrations)) + [calibration]
             yss = numpy.reshape(ys, (numpy.product(ys.shape[:-1]),) + (ys.shape[-1],))
-            fit_data = self._perform_fits(xs, yss, fs)
+            fit_data = self._perform_fits(xs, yss, fs, es)
             data_descriptor = DataAndMetadata.DataDescriptor(False, spectrum_xdata.navigation_dimension_count,
                                                              spectrum_xdata.datum_dimension_count)
             background_xdata = DataAndMetadata.new_data_and_metadata(numpy.reshape(fit_data, ys.shape[:-1] + (n,)),
@@ -121,7 +137,7 @@ class AbstractBackgroundModel:
                                                                      intensity_calibration=spectrum_xdata.intensity_calibration)
         return background_xdata
 
-    def _perform_fits(self, xs: DataArrayType, yss: DataArrayType, fs: DataArrayType) -> DataArrayType:
+    def _perform_fits(self, xs: DataArrayType, yss: DataArrayType, fs: DataArrayType, es: typing.Optional[DataArrayType]) -> DataArrayType:
         # xs will be a set of x-values with shape (L) representing the energies at which to fit
         # ys will be an array of y-values with shape (m,L)
         # fs will be an array of x-values with shape (n) representing energies at which to generate fitted data
@@ -137,9 +153,10 @@ class AbstractBackgroundModel:
         # xs will be a set of x-values with shape (L) representing the energies at which to fit
         # ys will be an array of y-values with shape (L)
         # fs will be an array of x-values with shape (n) representing energies at which to generate fitted data
+        # es will be an optional array of y-values with shape (L) representing the spectrum on which the background fit may be based
         # return an ndarray of the fit with shape (n)
         # implement at least one of _perform_fits and _perform_fit
-        return numpy.reshape(self._perform_fits(xs, numpy.reshape(ys, (1,) + ys.shape), fs), fs.shape)
+        return numpy.reshape(self._perform_fits(xs, numpy.reshape(ys, (1,) + ys.shape), fs, None), fs.shape)
 
 
 class PolynomialBackgroundModel(AbstractBackgroundModel):
@@ -153,7 +170,7 @@ class PolynomialBackgroundModel(AbstractBackgroundModel):
         self.transform = transform
         self.untransform = untransform
 
-    def _perform_fits(self, xs: DataArrayType, yss: DataArrayType, fs: DataArrayType) -> DataArrayType:
+    def _perform_fits(self, xs: DataArrayType, yss: DataArrayType, fs: DataArrayType, es: typing.Optional[DataArrayType]) -> DataArrayType:
         transform_data = self.transform or (lambda x: x)
         untransform_data = self.untransform or (lambda x: x)
         coefficients = numpy.polynomial.polynomial.polyfit(transform_data(xs), transform_data(yss.transpose()), self.deg)  # type: ignore
@@ -183,7 +200,7 @@ class TwoAreaBackgroundModel(AbstractBackgroundModel):
         self.model_func = model_func
         self.params_func = params_func
 
-    def _perform_fits(self, xs: DataArrayType, yss: DataArrayType, fs: DataArrayType) -> DataArrayType:
+    def _perform_fits(self, xs: DataArrayType, yss: DataArrayType, fs: DataArrayType, es: typing.Optional[DataArrayType]) -> DataArrayType:
         half_interval = len(xs) // 2
         x_interval_1 = xs[:half_interval]
         x_interval_2 = xs[half_interval:2 * half_interval]
@@ -196,6 +213,32 @@ class TwoAreaBackgroundModel(AbstractBackgroundModel):
         xs_tiled = numpy.transpose(numpy.tile(fs, (len(yss), 1)))
         series = numpy.transpose(self.model_func(xs_tiled, *params))
         return series
+
+
+def power_law(e0: float, x: DataArrayType, a: float, b: float) -> DataArrayType:
+    return typing.cast(DataArrayType, a * (x ** b / e0 ** b))
+
+
+class FittedPowerLawBackgroundModel(AbstractBackgroundModel):
+
+    def __init__(self, background_model_id: str, title: typing.Optional[str] = None) -> None:
+        super().__init__(background_model_id, title)
+
+    def _perform_fits(self, xs: DataArrayType, yss: DataArrayType, fs: DataArrayType, es: typing.Optional[DataArrayType]) -> DataArrayType:
+        es = es if es is not None else yss[0]
+        intercept, slope = numpy.polynomial.polynomial.polyfit(numpy.log(xs), numpy.log(es), 1)  # type: ignore
+        e0 = xs.flatten()[0]
+        a0 = es[0] if es is not None else 0.0
+        popt, pcov = scipy.optimize.curve_fit(functools.partial(power_law, e0), xs, es, p0=[a0, slope])  # type: ignore
+        global_model = power_law(e0, fs, *popt)
+        global_model_fit = power_law(e0, xs, *popt)
+        global_model_norm_factor = numpy.sqrt(numpy.sum(global_model_fit ** 2))
+        global_model_fit_normed = global_model_fit / global_model_norm_factor
+        global_model_normed = global_model / global_model_norm_factor
+        amplitudes = numpy.sum(global_model_fit_normed * yss, axis = 1)  # this is the "fit"
+        fit = numpy.reshape(numpy.tile(global_model_normed, yss.shape[0]), [yss.shape[0], fs.shape[0]])
+        fit = numpy.transpose(amplitudes*numpy.transpose(fit))
+        return numpy.where(numpy.isfinite(fit), fit, 0)
 
 
 def power_law_params(x_interval_1: DataArrayType,
@@ -260,3 +303,13 @@ Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_backgroun
 
 Registry.register_component(TwoAreaBackgroundModel("exponential_two_area_background_model", params_func=exponential_params, model_func=exponential_func,
                                                    title=_("Exponential Two Area")), {"background-model"})
+
+Registry.register_component(FittedPowerLawBackgroundModel("power_law_fitted_background_model",
+                                                          title=_("Power Law Fitted")), {"background-model"})
+
+
+def find_background_model_by_id(background_model_id: str) -> AbstractBackgroundModel:
+    for component in Registry.get_components_by_type("background-model"):
+        if background_model_id == component.background_model_id:
+            return typing.cast(AbstractBackgroundModel, component)
+    raise IndexError()
