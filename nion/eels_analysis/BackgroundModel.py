@@ -71,7 +71,9 @@ class AbstractBackgroundModel:
                          eels_spectrum_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None,
                          **kwargs: typing.Any) -> typing.Dict[str, typing.Any]:
         # set up initial values
-        subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata, self.__fit_background(spectrum_xdata, eels_spectrum_xdata, fit_intervals, signal_interval))
+        subtracted_xdata = Core.calibrated_subtract_spectrum(spectrum_xdata,
+                                                             self.__fit_background(spectrum_xdata, eels_spectrum_xdata,
+                                                                                   fit_intervals, signal_interval))
         assert subtracted_xdata
         subtracted_data = subtracted_xdata.data
         assert subtracted_data is not None
@@ -235,7 +237,7 @@ class FittedPowerLawBackgroundModel(AbstractBackgroundModel):
         global_model_norm_factor = numpy.sqrt(numpy.sum(global_model_fit ** 2))
         global_model_fit_normed = global_model_fit / global_model_norm_factor
         global_model_normed = global_model / global_model_norm_factor
-        amplitudes = numpy.sum(global_model_fit_normed * yss, axis = 1)  # this is the "fit"
+        amplitudes = numpy.sum(global_model_fit_normed * yss, axis=1)  # this is the "fit"
         fit = numpy.reshape(numpy.tile(global_model_normed, yss.shape[0]), [yss.shape[0], fs.shape[0]])
         fit = numpy.transpose(amplitudes*numpy.transpose(fit))
         return numpy.where(numpy.isfinite(fit), fit, 0)
