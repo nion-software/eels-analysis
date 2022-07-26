@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.2 (2022-07-26):
+-------------------
+- Introduce power law (uniform) background model, uses uniform background shape.
+
 0.6.1 (2022-05-28):
 -------------------
 - Minor changes for improved nionui compatibility.
