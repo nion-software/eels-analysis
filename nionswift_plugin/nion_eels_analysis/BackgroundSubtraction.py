@@ -187,7 +187,7 @@ def add_background_subtraction_computation(api: Facade.API_1, library: Facade.Li
     background = api.library.create_data_item(title="{} Background".format(data_item.title))
     signal = api.library.create_data_item(title="{} Subtracted".format(data_item.title))
 
-    background_model = DataStructure.DataStructure(structure_type="power_law_background_model")
+    background_model = DataStructure.DataStructure(structure_type="power_law_fit_background_model")
     library._document_model.append_data_structure(background_model)
     background_model.source = background._data_item
 

@@ -227,7 +227,7 @@ class FittedPowerLawBackgroundModel(AbstractBackgroundModel):
         super().__init__(background_model_id, title)
 
     def _perform_fits(self, xs: DataArrayType, yss: DataArrayType, fs: DataArrayType, es: typing.Optional[DataArrayType]) -> DataArrayType:
-        es = es if es is not None else yss[0]
+        es = es if es is not None else numpy.mean(yss, axis=0)
         intercept, slope = numpy.polynomial.polynomial.polyfit(numpy.log(xs), numpy.log(es), 1)  # type: ignore
         e0 = xs.flatten()[0]
         a0 = es[0] if es is not None else 0.0
@@ -291,19 +291,17 @@ Registry.register_component(PolynomialBackgroundModel("constant_background_model
 Registry.register_component(PolynomialBackgroundModel("linear_background_model", 1,
                                                       title=_("Linear")), {"background-model"})
 
-# NOTE: disabled in favor of the fitted power law
-# Registry.register_component(PolynomialBackgroundModel("power_law_background_model", 1,
-#                                                       transform=numpy.log, untransform=numpy.exp, title=_("Power Law")), {"background-model"})
+Registry.register_component(PolynomialBackgroundModel("power_law_background_model", 1,
+                                                      transform=numpy.log, untransform=numpy.exp, title=_("Power Law")), {"background-model"})
 
-Registry.register_component(FittedPowerLawBackgroundModel("power_law_background_model",
-                                                          title=_("Power Law")), {"background-model"})
+Registry.register_component(FittedPowerLawBackgroundModel("power_law_fit_background_model",
+                                                          title=_("Power Law (Uniform)")), {"background-model"})
 
 Registry.register_component(PolynomialBackgroundModel("poly2_background_model", 2,
                                                       title=_("2nd Order Polynomial")), {"background-model"})
 
-# NOTE: disabled in favor of the fitted power law
-# Registry.register_component(PolynomialBackgroundModel("poly2_log_background_model", 2, transform=numpy.log, untransform=numpy.exp,
-#                                                       title=_("2nd Order Power Law")), {"background-model"})
+Registry.register_component(PolynomialBackgroundModel("poly2_log_background_model", 2, transform=numpy.log, untransform=numpy.exp,
+                                                      title=_("2nd Order Power Law")), {"background-model"})
 
 Registry.register_component(TwoAreaBackgroundModel("power_law_two_area_background_model", params_func=power_law_params, model_func=power_law_func,
                                                    title=_("Power Law Two Area")), {"background-model"})
