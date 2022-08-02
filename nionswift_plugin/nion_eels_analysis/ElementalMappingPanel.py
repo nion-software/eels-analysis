@@ -104,7 +104,7 @@ class ElementalMappingPanel(Panel.Panel):
                     label = None
                     if edge:
                         radio_button = ui.create_radio_button_widget(edge_bundle.electron_shell_str)
-                        self.__button_group.add_button(radio_button, str(index))
+                        self.__button_group.add_button(radio_button, typing.cast(str, index))  # work around incorrect typing
                         radio_button.checked = edge_bundle.selected
                         radio_button.on_clicked = edge_bundle.select_action
                     else:

@@ -444,7 +444,7 @@ def energy_diff_cross_section_nm2_per_ev(atomic_number: int, shell_number: int, 
                                                                                     beam_energy_ev,
                                                                                     convergence_angle_rad,
                                                                                     collection_angle_rad)
-    assert energy_diff_sigma is not None
+    assert energy_diff_sigma is not None, f"{atomic_number=} {shell_number=} {subshell_index=} / {eels_analysis_service}"
     return energy_diff_sigma
 
 

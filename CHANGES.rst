@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.3 (UNRELEASED):
+-------------------
+- Fix regression in elemental mapping radio buttons for picked edge.
+
 0.6.2 (2022-07-26):
 -------------------
 - Introduce power law (uniform) background model, uses uniform background shape.
