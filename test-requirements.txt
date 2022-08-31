@@ -3,15 +3,15 @@
 # Use it like this:
 #   pip install -r test-requirements.txt
 
--e git+https://github.com/nion-software/nionutils.git#egg=nionutils
--e git+https://github.com/nion-software/nionui.git#egg=nionui
--e git+https://github.com/nion-software/niondata.git#egg=niondata
--e git+https://github.com/nion-software/nionswift.git#egg=nionswift
--e git+https://github.com/nion-software/nionswift-io.git#egg=nionswift-io
+git+https://github.com/nion-software/nionutils.git#egg=nionutils
+git+https://github.com/nion-software/nionui.git#egg=nionui
+git+https://github.com/nion-software/niondata.git#egg=niondata
+git+https://github.com/nion-software/nionswift.git#egg=nionswift
+git+https://github.com/nion-software/nionswift-io.git#egg=nionswift-io
 
 imageio
 scipy
-numpy==1.22.3
+numpy
 h5py
 pytz
 tzlocal
