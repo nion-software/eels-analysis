@@ -1,7 +1,7 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
-0.6.3 (UNRELEASED):
+0.6.3 (2022-09-14):
 -------------------
 - Fix regression in elemental mapping radio buttons for picked edge.
 
