@@ -396,18 +396,18 @@ def map_background_subtracted_signal(data_and_metadata: DataAndMetadata.DataAndM
     return DataAndMetadata.new_data_and_metadata(result, intensity_calibration, dimensional_calibrations)
 
 
-def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au: float,
-                                    atomic_number: int, shell_number: int, subshell_index: int) -> DataArrayType:
-    """Return the generalized oscillator strength as an ndarray.
-
-    energy is in eV.
-    scattering_angle is in radians.
-
-    The 0-axis is in units of eV
-    The 1-axis is in units of Phi * Phi / scattering angle
-    The intensity is in units of nm * nm
-    """
-    pass
+# def generalized_oscillator_strength(energy_loss_eV: float, momentum_transfer_au: float,
+#                                     atomic_number: int, shell_number: int, subshell_index: int) -> DataArrayType:
+#     """Return the generalized oscillator strength as an ndarray.
+#
+#     energy is in eV.
+#     scattering_angle is in radians.
+#
+#     The 0-axis is in units of eV
+#     The 1-axis is in units of Phi * Phi / scattering angle
+#     The intensity is in units of nm * nm
+#     """
+#     pass
 
 
 class P1(typing.Protocol):
@@ -501,35 +501,35 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
     return cross_section
 
 
-def relative_atomic_abundance(counts_edge: float, partial_cross_section_nm2: float) -> float:
-    """Return the relative atomic concentration.
-
-    partial_cross_section is in nm * nm.
-
-    The return value units are atoms / (nm * nm) * spectrum intensity.
-    """
-    pass
-
-
-def atomic_areal_density_nm2(counts_edge: float, counts_spectrum: float, partial_cross_section_nm2: float) -> float:
-    """Return the areal density.
-
-    partial_cross_section is in nm * nm.
-
-    The return value units are atoms / (nm * nm).
-    """
-    pass
+# def relative_atomic_abundance(counts_edge: float, partial_cross_section_nm2: float) -> float:
+#     """Return the relative atomic concentration.
+#
+#     partial_cross_section is in nm * nm.
+#
+#     The return value units are atoms / (nm * nm) * spectrum intensity.
+#     """
+#     pass
 
 
-def edge_onset_energy_eV(atomic_number: int, shell_number: int, subshell_index: int) -> float:
-    """Return the electron binding energy for the given edge.
+# def atomic_areal_density_nm2(counts_edge: float, counts_spectrum: float, partial_cross_section_nm2: float) -> float:
+#     """Return the areal density.
+#
+#     partial_cross_section is in nm * nm.
+#
+#     The return value units are atoms / (nm * nm).
+#     """
+#     pass
 
-    Return value is in eV.
-    """
-    pass
+
+# def edge_onset_energy_eV(atomic_number: int, shell_number: int, subshell_index: int) -> float:
+#     """Return the electron binding energy for the given edge.
+#
+#     Return value is in eV.
+#     """
+#     pass
 
 
-def edges_near_energy_eV(energy_loss_eV: float, energy_loss_delta_eV: float) -> typing.Sequence[float]:
-    """Return a list of edges near the energy_loss.
-    """
-    pass
+# def edges_near_energy_eV(energy_loss_eV: float, energy_loss_delta_eV: float) -> typing.Sequence[float]:
+#     """Return a list of edges near the energy_loss.
+#     """
+#     pass
