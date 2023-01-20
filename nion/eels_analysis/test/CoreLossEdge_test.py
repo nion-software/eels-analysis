@@ -30,7 +30,7 @@ class TestLibrary(unittest.TestCase):
         # 10 * pow(linspace(1,10,1000), -4)
         scale = 1E4
         background = scale * numpy.power(numpy.linspace(1,10,1000), -4)
-        self.assertGreaterEqual(numpy.amin(background), 1)
+        self.assertGreaterEqual(numpy.amin(background), 1 - 1E-9)  # adjust for rounding error
         spectral_range = numpy.array([0, 1000])
         edge_onset = 500.0
         edge_delta = 100.0
@@ -63,7 +63,7 @@ class TestLibrary(unittest.TestCase):
         raw_signal = scipy.stats.gamma(a=1.3, loc=0.5, scale=0.01).pdf(numpy.linspace(0,1,1000))
         signal = scale / 1000 * (raw_signal - numpy.amin(raw_signal)) / numpy.ptp(raw_signal)
         spectrum = background + signal
-        self.assertGreaterEqual(numpy.amin(spectrum), 1)
+        self.assertGreaterEqual(numpy.amin(spectrum), 1 - 1E-9)
         spectral_range = numpy.array([0, 1000])
         edge_onset = 500.0
         edge_delta = 100.0
