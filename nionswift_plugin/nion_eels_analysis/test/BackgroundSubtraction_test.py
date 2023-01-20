@@ -11,7 +11,7 @@ from nion.swift.model import Graphics
 from nion.swift.test import TestContext
 from nion.ui import TestUI
 
-from nionswift_plugin.nion_eels_analysis import BackgroundSubtraction
+from .. import BackgroundSubtraction
 
 
 Facade.initialize()

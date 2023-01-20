@@ -16,7 +16,7 @@ from nion.swift.model import DataItem
 from nion.swift.model import DisplayItem
 from nion.swift.model import Persistence
 from nion.eels_analysis import PeriodicTable
-from nionswift_plugin.nion_eels_analysis import ElementalMappingController
+from . import ElementalMappingController
 
 _ = gettext.gettext
 

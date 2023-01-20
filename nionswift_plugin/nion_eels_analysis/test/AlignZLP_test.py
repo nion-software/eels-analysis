@@ -9,7 +9,7 @@ from nion.swift.model import DataItem
 from nion.swift.test import TestContext
 from nion.ui import TestUI
 
-from nionswift_plugin.nion_eels_analysis import AlignZLP
+from .. import AlignZLP
 
 
 Facade.initialize()

@@ -18,9 +18,9 @@ from nion.ui import TestUI
 from nion.eels_analysis import eels_analysis
 from nion.eels_analysis import PeriodicTable
 
-from nionswift_plugin.nion_eels_analysis import ElementalMappingController
-from nionswift_plugin.nion_eels_analysis import AlignZLP
-from nionswift_plugin.nion_eels_analysis import ThicknessMap
+from .. import ElementalMappingController
+from .. import AlignZLP
+from .. import ThicknessMap
 
 
 Facade.initialize()

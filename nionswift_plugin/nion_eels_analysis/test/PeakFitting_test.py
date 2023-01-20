@@ -1,4 +1,3 @@
-import copy
 import numpy
 import unittest
 
@@ -7,11 +6,10 @@ from nion.data import DataAndMetadata
 from nion.swift import Application
 from nion.swift import Facade
 from nion.swift.model import DataItem
-from nion.swift.model import Graphics
 from nion.swift.test import TestContext
 from nion.ui import TestUI
 
-from nionswift_plugin.nion_eels_analysis import PeakFitting
+from .. import PeakFitting
 
 
 Facade.initialize()
