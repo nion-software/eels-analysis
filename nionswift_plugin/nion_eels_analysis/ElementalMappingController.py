@@ -25,6 +25,8 @@ from nion.swift.model import DataStructure
 from nion.swift.model import DisplayItem
 from nion.swift.model import DocumentModel
 from nion.swift.model import Graphics
+from nion.swift.model import Model
+from nion.swift.model import Schema
 from nion.swift.model import Symbolic
 from nion.utils import Geometry
 
@@ -65,7 +67,6 @@ async def pick_new_edge(document_controller: DocumentController.DocumentControll
         - the edge reference is used to recognize the eels line plot as associated with the referenced edge
     """
     document_model = document_controller.document_model
-    project = document_model._project
     model_display_item = document_model.get_display_item_for_data_item(model_data_item)
     assert model_display_item
     pick_region = Graphics.RectangleGraphic()
@@ -99,6 +100,7 @@ async def pick_new_edge(document_controller: DocumentController.DocumentControll
     document_model.append_connection(Connection.PropertyConnection(edge.data_structure, "signal_interval", signal_region, "interval", parent=eels_data_item))
 
     computation = document_model.create_computation()
+    computation.label = _("Background Subtraction")
     computation.create_input_item("eels_xdata", Symbolic.make_item(model_data_item, type="xdata"))
     computation.create_input_item("region", Symbolic.make_item(pick_region))
     computation.create_input_item("fit_interval", Symbolic.make_item(edge.data_structure), property_name="fit_interval")
@@ -233,6 +235,7 @@ async def map_new_edge(document_controller: DocumentController.DocumentControlle
     document_model.append_data_item(map_data_item)
 
     computation = document_model.create_computation()
+    computation.label = _("Map Signal")
     computation.source = map_data_item
     computation.create_input_item("spectrum_image_xdata", Symbolic.make_item(model_data_item, type="xdata"))
     computation.create_input_item("fit_interval", Symbolic.make_item(edge.data_structure), property_name="fit_interval")
@@ -249,6 +252,49 @@ async def map_new_edge(document_controller: DocumentController.DocumentControlle
     map_display_item = document_model.get_display_item_for_data_item(map_data_item)
     assert map_display_item
     document_controller.show_display_item(map_display_item)
+
+
+ElementalMappingEdgeEntity = Schema.entity("elemental_mapping_edge", None, None, {
+    "atomic_number": Schema.prop(Schema.INT),
+    "shell_number": Schema.prop(Schema.INT),
+    "subshell_index": Schema.prop(Schema.INT),
+    "fit_interval": Schema.fixed_tuple([Schema.prop(Schema.FLOAT), Schema.prop(Schema.FLOAT)]),
+    "signal_interval": Schema.fixed_tuple([Schema.prop(Schema.FLOAT), Schema.prop(Schema.FLOAT)]),
+})
+
+
+ElementalMappingEdgeRefEntity = Schema.entity("elemental_mapping_edge_ref", None, None, {
+    "spectrum_image": Schema.reference(Model.DataItem),
+    "edge": Schema.reference(ElementalMappingEdgeEntity),
+    "data": Schema.reference(Model.DataItem),
+    "pick_region": Schema.reference(Model.Graphic),
+})
+
+def transform_elemental_mapping_edge_ref_entity_forward(d: typing.Dict[str, typing.Any]) -> Schema.PersistentDictType:
+    # we want to use references that are just uuids, not typed.
+    if "spectrum_image" in d:
+        d["spectrum_image"] = d["spectrum_image"]["uuid"]
+    if "edge" in d:
+        d["edge"] = d["edge"]["uuid"]
+    if "data" in d:
+        d["data"] = d["data"]["uuid"]
+    if "pick_region" in d:
+        d["pick_region"] = d["pick_region"]["uuid"]
+    return d
+
+def transform_elemental_mapping_edge_ref_entity_backward(d: typing.Dict[str, typing.Any]) -> Schema.PersistentDictType:
+    # transform references back to the typed references used in the past for backwards compatibility.
+    if "spectrum_image" in d:
+        d["spectrum_image"] = {"version": 1, "type": "data_item", "uuid": d["spectrum_image"]}
+    if "edge" in d:
+        d["edge"] = {"version": 1, "type": "structure", "uuid": d["edge"]}
+    if "data" in d:
+        d["data"] = {"version": 1, "type": "data_item", "uuid": d["data"]}
+    if "pick_region" in d:
+        d["pick_region"] = {"version": 1, "type": "graphic", "uuid": d["pick_region"]}
+    return d
+
+ElementalMappingEdgeRefEntity.transform(transform_elemental_mapping_edge_ref_entity_forward, transform_elemental_mapping_edge_ref_entity_backward)
 
 
 class ElementalMappingEdge:
@@ -475,7 +521,6 @@ class ElementalMappingController:
             self.__connect_explorer_interval(document_model, pick_data_item)
 
     def __add_edge(self, data_item: DataItem.DataItem, electron_shell: PeriodicTable.ElectronShell, fit_interval: typing.Tuple[float, float], signal_interval: typing.Tuple[float, float]) -> ElementalMappingEdge:
-        project = self.__document_model._project
         data_structure = self.__document_model.create_data_structure(structure_type="elemental_mapping_edge", source=data_item)
         self.__document_model.append_data_structure(data_structure)
         edge = ElementalMappingEdge(electron_shell=electron_shell, fit_interval=fit_interval, signal_interval=signal_interval)
@@ -618,3 +663,5 @@ class ElementalMappingController:
 ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
 Symbolic.register_computation_type("eels.background_subtraction11", typing.cast(ComputationCallable, EELSBackgroundSubtraction))
 Symbolic.register_computation_type("eels.mapping", typing.cast(ComputationCallable, EELSMapping))
+DataStructure.DataStructure.register_entity(ElementalMappingEdgeEntity, entity_name="ElementalMappingEdge", entity_package_name="EELSAnalysis")
+DataStructure.DataStructure.register_entity(ElementalMappingEdgeRefEntity, entity_name="ElementalMappingEdgeRef", entity_package_name="EELSAnalysis")
