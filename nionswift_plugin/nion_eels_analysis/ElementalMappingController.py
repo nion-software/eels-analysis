@@ -69,6 +69,7 @@ async def pick_new_edge(document_controller: DocumentController.DocumentControll
     document_model = document_controller.document_model
     model_display_item = document_model.get_display_item_for_data_item(model_data_item)
     assert model_display_item
+
     pick_region = Graphics.RectangleGraphic()
     pick_region.size = Geometry.FloatSize(min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1]))
     pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
@@ -77,7 +78,7 @@ async def pick_new_edge(document_controller: DocumentController.DocumentControll
     # set up the computation for this edge.
     eels_data_item = DataItem.DataItem()
     document_model.append_data_item(eels_data_item)
-    eels_data_item.title = "{} EELS Data of {}".format(pick_region.label, model_data_item.title)
+    eels_data_item.title = "{} EELS Data of {}".format(pick_region.label, model_display_item.displayed_title)
     eels_data_item.source = pick_region
     eels_display_item = document_model.get_display_item_for_data_item(eels_data_item)
     assert eels_display_item
@@ -142,7 +143,8 @@ async def change_edge(document_controller: DocumentController.DocumentController
         - the edge reference will reference the new edge
     """
     document_model = document_controller.document_model
-    project = document_model._project
+    model_display_item = document_model.get_display_item_for_data_item(model_data_item)
+    assert model_display_item
 
     computation: typing.Optional[Symbolic.Computation] = None
     for computation_ in document_model.computations:
@@ -181,7 +183,7 @@ async def change_edge(document_controller: DocumentController.DocumentController
     computation.set_input_item("fit_interval", Symbolic.make_item(edge.data_structure))
     computation.set_input_item("signal_interval", Symbolic.make_item(edge.data_structure))
 
-    eels_data_item.title = "{} EELS Data of {}".format(pick_region.label, model_data_item.title)
+    eels_data_item.title = "{} EELS Data of {}".format(pick_region.label, model_display_item.displayed_title)
 
     for connection_ in copy.copy(document_model.connections):
         connection = typing.cast(typing.Any, connection_)
@@ -226,7 +228,6 @@ class EELSMapping:
 
 async def map_new_edge(document_controller: DocumentController.DocumentController, model_data_item: DataItem.DataItem, edge: ElementalMappingEdge) -> None:
     document_model = document_controller.document_model
-    project = document_model._project
 
     map_data_item = DataItem.new_data_item()
     map_data_item.title = "{} of {}".format(_("Map"), str(edge.electron_shell))
@@ -629,7 +630,6 @@ class ElementalMappingController:
         model_data_item = self.__model_data_item
         if not model_data_item:
             return
-        project = document_model._project
         multiprofile_display_item = None
         line_profile_regions = list()
 

@@ -122,9 +122,9 @@ def _run_align_zlp(api: API.API, window: Facade.DocumentWindow, method_id: str, 
             # create a new data item in the library and set its title.
             if shift_xdata:
                 shift_data_item = api.library.create_data_item_from_data_and_metadata(shift_xdata)
-                shift_data_item.title = f"Shifts ({method_name}) " + src_display.data_item.title
+                shift_data_item.title = f"Shifts ({method_name}) " + src_display._display_item.displayed_title
             data_item = api.library.create_data_item_from_data_and_metadata(dst_xdata)
-            data_item.title = f"Aligned ({method_name}) " + src_display.data_item.title
+            data_item.title = f"Aligned ({method_name}) " + src_display._display_item.displayed_title
 
             # display the data item.
             window.display_data_item(data_item)
