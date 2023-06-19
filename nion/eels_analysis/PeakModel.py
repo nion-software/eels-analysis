@@ -33,7 +33,7 @@ class AbstractZeroLossPeakModel:
         ys = spectrum_xdata.data
         if spectrum_xdata.is_navigable:
             calibrations = list(copy.deepcopy(spectrum_xdata.navigation_dimensional_calibrations)) + [calibration]
-            yss = numpy.reshape(ys, (numpy.product(ys.shape[:-1]),) + (ys.shape[-1],))
+            yss = numpy.reshape(ys, (numpy.prod(ys.shape[:-1]),) + (ys.shape[-1],))
             fit_data = self._perform_fits(yss, z)
             data_descriptor = DataAndMetadata.DataDescriptor(False, spectrum_xdata.navigation_dimension_count,
                                                              spectrum_xdata.datum_dimension_count)
