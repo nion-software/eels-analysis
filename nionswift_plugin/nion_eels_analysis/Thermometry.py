@@ -39,7 +39,7 @@ class MeasureTemperature:
         self.__gain_fit_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
         self.__gain_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
         self.__difference_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
-        self.__fit: typing.Optional[DataAndMetadata.DataAndMetadata] = None
+        self.__fit: typing.Optional[DataArrayType] = None
 
     def execute(self, near_data_item: DataItem.DataItem, far_data_item: DataItem.DataItem, fit_interval_graphic: Graphics.IntervalGraphic, **kwargs: typing.Any) -> None:
         try:
@@ -63,19 +63,19 @@ class MeasureTemperature:
             gain_slice = slice(zero_index-length+1, zero_index+1)
             loss_data = difference_xdata.data[loss_slice]
             gain_data = difference_xdata.data[gain_slice][::-1]
-            weights = 1 + np.sqrt(np.abs(near_xdata.data[gain_slice][::-1]) + np.abs(far_xdata[gain_slice][::-1]))
+            weights = 1 + np.sqrt(np.abs(near_xdata.data[gain_slice][::-1]) + np.abs(far_xdata.data[gain_slice][::-1]))
 
-            result_calibration = Calibration.Calibration(offset=calibration.convert_to_calibrated_value(zero_index), scale=calibration.scale, units=calibration.units)
+            result_calibration = Calibration.Calibration(offset=calibration.convert_to_calibrated_value(fit_interval_graphic.start * len(difference_xdata.data)), scale=calibration.scale, units=calibration.units)
             x_data = np.arange(len(loss_data)) * result_calibration.scale + result_calibration.offset
             interpolator = interp1d(x_data, loss_data)
 
             def gain_fit(x: DataArrayType, T: DataArrayType, dx: DataArrayType) -> DataArrayType:
                 return typing.cast(DataArrayType, interpolator(x + 2 * dx) / np.exp((x + dx) / (kb * T)))
 
-            fit_slice = slice(max(0, typing.cast(int, fit_interval_graphic.start * len(difference_xdata.data) - zero_index)),
-                              min(len(gain_data), typing.cast(int, fit_interval_graphic.end * len(difference_xdata.data) - zero_index)))
+            fit_slice = slice(max(0, int(fit_interval_graphic.start * len(difference_xdata.data) - zero_index)),
+                              min(len(gain_data), int(fit_interval_graphic.end * len(difference_xdata.data) - zero_index)))
 
-            popt, pcov = curve_fit(gain_fit, x_data[fit_slice], gain_data[fit_slice], sigma=weights[fit_slice], p0=(300.0, 0.0))
+            popt, pcov = curve_fit(gain_fit, x_data[fit_slice], gain_data[fit_slice], sigma=weights[fit_slice], p0=(300.0, 0.0), bounds=((0, -0.000001), (2000, 0.000001)))
             self.__fit = popt
 
             self.__gain_fit_xdata = DataAndMetadata.new_data_and_metadata(gain_fit(x_data[fit_slice], *popt),
@@ -96,12 +96,12 @@ class MeasureTemperature:
         assert self.__gain_xdata
         assert self.__gain_fit_xdata
         assert self.__difference_xdata
-        assert self.__fit
+        assert self.__fit is not None
         self.computation.set_referenced_xdata("gain_data_item", self.__gain_xdata)
         self.computation.set_referenced_xdata("gain_fit_data_item", self.__gain_fit_xdata)
         self.computation.set_referenced_xdata("difference_data_item", self.__difference_xdata)
         gain_fit_display_item = self.computation.get_result("gain_fit_data_item").display._display_item
-        gain_fit_display_item._set_display_layer_properties(0, label=_(f"Fit T = {self.__fit[0] - 273.15:.0f} °C \nZLP shift = {self.__fit[1]*1000.0:.2f} meV"))
+        gain_fit_display_item._set_display_layer_properties(0, label=_(f"Fit T = {self.__fit[0] - 273.15:.0f} °C"))
 
 
 ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
@@ -160,7 +160,7 @@ def measure_temperature(api: Facade.API_1, window: Facade.DocumentWindow) -> Non
     gain_fit_display_item = document_model.get_display_item_for_data_item(gain_fit_data_item._data_item)
     if gain_fit_display_item:
         gain_fit_display_item.append_display_data_channel_for_data_item(gain_data_item._data_item)
-        gain_fit_display_item._set_display_layer_properties(0, label=_("Fit"), fill_color=None, stroke_color="#F00")
-        gain_fit_display_item._set_display_layer_properties(1, label=_("Gain"), fill_color="#1E90FF")
+        gain_fit_display_item._set_display_layer_properties(0, label=_("Fit"), fill_color=None, stroke_color="#F00", stroke_width=2)
+        gain_fit_display_item._set_display_layer_properties(1, label=_("Gain"), fill_color="#1E90FF", stroke_color=None)
         gain_fit_display_item.set_display_property("legend_position", "top-right")
         gain_fit_display_item.title = "Temperature Measurement Fit"
