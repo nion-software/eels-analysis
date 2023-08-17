@@ -1,6 +1,12 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.4 (2023-08-17):
+-------------------
+- Add Python 3.11 support. Drop 3.8.
+- Update titles for new auto-title system in nionswift.
+- Fix thermometry issues.
+
 0.6.3 (2022-09-14):
 -------------------
 - Fix regression in elemental mapping radio buttons for picked edge.
