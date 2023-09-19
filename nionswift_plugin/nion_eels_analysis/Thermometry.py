@@ -66,7 +66,8 @@ class MeasureTemperature:
             weights = 1 + np.sqrt(np.abs(near_xdata.data[gain_slice][::-1]) + np.abs(far_xdata.data[gain_slice][::-1]))
 
             result_calibration = Calibration.Calibration(offset=calibration.convert_to_calibrated_value(fit_interval_graphic.start * len(difference_xdata.data)), scale=calibration.scale, units=calibration.units)
-            x_data = np.arange(len(loss_data)) * result_calibration.scale + result_calibration.offset
+            # Our fit data ranges from 0 to some number, so we need to offset our x-axis by the zero index too.
+            x_data = np.arange(len(loss_data)) * calibration.scale + calibration.convert_to_calibrated_value(zero_index)
             interpolator = interp1d(x_data, loss_data)
 
             def gain_fit(x: DataArrayType, T: DataArrayType, dx: DataArrayType) -> DataArrayType:
@@ -75,7 +76,7 @@ class MeasureTemperature:
             fit_slice = slice(max(0, int(fit_interval_graphic.start * len(difference_xdata.data) - zero_index)),
                               min(len(gain_data), int(fit_interval_graphic.end * len(difference_xdata.data) - zero_index)))
 
-            popt, pcov = curve_fit(gain_fit, x_data[fit_slice], gain_data[fit_slice], sigma=weights[fit_slice], p0=(300.0, 0.0), bounds=((0, -0.000001), (2000, 0.000001)))
+            popt, pcov = curve_fit(gain_fit, x_data[fit_slice], gain_data[fit_slice], sigma=weights[fit_slice], p0=(300.0, 0.0), bounds=((0, -0.000001), (5000, 0.000001)))
             self.__fit = popt
 
             self.__gain_fit_xdata = DataAndMetadata.new_data_and_metadata(gain_fit(x_data[fit_slice], *popt),
