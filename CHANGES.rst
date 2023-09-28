@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.5 (2023-09-28):
+-------------------
+- Fix a bug in temperature calculation.
+
 0.6.4 (2023-08-17):
 -------------------
 - Add Python 3.11 support. Drop 3.8.
