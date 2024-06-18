@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.6 (2024-06-18):
+-------------------
+- Swift 16.11 compatibility (no changes).
+
 0.6.5 (2023-09-28):
 -------------------
 - Fix a bug in temperature calculation.
