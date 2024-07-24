@@ -196,7 +196,7 @@ class ElementalMappingPanel(Panel.Panel):
                         edges = PeriodicTable.PeriodicTable().find_edges_in_energy_interval(explore_interval)
                         for i, edge in enumerate(edges[0:4]):
                             button = ui.create_push_button_widget(edge.to_long_str())
-                            def add_edge(model_data_item: DataItem.DataItem, edge: PeriodicTable.ElectronShell, data_item: DataItem.DataItem) -> None:
+                            def add_edge(model_data_item: DataItem.DataItem, edge: PeriodicTable.ElectronShell, data_item: typing.Optional[DataItem.DataItem]) -> None:
                                 self.__elemental_mapping_controller.add_edge(edge)
                                 data_item_changed(model_data_item)
                                 data_item_changed(data_item)

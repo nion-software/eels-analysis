@@ -39,7 +39,7 @@ class TestBackgroundSubtraction(unittest.TestCase):
             document_controller.select_display_items_in_data_panel([display_item])
             document_controller.data_panel_focused()
             api = Facade.get_api("~1.0", "~1.0")
-            dialog = AlignZLP.calibrate_spectrum(api, api.application.document_windows[0])
+            dialog = AlignZLP._calibrate_spectrum(api, api.application.document_windows[0])
             self.assertEqual(1, len(document_model.data_items))
             self.assertEqual(1, len(document_model.display_items))
             self.assertEqual(1, len(api.library.data_items))

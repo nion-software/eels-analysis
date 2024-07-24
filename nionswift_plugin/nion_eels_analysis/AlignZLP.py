@@ -146,7 +146,7 @@ def align_zlp_fit(api: API.API, window: Facade.DocumentWindow) -> None:
     _run_align_zlp(api, window, "fit", "peak fit")
 
 
-def calibrate_spectrum(api: Facade.API_1, window: Facade.DocumentWindow) -> typing.Optional[Dialog.ActionDialog]:
+def _calibrate_spectrum(api: Facade.API_1, window: Facade.DocumentWindow) -> typing.Optional[Dialog.ActionDialog]:
 
     class UIHandler(Declarative.Handler):
         def __init__(self, data_item: Facade.DataItem, src_data_item: Facade.DataItem, offset_graphic: Facade.Graphic,
@@ -336,3 +336,7 @@ def calibrate_spectrum(api: Facade.API_1, window: Facade.DocumentWindow) -> typi
 
     # Return the dialog which is useful for testing
     return dialog
+
+
+def calibrate_spectrum(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
+    _calibrate_spectrum(api, window)

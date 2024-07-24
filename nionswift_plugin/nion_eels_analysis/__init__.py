@@ -60,7 +60,7 @@ class MenuExtension:
         eels_menu.add_menu_item(_("Show Live Thickness Measurement"), functools.partial(LiveThickness.attach_measure_thickness, api, window))
         eels_menu.add_menu_item(_("Show Live ZLP Measurement"), functools.partial(LiveZLP.attach_measure_zlp, api, window))
         eels_menu.add_separator()
-        eels_menu.add_menu_item(_("Calibrate Spectrum"), functools.partial(typing.cast(typing.Callable[[], None], AlignZLP.calibrate_spectrum), api, window))
+        eels_menu.add_menu_item(_("Calibrate Spectrum"), functools.partial(AlignZLP.calibrate_spectrum, api, window))
         eels_menu.add_separator()
         eels_menu.add_menu_item(_("Measure Temperature"), functools.partial(Thermometry.measure_temperature, api, window))
         eels_menu.add_separator()
