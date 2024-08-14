@@ -6,6 +6,7 @@ import functools
 import gettext
 import numpy
 import scipy
+import scipy.integrate
 import typing
 
 # local libraries
@@ -80,12 +81,12 @@ class AbstractBackgroundModel:
         if spectrum_xdata.is_navigable:
             return {
                 "integrated": DataAndMetadata.new_data_and_metadata(
-                    numpy.trapz(subtracted_data),
+                    scipy.integrate.trapezoid(subtracted_data),
                     dimensional_calibrations=spectrum_xdata.navigation_dimensional_calibrations)
             }
         else:
             return {
-                "integrated_value": numpy.trapz(subtracted_data),
+                "integrated_value": scipy.integrate.trapezoid(subtracted_data),
             }
 
     def __fit_background(self,
@@ -250,8 +251,8 @@ def power_law_params(x_interval_1: DataArrayType,
                      x_start: float,
                      x_center: float,
                      x_end: float) -> typing.Tuple[DataArrayType, DataArrayType]:
-    areas_1 = typing.cast(DataArrayType, numpy.trapz(y_interval_1, x_interval_1, axis=1))
-    areas_2 = typing.cast(DataArrayType, numpy.trapz(y_interval_2, x_interval_2, axis=1))
+    areas_1 = typing.cast(DataArrayType, scipy.integrate.trapezoid(y_interval_1, x_interval_1, axis=1))
+    areas_2 = typing.cast(DataArrayType, scipy.integrate.trapezoid(y_interval_2, x_interval_2, axis=1))
     r = 2 * (numpy.log(areas_1) - numpy.log(areas_2)) / (numpy.log(x_end) - numpy.log(x_start))
     k = 1 - r
     A = k * areas_2 / (x_end ** k - x_center ** k)
