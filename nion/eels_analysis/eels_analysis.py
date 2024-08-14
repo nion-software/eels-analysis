@@ -10,6 +10,7 @@
 import copy
 import numpy
 import numpy.typing
+import scipy.integrate
 import typing
 
 from nion.eels_analysis import CurveFitting
@@ -486,7 +487,7 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
         # Integrate over energy window to get partial cross-section
         energy_sample_count = energy_diff_sigma.shape[0]
         energy_step = edge_delta_ev / (energy_sample_count - 1)
-        cross_section = numpy.trapz(energy_diff_sigma, dx=energy_step)
+        cross_section = scipy.integrate.trapezoid(energy_diff_sigma, dx=energy_step)
 
     if cross_section is None and atomic_number == 32 and shell_number == 2 and subshell_index == 3:
         # special section for testing

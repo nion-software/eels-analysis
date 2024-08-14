@@ -5,6 +5,7 @@
 """
 
 import numpy
+import scipy.integrate
 import typing
 
 
@@ -247,7 +248,7 @@ def energy_diff_cross_section_nm2_per_ev(atomic_number: int, shell_number: int, 
     collection_efficiency = kohl_collection_efficiency(theta_rad, convergence_angle_rad, collection_angle_rad)
     dSigma *= 2 * numpy.pi * theta_rad.reshape(thetaSampleCount, 1) * collection_efficiency.reshape(thetaSampleCount, 1)
     theta_step = max_scattering_angle_rad / (thetaSampleCount - 1)
-    energyDiffSigma = typing.cast(DataArrayType, numpy.trapz(dSigma, dx = theta_step, axis = 0))
+    energyDiffSigma = typing.cast(DataArrayType, scipy.integrate.trapezoid(dSigma, dx = theta_step, axis = 0))
 
     return energyDiffSigma
 
@@ -270,6 +271,6 @@ def partial_cross_section_nm2(atomic_number: int, shell_number: int, subshell_in
     # Integrate over energy window to get partial cross-section
     energySampleCount = energyDiffSigma.shape[0]
     energy_step = edge_delta_eV / (energySampleCount - 1)
-    partialCrossSection = typing.cast(float, numpy.trapz(energyDiffSigma, dx = energy_step))
+    partialCrossSection = typing.cast(float, scipy.integrate.trapezoid(energyDiffSigma, dx = energy_step))
 
     return partialCrossSection

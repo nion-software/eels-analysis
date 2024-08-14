@@ -8,6 +8,7 @@ import sys
 import unittest
 
 import numpy
+import scipy.integrate
 import scipy.stats
 
 sys.path.append(os.path.dirname(os.path.realpath(os.path.join(__file__, "..", ".."))))
@@ -72,7 +73,7 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(tuple(profile_range), (400, 600))
         self.assertEqual(edge_map.shape, (1, ))
         signal_slice = signal[400:600]
-        expected_edge_map = numpy.trapz(signal_slice)
+        expected_edge_map = scipy.integrate.trapezoid(signal_slice)
         log10_scale = int(-math.log10(scale) + 1)  # 1/10 of scale
         self.assertAlmostEqual(edge_map[0], expected_edge_map, 1 + log10_scale)  # within 1/10
         self.assertEqual(edge_profile.shape, (1, 200))

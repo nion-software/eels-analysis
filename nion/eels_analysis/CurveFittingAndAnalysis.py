@@ -6,6 +6,7 @@
 
 import numpy
 import numpy.typing
+import scipy.integrate
 import typing
 
 
@@ -285,6 +286,7 @@ def signal_from_polynomial_background(data_values: DataArrayType, data_x_range: 
     # Compute the net signal integral over the specified signal range
     profile_range_converter = RangeSliceConverter(profile_range[0], x_step)
     signal_slice = profile_range_converter.get_slice(signal_x_range)
-    signal_integral: DataArrayType = numpy.trapz(signal_profile[..., signal_slice], dx = x_step)
+    # the copy is to work around a change in behavior in numpy 2.0 where the data type is promoted to float64.
+    signal_integral: DataArrayType = scipy.integrate.trapezoid(signal_profile[..., signal_slice], dx = x_step).astype(signal_profile.dtype, copy=False)
 
     return signal_integral, signal_profile, background_model, profile_range
