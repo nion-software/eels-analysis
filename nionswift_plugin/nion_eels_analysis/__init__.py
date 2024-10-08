@@ -1,6 +1,7 @@
+import dataclasses
 import functools
 import gettext
-import typing
+import pkgutil
 
 # ensure background models are registered
 from nion.eels_analysis import BackgroundModel
@@ -18,6 +19,7 @@ from . import Thermometry
 from nion.swift import DocumentController
 from nion.swift import Facade
 from nion.swift.model import PlugInManager
+from nion.utils import Registry
 
 _ = gettext.gettext
 
@@ -34,6 +36,18 @@ class MenuExtension:
 
         LiveThickness.register_measure_thickness_process(self.__api)
         LiveZLP.register_measure_zlp_process(self.__api)
+
+        xml_bytes = pkgutil.get_data(__name__, "resources/color_maps/sqe_bgyw.xml")
+        assert xml_bytes is not None
+        xml_str = xml_bytes.decode("utf-8")
+
+        @dataclasses.dataclass(frozen=True)
+        class ColorMapDescription:
+            color_map_id: str
+            name: str
+            xml_str: str
+
+        Registry.register_component(ColorMapDescription("areels-high-contrast", _("AREELS High Contrast"), xml_str), {"color-map-description"})
 
     def close(self) -> None:
         self.__api.application._application.unregister_menu_handler(self.__build_menus)
