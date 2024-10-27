@@ -1,6 +1,11 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.7 (2024-10-24):
+-------------------
+- Include AREELS High Contrast color table.
+- Require Numpy 2. Add Python 3.13 support. Drop Python 3.9, 3.10 support.
+
 0.6.6 (2024-06-18):
 -------------------
 - Swift 16.11 compatibility (no changes).
