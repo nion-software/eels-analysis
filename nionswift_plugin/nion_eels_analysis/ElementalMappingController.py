@@ -62,7 +62,7 @@ async def pick_new_edge(document_controller: DocumentController.DocumentControll
         - a background subtraction computation with model data item, and edge intervals as inputs
         - a background data item, computed by the background subtraction computation
         - a subtracted data item, computed by the background subtraction computation
-        - a eels line plot with pick, background, and subtracted data items as components
+        - an eels line plot with pick, background, and subtracted data items as components
         - an edge reference, owned by eels line plot, with reference to edge
         - the edge reference is used to recognize the eels line plot as associated with the referenced edge
     """
