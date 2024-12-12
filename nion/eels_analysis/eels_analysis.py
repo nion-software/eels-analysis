@@ -274,7 +274,7 @@ def subtract_linear_background(data_and_metadata: DataAndMetadata.DataAndMetadat
     p = stacked_fit_linear_background(data[..., range(*fit_range)], signal_index)
     linear = numpy.arange(signal_range[0], signal_range[1])
     background = (p[..., 0, numpy.newaxis] * linear[:] + p[..., 1, numpy.newaxis])
-    result = data[..., range(*signal_range)] - background
+    result: DataAndMetadata._ImageDataType = data[..., range(*signal_range)] - background
 
     return DataAndMetadata.new_data_and_metadata(result, data_and_metadata.intensity_calibration, data_and_metadata.dimensional_calibrations)
 

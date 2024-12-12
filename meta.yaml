@@ -21,6 +21,7 @@ requirements:
     - python >=3.11
     - nionswift >=16.12,<17.0
     - nionui >=8.0,<9.0
+    - numpy >=2.2,<3.0
 
 test:
   imports:
