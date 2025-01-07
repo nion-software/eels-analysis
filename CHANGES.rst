@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.8 (2025-01-07):
+-------------------
+- Package dependencies updated.
+
 0.6.7 (2024-10-24):
 -------------------
 - Include AREELS High Contrast color table.
