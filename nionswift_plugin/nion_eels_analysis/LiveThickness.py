@@ -33,20 +33,18 @@ class MeasureThickness:
 
         This method will run in a thread and should not make any modifications to the library.
         """
-        xdata = src.display_xdata
+        xdata = src.xdata
         assert xdata
         data = xdata.data
         if data is not None and len(data.shape) == 1:
             self.__data_length = data.shape[0]
             self.__left, self.__right, s = sum_zlp(data)
-            self.__thickness  = math.log(sum(data) / s)
-            self.__src = src
+            self.__thickness  = math.log(sum(data) / s) if s != 0 else 0.0
         else:
             self.__data_length = typing.cast(typing.Any, None)
             self.__left = 0
             self.__right = 0
             self.__thickness = 0
-            self.__src = typing.cast(typing.Any, None)
 
     def commit(self) -> None:
         """Commit the computation.
@@ -54,14 +52,15 @@ class MeasureThickness:
         This method will run at UI time and can make modifications to the library. It is essential
         that this method be as fast as possible. Any lengthy operations should be done in `execute`.
         """
-        if self.__src:
+        if self.__data_length is not None:
             left, right, thickness = self.__left, self.__right, self.__thickness
             data_length = self.__data_length
             start = left / data_length
             end = right / data_length
             thickness_interval = self.computation.get_result("thickness_interval", None)
             if not thickness_interval:
-                thickness_interval = self.__src.add_interval_region(start, end)
+                src = self.computation.get_input("src")
+                thickness_interval = src.add_interval_region(start, end)
                 self.computation.set_result("thickness_interval", thickness_interval)
             thickness_interval.interval = start, end
             thickness_interval.graphic_id = "thickness_interval"

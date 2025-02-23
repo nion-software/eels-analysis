@@ -43,15 +43,13 @@ class FitZeroLossPeak:
             eels_spectrum_xdata = spectrum_xdata
             model_xdata = None
             subtracted_xdata = None
-            if zlp_model._data_structure.entity:
-                entity_id = zlp_model._data_structure.entity.entity_type.entity_id
-                for component in Registry.get_components_by_type("zlp-model"):
-                    # print(f"{entity_id=} {component.zero_loss_peak_model_id=}")
-                    if entity_id == component.zero_loss_peak_model_id:
-                        fit_result = component.fit_zero_loss_peak(spectrum_xdata=spectrum_xdata)
-                        model_xdata = fit_result["zero_loss_peak_model"]
-                        # use 'or' to avoid doing subtraction if subtracted_spectrum already present
-                        subtracted_xdata = fit_result.get("subtracted_spectrum", None) or Core.calibrated_subtract_spectrum(spectrum_xdata, model_xdata)
+            zero_loss_peak_model_id = zlp_model.structure_type
+            for component in Registry.get_components_by_type("zlp-model"):
+                if zero_loss_peak_model_id == component.zero_loss_peak_model_id:
+                    fit_result = component.fit_zero_loss_peak(spectrum_xdata=spectrum_xdata)
+                    model_xdata = fit_result["zero_loss_peak_model"]
+                    # use 'or' to avoid doing subtraction if subtracted_spectrum already present
+                    subtracted_xdata = fit_result.get("subtracted_spectrum", None) or Core.calibrated_subtract_spectrum(spectrum_xdata, model_xdata)
             if model_xdata is None:
                 model_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros_like(eels_spectrum_xdata.data), intensity_calibration=eels_spectrum_xdata.intensity_calibration, dimensional_calibrations=eels_spectrum_xdata.dimensional_calibrations)
             if subtracted_xdata is None:
