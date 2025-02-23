@@ -1,5 +1,6 @@
 import copy
 import numpy
+import scipy
 import unittest
 
 from nion.data import Calibration
@@ -15,6 +16,17 @@ from .. import BackgroundSubtraction
 
 
 Facade.initialize()
+
+
+def generate_peak_data(*, range_ev: float = 100.0, length: int = 1000, add_noise: bool = False) -> DataAndMetadata.DataAndMetadata:
+    x_axis = numpy.arange(-range_ev / 10, range_ev, range_ev / length)
+    x_axis[length // 10:] = numpy.arange(0, range_ev / 2.5, range_ev / 2.5 / length)
+    data = 1e6 * scipy.stats.norm.pdf(x_axis, 0, 1)
+    if add_noise:
+        data += numpy.abs(numpy.random.normal(0, 5, data.shape))
+    intensity_calibration = Calibration.Calibration(units="counts")
+    dimensional_calibrations = [Calibration.Calibration(scale=range_ev / length, offset=-range_ev / 10, units="eV")]
+    return DataAndMetadata.new_data_and_metadata(data, intensity_calibration=intensity_calibration, dimensional_calibrations=dimensional_calibrations)
 
 
 class TestBackgroundSubtraction(unittest.TestCase):
@@ -52,6 +64,8 @@ class TestBackgroundSubtraction(unittest.TestCase):
             BackgroundSubtraction.add_background_subtraction_computation(api, library,
                                                                          api_display_item, api_data_item,
                                                                          api_intervals)
+            document_model.recompute_all()
+            document_controller.periodic()
             self.assertEqual(3, len(document_model.data_items))
             self.assertEqual(3, len(document_model.display_items))
             self.assertEqual(3, len(display_item.data_items))
@@ -59,6 +73,8 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(1, len(document_model.data_structures))
             self.assertEqual(1, len(document_model.computations))
             document_model.remove_data_item(data_item)
+            document_model.recompute_all()
+            document_controller.periodic()
             self.assertEqual(0, len(document_model.data_items))
             self.assertEqual(0, len(document_model.display_items))
             self.assertEqual(0, len(document_model.data_structures))
@@ -83,6 +99,8 @@ class TestBackgroundSubtraction(unittest.TestCase):
             BackgroundSubtraction.add_background_subtraction_computation(api, library,
                                                                          api_display_item, api_data_item,
                                                                          api_intervals)
+            document_model.recompute_all()
+            document_controller.periodic()
             self.assertEqual(3, len(document_model.data_items))
             self.assertEqual(3, len(document_model.display_items))
             self.assertEqual(3, len(display_item.data_items))
@@ -90,6 +108,8 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(1, len(document_model.data_structures))
             self.assertEqual(1, len(document_model.computations))
             document_model.remove_data_item(document_model.data_items[-2])
+            document_model.recompute_all()
+            document_controller.periodic()
             self.assertEqual(1, len(document_model.data_items))
             self.assertEqual(1, len(document_model.display_items))
             self.assertEqual(0, len(document_model.data_structures))
@@ -114,6 +134,8 @@ class TestBackgroundSubtraction(unittest.TestCase):
             BackgroundSubtraction.add_background_subtraction_computation(api, library,
                                                                          api_display_item, api_data_item,
                                                                          api_intervals)
+            document_model.recompute_all()
+            document_controller.periodic()
             self.assertEqual(3, len(document_model.data_items))
             self.assertEqual(3, len(document_model.display_items))
             self.assertEqual(3, len(display_item.data_items))
@@ -121,6 +143,8 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(1, len(document_model.data_structures))
             self.assertEqual(1, len(document_model.computations))
             document_model.remove_data_item(document_model.data_items[-1])
+            document_model.recompute_all()
+            document_controller.periodic()
             self.assertEqual(1, len(document_model.data_items))
             self.assertEqual(1, len(document_model.display_items))
             self.assertEqual(0, len(document_model.data_structures))
@@ -149,6 +173,8 @@ class TestBackgroundSubtraction(unittest.TestCase):
             BackgroundSubtraction.add_background_subtraction_computation(api, library,
                                                                          api_display_item, api_data_item,
                                                                          api_intervals)
+            document_model.recompute_all()
+            document_controller.periodic()
             self.assertEqual(3, len(document_model.data_items))
             self.assertEqual(3, len(document_model.display_items))
             self.assertEqual(3, len(display_item.data_items))
@@ -156,6 +182,8 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(1, len(document_model.data_structures))
             self.assertEqual(1, len(document_model.computations))
             document_model.remove_data_item(interval2)
+            document_model.recompute_all()
+            document_controller.periodic()
             self.assertEqual(3, len(document_model.data_items))
             self.assertEqual(3, len(document_model.display_items))
             self.assertEqual(3, len(display_item.data_items))
@@ -163,10 +191,106 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(1, len(document_model.data_structures))
             self.assertEqual(1, len(document_model.computations))
             document_model.remove_data_item(interval1)
+            document_model.recompute_all()
+            document_controller.periodic()
             self.assertEqual(1, len(document_model.data_items))
             self.assertEqual(1, len(document_model.display_items))
             self.assertEqual(0, len(document_model.data_structures))
             self.assertEqual(0, len(document_model.computations))
+
+    def test_subtraction_computation(self) -> None:
+        with TestContext.create_memory_context() as profile_context:
+            document_controller = profile_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            peak_xdata = generate_peak_data()
+            si_data = numpy.empty((4, 4, peak_xdata.data.shape[0]), dtype=numpy.float32)
+            for i in range(si_data.shape[0]):
+                for j in range(si_data.shape[1]):
+                    si_data[i, j] = generate_peak_data(add_noise=True)
+            si_xdata = DataAndMetadata.new_data_and_metadata(
+                si_data,
+                intensity_calibration=peak_xdata.intensity_calibration,
+                dimensional_calibrations=[Calibration.Calibration(), Calibration.Calibration(), peak_xdata.dimensional_calibrations[-1]],
+                data_descriptor=DataAndMetadata.DataDescriptor(False, 2, 1)
+            )
+            si_data_item = DataItem.new_data_item(si_xdata)
+            document_model.append_data_item(si_data_item)
+            si_display_item = document_model.get_display_item_for_data_item(si_data_item)
+            data_item = document_model.get_pick_new(si_display_item, si_data_item)
+            document_model.recompute_all()
+            document_controller.periodic()
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            interval1 = Graphics.IntervalGraphic()
+            interval1.start = 0.2
+            interval1.end = 0.3
+            display_item.add_graphic(interval1)
+            interval2 = Graphics.IntervalGraphic()
+            interval2.start = 0.4
+            interval2.end = 0.5
+            display_item.add_graphic(interval2)
+            display_panel = document_controller.selected_display_panel
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            display_panel.set_display_panel_display_item(display_item)
+            api = Facade.get_api("~1.0", "~1.0")
+            BackgroundSubtraction.add_background_subtraction_computation(api, Facade.Library(document_model),
+                                                                         Facade.Display(display_item), Facade.DataItem(data_item),
+                                                                         [Facade.Graphic(interval1), Facade.Graphic(interval2)])
+            document_model.recompute_all()
+            document_controller.periodic()
+            BackgroundSubtraction.subtract_background(api, Facade.DocumentWindow(document_controller))
+            document_model.recompute_all()
+            document_controller.periodic()
+            self.assertEqual(5, len(document_model.data_items))
+            self.assertIn("Background Removed", document_model.data_items[4].title)
+
+    def test_signal_map_computation(self) -> None:
+        with TestContext.create_memory_context() as profile_context:
+            document_controller = profile_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            peak_xdata = generate_peak_data()
+            si_data = numpy.empty((4, 4, peak_xdata.data.shape[0]), dtype=numpy.float32)
+            for i in range(si_data.shape[0]):
+                for j in range(si_data.shape[1]):
+                    si_data[i, j] = generate_peak_data(add_noise=True)
+            si_xdata = DataAndMetadata.new_data_and_metadata(
+                si_data,
+                intensity_calibration=peak_xdata.intensity_calibration,
+                dimensional_calibrations=[Calibration.Calibration(), Calibration.Calibration(), peak_xdata.dimensional_calibrations[-1]],
+                data_descriptor=DataAndMetadata.DataDescriptor(False, 2, 1)
+            )
+            si_data_item = DataItem.new_data_item(si_xdata)
+            document_model.append_data_item(si_data_item)
+            si_display_item = document_model.get_display_item_for_data_item(si_data_item)
+            data_item = document_model.get_pick_new(si_display_item, si_data_item)
+            document_model.recompute_all()
+            document_controller.periodic()
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            interval1 = Graphics.IntervalGraphic()
+            interval1.start = 0.2
+            interval1.end = 0.3
+            display_item.add_graphic(interval1)
+            interval2 = Graphics.IntervalGraphic()
+            interval2.start = 0.4
+            interval2.end = 0.5
+            display_item.add_graphic(interval2)
+            display_panel = document_controller.selected_display_panel
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            display_panel.set_display_panel_display_item(display_item)
+            api = Facade.get_api("~1.0", "~1.0")
+            BackgroundSubtraction.add_background_subtraction_computation(api, Facade.Library(document_model),
+                                                                         Facade.Display(display_item), Facade.DataItem(data_item),
+                                                                         [Facade.Graphic(interval1), Facade.Graphic(interval2)])
+            document_model.recompute_all()
+            document_controller.periodic()
+            BackgroundSubtraction.subtract_background(api, Facade.DocumentWindow(document_controller))
+            document_model.recompute_all()
+            document_controller.periodic()
+            display_item.graphic_selection.set(2)
+            BackgroundSubtraction.use_signal_for_map(api, Facade.DocumentWindow(document_controller))
+            document_model.recompute_all()
+            document_controller.periodic()
+            self.assertEqual(6, len(document_model.data_items))
+            self.assertIn("Map", document_model.data_items[5].title)
 
 
 if __name__ == '__main__':

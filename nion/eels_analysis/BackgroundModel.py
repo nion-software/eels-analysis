@@ -95,21 +95,16 @@ class AbstractBackgroundModel:
                          fit_intervals: typing.Sequence[BackgroundInterval],
                          background_interval: BackgroundInterval) -> DataAndMetadata.DataAndMetadata:
         # fit polynomial to the data
-        xs: DataArrayType = numpy.concatenate(
-            [get_calibrated_interval_domain(spectrum_xdata, fit_interval) for fit_interval in fit_intervals],
-            dtype=numpy.float32)
+        xs: DataArrayType = numpy.concatenate([get_calibrated_interval_domain(spectrum_xdata, fit_interval) for fit_interval in fit_intervals], dtype=numpy.float32)
         ys: DataArrayType
         if len(fit_intervals) > 1:
-            ys = numpy.concatenate(
-                [get_calibrated_interval_slice(spectrum_xdata, fit_interval)._data_ex for fit_interval in
-                 fit_intervals])
+            ys = numpy.concatenate([get_calibrated_interval_slice(spectrum_xdata, fit_interval)._data_ex for fit_interval in fit_intervals], axis=-1)
         else:
             ys = get_calibrated_interval_slice(spectrum_xdata, fit_intervals[0])._data_ex
         es: typing.Optional[DataArrayType]
         if eels_spectrum_xdata:
             if len(fit_intervals) > 1:
-                es = numpy.concatenate(
-                    [get_calibrated_interval_slice(eels_spectrum_xdata, fit_interval).data for fit_interval in fit_intervals])
+                es = numpy.concatenate([get_calibrated_interval_slice(eels_spectrum_xdata, fit_interval).data for fit_interval in fit_intervals])
             else:
                 es = get_calibrated_interval_slice(eels_spectrum_xdata, fit_intervals[0]).data
         else:
