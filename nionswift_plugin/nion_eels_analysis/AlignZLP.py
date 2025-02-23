@@ -278,10 +278,7 @@ def _calibrate_spectrum(api: Facade.API_1, window: Facade.DocumentWindow) -> typ
     for computation in api.library._document_model.computations:
         if computation.processing_id in {"pick-point", "pick-mask-average", "pick-mask-sum"}:
             if computation.get_output("target") == data_item._data_item:
-                input_ = computation.get_input("src")
-                # If input_ is a "DataSource" we need to get the actual data item
-                if hasattr(input_, "data_item"):
-                    input_ = input_.data_item
+                input_ = computation.get_input_data_item("src")
                 src_data_item = api._new_api_object(input_)
 
     mx_pos = numpy.nan

@@ -52,14 +52,13 @@ class EELSFitBackground:
             signal_xdata = BackgroundModel.get_calibrated_interval_slice(eels_spectrum_xdata, signal_interval)
             background_xdata = None
             subtracted_xdata = None
-            if background_model._data_structure.entity:
-                entity_id = background_model._data_structure.entity.entity_type.entity_id
-                for component in Registry.get_components_by_type("background-model"):
-                    if entity_id == component.background_model_id:
-                        fit_result = component.fit_background(spectrum_xdata=spectrum_xdata, fit_intervals=fit_intervals, background_interval=signal_interval)
-                        background_xdata = fit_result["background_model"]
-                        # use 'or' to avoid doing subtraction if subtracted_spectrum already present
-                        subtracted_xdata = fit_result.get("subtracted_spectrum", None) or Core.calibrated_subtract_spectrum(spectrum_xdata, background_xdata)
+            background_model_id = background_model.structure_type
+            for component in Registry.get_components_by_type("background-model"):
+                if background_model_id == component.background_model_id:
+                    fit_result = component.fit_background(spectrum_xdata=spectrum_xdata, fit_intervals=fit_intervals, background_interval=signal_interval)
+                    background_xdata = fit_result["background_model"]
+                    # use 'or' to avoid doing subtraction if subtracted_spectrum already present
+                    subtracted_xdata = fit_result.get("subtracted_spectrum", None) or Core.calibrated_subtract_spectrum(spectrum_xdata, background_xdata)
             if background_xdata is None:
                 background_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros_like(signal_xdata.data), intensity_calibration=signal_xdata.intensity_calibration, dimensional_calibrations=signal_xdata.dimensional_calibrations)
             if subtracted_xdata is None:
@@ -105,12 +104,11 @@ class EELSSubtractBackground:
             for fit_interval_graphic in fit_interval_graphics:
                 fit_intervals.append(fit_interval_graphic.interval)
             subtracted_xdata = None
-            if background_model._data_structure.entity:
-                entity_id = background_model._data_structure.entity.entity_type.entity_id
-                for component in Registry.get_components_by_type("background-model"):
-                    if entity_id == component.background_model_id:
-                        integrate_result = component.subtract_background(spectrum_xdata=spectrum_image_xdata, fit_intervals=fit_intervals)
-                        subtracted_xdata = integrate_result["subtracted"]
+            background_model_id = background_model.structure_type
+            for component in Registry.get_components_by_type("background-model"):
+                if background_model_id == component.background_model_id:
+                    integrate_result = component.subtract_background(spectrum_xdata=spectrum_image_xdata, fit_intervals=fit_intervals)
+                    subtracted_xdata = integrate_result["subtracted"]
             if subtracted_xdata is None:
                 subtracted_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros(spectrum_image_xdata.navigation_dimension_shape), dimensional_calibrations=spectrum_image_xdata.navigation_dimensional_calibrations)
             self.__subtracted_xdata = subtracted_xdata
@@ -164,12 +162,11 @@ class EELSMapBackgroundSubtractedSignal:
                 fit_intervals.append(fit_interval_graphic.interval)
             signal_interval = signal_interval_graphic.interval
             mapped_xdata = None
-            if background_model._data_structure.entity:
-                entity_id = background_model._data_structure.entity.entity_type.entity_id
-                for component in Registry.get_components_by_type("background-model"):
-                    if entity_id == component.background_model_id:
-                        integrate_result = component.integrate_signal(spectrum_xdata=spectrum_image_xdata, eels_spectrum_xdata=eels_spectrum_xdata, fit_intervals=fit_intervals, signal_interval=signal_interval)
-                        mapped_xdata = integrate_result["integrated"]
+            background_model_id = background_model.structure_type
+            for component in Registry.get_components_by_type("background-model"):
+                if background_model_id == component.background_model_id:
+                    integrate_result = component.integrate_signal(spectrum_xdata=spectrum_image_xdata, eels_spectrum_xdata=eels_spectrum_xdata, fit_intervals=fit_intervals, signal_interval=signal_interval)
+                    mapped_xdata = integrate_result["integrated"]
             if mapped_xdata is None:
                 mapped_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros(spectrum_image_xdata.navigation_dimension_shape), dimensional_calibrations=spectrum_image_xdata.navigation_dimensional_calibrations)
             self.__mapped_xdata = mapped_xdata
