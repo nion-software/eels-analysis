@@ -37,39 +37,33 @@ class EELSFitBackground:
         self.__subtracted_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
 
     def execute(self, eels_spectrum_data_item: Facade.DataItem, background_model: Facade.DataStructure, fit_interval_graphics: typing.Sequence[Facade.Graphic], **kwargs: typing.Any) -> None:
-        try:
-            spectrum_xdata = eels_spectrum_data_item.xdata
-            assert spectrum_xdata
-            assert spectrum_xdata.is_datum_1d
-            assert spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
-            eels_spectrum_xdata = spectrum_xdata
-            # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
-            fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
-            for fit_interval_graphic in fit_interval_graphics:
-                fit_intervals.append(fit_interval_graphic.interval)
-            fit_minimum = min([fit_interval[0] for fit_interval in fit_intervals])
-            signal_interval = fit_minimum, 1.0
-            signal_xdata = BackgroundModel.get_calibrated_interval_slice(eels_spectrum_xdata, signal_interval)
-            background_xdata = None
-            subtracted_xdata = None
-            background_model_id = background_model.structure_type
-            for component in Registry.get_components_by_type("background-model"):
-                if background_model_id == component.background_model_id:
-                    fit_result = component.fit_background(spectrum_xdata=spectrum_xdata, fit_intervals=fit_intervals, background_interval=signal_interval)
-                    background_xdata = fit_result["background_model"]
-                    # use 'or' to avoid doing subtraction if subtracted_spectrum already present
-                    subtracted_xdata = fit_result.get("subtracted_spectrum", None) or Core.calibrated_subtract_spectrum(spectrum_xdata, background_xdata)
-            if background_xdata is None:
-                background_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros_like(signal_xdata.data), intensity_calibration=signal_xdata.intensity_calibration, dimensional_calibrations=signal_xdata.dimensional_calibrations)
-            if subtracted_xdata is None:
-                subtracted_xdata = DataAndMetadata.new_data_and_metadata(signal_xdata.data, intensity_calibration=signal_xdata.intensity_calibration, dimensional_calibrations=signal_xdata.dimensional_calibrations)
-            self.__background_xdata = background_xdata
-            self.__subtracted_xdata = subtracted_xdata
-        except Exception as e:
-            import traceback
-            print(traceback.format_exc())
-            print(e)
-            raise
+        spectrum_xdata = eels_spectrum_data_item.xdata
+        assert spectrum_xdata
+        assert spectrum_xdata.is_datum_1d
+        assert spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
+        eels_spectrum_xdata = spectrum_xdata
+        # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
+        fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
+        for fit_interval_graphic in fit_interval_graphics:
+            fit_intervals.append(fit_interval_graphic.interval)
+        fit_minimum = min([fit_interval[0] for fit_interval in fit_intervals])
+        signal_interval = fit_minimum, 1.0
+        signal_xdata = BackgroundModel.get_calibrated_interval_slice(eels_spectrum_xdata, signal_interval)
+        background_xdata = None
+        subtracted_xdata = None
+        background_model_id = background_model.structure_type
+        for component in Registry.get_components_by_type("background-model"):
+            if background_model_id == component.background_model_id:
+                fit_result = component.fit_background(spectrum_xdata=spectrum_xdata, fit_intervals=fit_intervals, background_interval=signal_interval)
+                background_xdata = fit_result["background_model"]
+                # use 'or' to avoid doing subtraction if subtracted_spectrum already present
+                subtracted_xdata = fit_result.get("subtracted_spectrum", None) or Core.calibrated_subtract_spectrum(spectrum_xdata, background_xdata)
+        if background_xdata is None:
+            background_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros_like(signal_xdata.data), intensity_calibration=signal_xdata.intensity_calibration, dimensional_calibrations=signal_xdata.dimensional_calibrations)
+        if subtracted_xdata is None:
+            subtracted_xdata = DataAndMetadata.new_data_and_metadata(signal_xdata.data, intensity_calibration=signal_xdata.intensity_calibration, dimensional_calibrations=signal_xdata.dimensional_calibrations)
+        self.__background_xdata = background_xdata
+        self.__subtracted_xdata = subtracted_xdata
 
     def commit(self) -> None:
         assert self.__background_xdata
@@ -93,30 +87,24 @@ class EELSSubtractBackground:
         self.computation = computation
 
     def execute(self, spectrum_image_data_item: Facade.DataItem, background_model: Facade.DataStructure, fit_interval_graphics: typing.Sequence[Facade.Graphic], **kwargs: typing.Any) -> None:
-        try:
-            assert spectrum_image_data_item.xdata
-            assert spectrum_image_data_item.xdata.is_datum_1d
-            assert spectrum_image_data_item.xdata.is_navigable
-            assert spectrum_image_data_item.xdata.datum_dimensional_calibrations[0].units == "eV"
-            spectrum_image_xdata = spectrum_image_data_item.xdata
-            # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
-            fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
-            for fit_interval_graphic in fit_interval_graphics:
-                fit_intervals.append(fit_interval_graphic.interval)
-            subtracted_xdata = None
-            background_model_id = background_model.structure_type
-            for component in Registry.get_components_by_type("background-model"):
-                if background_model_id == component.background_model_id:
-                    integrate_result = component.subtract_background(spectrum_xdata=spectrum_image_xdata, fit_intervals=fit_intervals)
-                    subtracted_xdata = integrate_result["subtracted"]
-            if subtracted_xdata is None:
-                subtracted_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros(spectrum_image_xdata.navigation_dimension_shape), dimensional_calibrations=spectrum_image_xdata.navigation_dimensional_calibrations)
-            self.__subtracted_xdata = subtracted_xdata
-        except Exception as e:
-            import traceback
-            print(traceback.format_exc())
-            print(e)
-            raise
+        assert spectrum_image_data_item.xdata
+        assert spectrum_image_data_item.xdata.is_datum_1d
+        assert spectrum_image_data_item.xdata.is_navigable
+        assert spectrum_image_data_item.xdata.datum_dimensional_calibrations[0].units == "eV"
+        spectrum_image_xdata = spectrum_image_data_item.xdata
+        # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
+        fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
+        for fit_interval_graphic in fit_interval_graphics:
+            fit_intervals.append(fit_interval_graphic.interval)
+        subtracted_xdata = None
+        background_model_id = background_model.structure_type
+        for component in Registry.get_components_by_type("background-model"):
+            if background_model_id == component.background_model_id:
+                integrate_result = component.subtract_background(spectrum_xdata=spectrum_image_xdata, fit_intervals=fit_intervals)
+                subtracted_xdata = integrate_result["subtracted"]
+        if subtracted_xdata is None:
+            subtracted_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros(spectrum_image_xdata.navigation_dimension_shape), dimensional_calibrations=spectrum_image_xdata.navigation_dimensional_calibrations)
+        self.__subtracted_xdata = subtracted_xdata
 
     def commit(self) -> None:
         self.computation.set_referenced_xdata("subtracted", self.__subtracted_xdata)
@@ -144,37 +132,31 @@ class EELSMapBackgroundSubtractedSignal:
         fit_interval_graphics = typing.cast(typing.Sequence[Facade.Graphic], kwargs["fit_interval_graphics"])
         signal_interval_graphic = typing.cast(Facade.Graphic, kwargs["signal_interval_graphic"])
         eels_spectrum_data_item = typing.cast(typing.Optional[Facade.DataItem], kwargs.get("eels_spectrum_data_item"))
-        try:
-            assert spectrum_image_data_item.xdata
-            assert spectrum_image_data_item.xdata.is_datum_1d
-            assert spectrum_image_data_item.xdata.is_navigable
-            assert spectrum_image_data_item.xdata.datum_dimensional_calibrations[0].units == "eV"
-            spectrum_image_xdata = spectrum_image_data_item.xdata
-            eels_spectrum_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
-            if eels_spectrum_data_item:
-                eels_spectrum_xdata = eels_spectrum_data_item.xdata
-                assert eels_spectrum_xdata
-                assert eels_spectrum_xdata.is_datum_1d
-                assert eels_spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
-            # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
-            fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
-            for fit_interval_graphic in fit_interval_graphics:
-                fit_intervals.append(fit_interval_graphic.interval)
-            signal_interval = signal_interval_graphic.interval
-            mapped_xdata = None
-            background_model_id = background_model.structure_type
-            for component in Registry.get_components_by_type("background-model"):
-                if background_model_id == component.background_model_id:
-                    integrate_result = component.integrate_signal(spectrum_xdata=spectrum_image_xdata, eels_spectrum_xdata=eels_spectrum_xdata, fit_intervals=fit_intervals, signal_interval=signal_interval)
-                    mapped_xdata = integrate_result["integrated"]
-            if mapped_xdata is None:
-                mapped_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros(spectrum_image_xdata.navigation_dimension_shape), dimensional_calibrations=spectrum_image_xdata.navigation_dimensional_calibrations)
-            self.__mapped_xdata = mapped_xdata
-        except Exception as e:
-            import traceback
-            print(traceback.format_exc())
-            print(e)
-            raise
+        assert spectrum_image_data_item.xdata
+        assert spectrum_image_data_item.xdata.is_datum_1d
+        assert spectrum_image_data_item.xdata.is_navigable
+        assert spectrum_image_data_item.xdata.datum_dimensional_calibrations[0].units == "eV"
+        spectrum_image_xdata = spectrum_image_data_item.xdata
+        eels_spectrum_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
+        if eels_spectrum_data_item:
+            eels_spectrum_xdata = eels_spectrum_data_item.xdata
+            assert eels_spectrum_xdata
+            assert eels_spectrum_xdata.is_datum_1d
+            assert eels_spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
+        # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
+        fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
+        for fit_interval_graphic in fit_interval_graphics:
+            fit_intervals.append(fit_interval_graphic.interval)
+        signal_interval = signal_interval_graphic.interval
+        mapped_xdata = None
+        background_model_id = background_model.structure_type
+        for component in Registry.get_components_by_type("background-model"):
+            if background_model_id == component.background_model_id:
+                integrate_result = component.integrate_signal(spectrum_xdata=spectrum_image_xdata, eels_spectrum_xdata=eels_spectrum_xdata, fit_intervals=fit_intervals, signal_interval=signal_interval)
+                mapped_xdata = integrate_result["integrated"]
+        if mapped_xdata is None:
+            mapped_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros(spectrum_image_xdata.navigation_dimension_shape), dimensional_calibrations=spectrum_image_xdata.navigation_dimensional_calibrations)
+        self.__mapped_xdata = mapped_xdata
 
     def commit(self) -> None:
         self.computation.set_referenced_xdata("map", self.__mapped_xdata)

@@ -43,56 +43,49 @@ class MeasureTemperature:
         self.__fit: typing.Optional[DataArrayType] = None
 
     def execute(self, near_data_item: DataItem.DataItem, far_data_item: DataItem.DataItem, fit_interval_graphic: Graphics.IntervalGraphic, **kwargs: typing.Any) -> None:
-        try:
-            assert near_data_item.xdata
-            assert near_data_item.xdata.is_data_1d
-            assert far_data_item.xdata
-            assert far_data_item.xdata.is_data_1d
-            # Only allow data of same shape for now. A future version could crop to the smaller size of the two.
-            assert near_data_item.data is not None and far_data_item.data is not None and len(near_data_item.data) == len(far_data_item.data)
-            near_xdata = near_data_item.xdata
-            far_xdata = far_data_item.xdata
-            # For now only allow near and far having the same calibration. A future version could allow different
-            # offsets and shift the data accordingly
-            assert near_xdata.dimensional_calibrations == far_xdata.dimensional_calibrations
+        assert near_data_item.xdata
+        assert near_data_item.xdata.is_data_1d
+        assert far_data_item.xdata
+        assert far_data_item.xdata.is_data_1d
+        # Only allow data of same shape for now. A future version could crop to the smaller size of the two.
+        assert near_data_item.data is not None and far_data_item.data is not None and len(near_data_item.data) == len(far_data_item.data)
+        near_xdata = near_data_item.xdata
+        far_xdata = far_data_item.xdata
+        # For now only allow near and far having the same calibration. A future version could allow different
+        # offsets and shift the data accordingly
+        assert near_xdata.dimensional_calibrations == far_xdata.dimensional_calibrations
 
-            difference_xdata = near_xdata - far_xdata
-            calibration = difference_xdata.dimensional_calibrations[0]
-            zero_index = int(calibration.convert_from_calibrated_value(0))
-            length = min(zero_index, len(difference_xdata.data) - zero_index)
-            loss_slice = slice(zero_index, zero_index + length)
-            gain_slice = slice(zero_index-length+1, zero_index+1)
-            loss_data = difference_xdata.data[loss_slice]
-            gain_data = difference_xdata.data[gain_slice][::-1]
-            weights = 1 + np.sqrt(np.abs(near_xdata.data[gain_slice][::-1]) + np.abs(far_xdata.data[gain_slice][::-1]))
+        difference_xdata = near_xdata - far_xdata
+        calibration = difference_xdata.dimensional_calibrations[0]
+        zero_index = int(calibration.convert_from_calibrated_value(0))
+        length = min(zero_index, len(difference_xdata.data) - zero_index)
+        loss_slice = slice(zero_index, zero_index + length)
+        gain_slice = slice(zero_index-length+1, zero_index+1)
+        loss_data = difference_xdata.data[loss_slice]
+        gain_data = difference_xdata.data[gain_slice][::-1]
+        weights = 1 + np.sqrt(np.abs(near_xdata.data[gain_slice][::-1]) + np.abs(far_xdata.data[gain_slice][::-1]))
 
-            result_calibration = Calibration.Calibration(offset=calibration.convert_to_calibrated_value(fit_interval_graphic.start * len(difference_xdata.data)), scale=calibration.scale, units=calibration.units)
-            # Our fit data ranges from 0 to some number, so we need to offset our x-axis by the zero index too.
-            x_data = np.arange(len(loss_data)) * calibration.scale + calibration.convert_to_calibrated_value(zero_index)
-            interpolator = interp1d(x_data, loss_data)
+        result_calibration = Calibration.Calibration(offset=calibration.convert_to_calibrated_value(fit_interval_graphic.start * len(difference_xdata.data)), scale=calibration.scale, units=calibration.units)
+        # Our fit data ranges from 0 to some number, so we need to offset our x-axis by the zero index too.
+        x_data = np.arange(len(loss_data)) * calibration.scale + calibration.convert_to_calibrated_value(zero_index)
+        interpolator = interp1d(x_data, loss_data)
 
-            def gain_fit(x: DataArrayType, T: DataArrayType, dx: DataArrayType) -> DataArrayType:
-                return typing.cast(DataArrayType, interpolator(x + 2 * dx) / np.exp((x + dx) / (kb * T)))
+        def gain_fit(x: DataArrayType, T: DataArrayType, dx: DataArrayType) -> DataArrayType:
+            return typing.cast(DataArrayType, interpolator(x + 2 * dx) / np.exp((x + dx) / (kb * T)))
 
-            fit_slice = slice(max(0, int(fit_interval_graphic.start * len(difference_xdata.data) - zero_index)),
-                              min(len(gain_data), int(fit_interval_graphic.end * len(difference_xdata.data) - zero_index)))
+        fit_slice = slice(max(0, int(fit_interval_graphic.start * len(difference_xdata.data) - zero_index)),
+                          min(len(gain_data), int(fit_interval_graphic.end * len(difference_xdata.data) - zero_index)))
 
-            popt, pcov = curve_fit(gain_fit, x_data[fit_slice], gain_data[fit_slice], sigma=weights[fit_slice], p0=(300.0, 0.0), bounds=((0, -0.000001), (5000, 0.000001)))
-            self.__fit = popt
+        popt, pcov = curve_fit(gain_fit, x_data[fit_slice], gain_data[fit_slice], sigma=weights[fit_slice], p0=(300.0, 0.0), bounds=((0, -0.000001), (5000, 0.000001)))
+        self.__fit = popt
 
-            self.__gain_fit_xdata = DataAndMetadata.new_data_and_metadata(gain_fit(x_data[fit_slice], *popt),
-                                                                          intensity_calibration=difference_xdata.intensity_calibration,
-                                                                          dimensional_calibrations=[result_calibration])
-            self.__gain_xdata = DataAndMetadata.new_data_and_metadata(gain_data[fit_slice],
+        self.__gain_fit_xdata = DataAndMetadata.new_data_and_metadata(gain_fit(x_data[fit_slice], *popt),
                                                                       intensity_calibration=difference_xdata.intensity_calibration,
                                                                       dimensional_calibrations=[result_calibration])
-            self.__difference_xdata = difference_xdata
-
-        except Exception as e:
-            import traceback
-            print(traceback.format_exc())
-            print(e)
-            raise
+        self.__gain_xdata = DataAndMetadata.new_data_and_metadata(gain_data[fit_slice],
+                                                                  intensity_calibration=difference_xdata.intensity_calibration,
+                                                                  dimensional_calibrations=[result_calibration])
+        self.__difference_xdata = difference_xdata
 
     def commit(self) -> None:
         assert self.__gain_xdata
