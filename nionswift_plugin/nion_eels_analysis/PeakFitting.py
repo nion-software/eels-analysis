@@ -35,32 +35,26 @@ class FitZeroLossPeak:
         self.__subtracted_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
 
     def execute(self, eels_spectrum_data_item: Facade.DataItem, zlp_model: Facade.DataStructure, **kwargs: typing.Any) -> None:
-        try:
-            spectrum_xdata = eels_spectrum_data_item.xdata
-            assert spectrum_xdata
-            assert spectrum_xdata.is_datum_1d
-            assert spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
-            eels_spectrum_xdata = spectrum_xdata
-            model_xdata = None
-            subtracted_xdata = None
-            zero_loss_peak_model_id = zlp_model.structure_type
-            for component in Registry.get_components_by_type("zlp-model"):
-                if zero_loss_peak_model_id == component.zero_loss_peak_model_id:
-                    fit_result = component.fit_zero_loss_peak(spectrum_xdata=spectrum_xdata)
-                    model_xdata = fit_result["zero_loss_peak_model"]
-                    # use 'or' to avoid doing subtraction if subtracted_spectrum already present
-                    subtracted_xdata = fit_result.get("subtracted_spectrum", None) or Core.calibrated_subtract_spectrum(spectrum_xdata, model_xdata)
-            if model_xdata is None:
-                model_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros_like(eels_spectrum_xdata.data), intensity_calibration=eels_spectrum_xdata.intensity_calibration, dimensional_calibrations=eels_spectrum_xdata.dimensional_calibrations)
-            if subtracted_xdata is None:
-                subtracted_xdata = DataAndMetadata.new_data_and_metadata(eels_spectrum_xdata.data, intensity_calibration=eels_spectrum_xdata.intensity_calibration, dimensional_calibrations=eels_spectrum_xdata.dimensional_calibrations)
-            self.__model_xdata = model_xdata
-            self.__subtracted_xdata = subtracted_xdata
-        except Exception as e:
-            import traceback
-            print(traceback.format_exc())
-            print(e)
-            raise
+        spectrum_xdata = eels_spectrum_data_item.xdata
+        assert spectrum_xdata
+        assert spectrum_xdata.is_datum_1d
+        assert spectrum_xdata.datum_dimensional_calibrations[0].units == "eV"
+        eels_spectrum_xdata = spectrum_xdata
+        model_xdata = None
+        subtracted_xdata = None
+        zero_loss_peak_model_id = zlp_model.structure_type
+        for component in Registry.get_components_by_type("zlp-model"):
+            if zero_loss_peak_model_id == component.zero_loss_peak_model_id:
+                fit_result = component.fit_zero_loss_peak(spectrum_xdata=spectrum_xdata)
+                model_xdata = fit_result["zero_loss_peak_model"]
+                # use 'or' to avoid doing subtraction if subtracted_spectrum already present
+                subtracted_xdata = fit_result.get("subtracted_spectrum", None) or Core.calibrated_subtract_spectrum(spectrum_xdata, model_xdata)
+        if model_xdata is None:
+            model_xdata = DataAndMetadata.new_data_and_metadata(numpy.zeros_like(eels_spectrum_xdata.data), intensity_calibration=eels_spectrum_xdata.intensity_calibration, dimensional_calibrations=eels_spectrum_xdata.dimensional_calibrations)
+        if subtracted_xdata is None:
+            subtracted_xdata = DataAndMetadata.new_data_and_metadata(eels_spectrum_xdata.data, intensity_calibration=eels_spectrum_xdata.intensity_calibration, dimensional_calibrations=eels_spectrum_xdata.dimensional_calibrations)
+        self.__model_xdata = model_xdata
+        self.__subtracted_xdata = subtracted_xdata
 
     def commit(self) -> None:
         assert self.__model_xdata
