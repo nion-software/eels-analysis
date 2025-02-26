@@ -111,8 +111,8 @@ class TestElementalMappingController(unittest.TestCase):
             document_controller.periodic()
             self.assertFalse(any(computation.error_text for computation in document_model.computations))
             self.assertEqual(3, len(document_model.data_items))
-            self.assertIn("Zero Loss Peak", document_model.data_items[1].title)
-            self.assertIn("Subtracted", document_model.data_items[2].title)
+            self.assertIn("(Fit ZLP - Background)", document_model.data_items[1].title)
+            self.assertIn("(Fit ZLP - Subtracted)", document_model.data_items[2].title)
 
     def test_measure_temperature_computation(self) -> None:
         with create_memory_profile_context() as test_context:
@@ -132,9 +132,9 @@ class TestElementalMappingController(unittest.TestCase):
             document_controller.periodic()
             self.assertFalse(any(computation.error_text for computation in document_model.computations))
             self.assertEqual(5, len(document_model.data_items))
-            self.assertIn("Difference", document_model.data_items[2].title)
+            self.assertIn("Near - Far", document_model.data_items[2].title)
             self.assertIn("Gain", document_model.data_items[3].title)
-            self.assertIn("Fit", document_model.data_items[4].title)
+            self.assertIn("Gain Fit", document_model.data_items[4].title)
 
     def test_thickness_mapping_computation(self) -> None:
         with create_memory_profile_context() as test_context:
@@ -162,5 +162,5 @@ class TestElementalMappingController(unittest.TestCase):
             document_controller.periodic()
             self.assertFalse(any(computation.error_text for computation in document_model.computations))
             self.assertEqual(2, len(document_model.data_items))
-            self.assertIn("Thickness Map", document_model.data_items[1].title)
+            self.assertIn("(Thickness Map)", document_model.data_items[1].title)
             self.assertAlmostEqual(0.3145582, document_model.data_items[1].data[0, 0])  # dependent on peak data

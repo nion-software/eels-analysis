@@ -163,8 +163,8 @@ class EELSMapBackgroundSubtractedSignal:
 
 
 def add_background_subtraction_computation(api: Facade.API_1, library: Facade.Library, display_item: Facade.Display, data_item: Facade.DataItem, intervals: typing.Sequence[Facade.Graphic]) -> None:
-    background = api.library.create_data_item(title="{} Background".format(data_item.title))
-    signal = api.library.create_data_item(title="{} Subtracted".format(data_item.title))
+    background = api.library.create_data_item()
+    signal = api.library.create_data_item()
 
     background_model = DataStructure.DataStructure(structure_type="power_law_fit_background_model")
     library._document_model.append_data_structure(background_model)
@@ -223,7 +223,7 @@ def subtract_background(api: Facade.API_1, window: Facade.DocumentWindow) -> Non
                         assert source_xdata
                         if source_xdata.is_navigable and source_data_items[0].datum_dimension_count == 1:
                             spectrum_image = api._new_api_object(source_data_items[0])
-                            subtracted = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape), title="{} Background Removed".format(spectrum_image.title))
+                            subtracted = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape))
                             api.library.create_computation(
                                 "eels.subtract_background",
                                 inputs={
@@ -260,7 +260,7 @@ def use_signal_for_map(api: Facade.API_1, window: Facade.DocumentWindow) -> None
                         assert source_xdata
                         if source_xdata.is_navigable and source_data_items[0].datum_dimension_count == 1:
                             spectrum_image = api._new_api_object(source_data_items[0])
-                            map = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape), title="{} Map".format(spectrum_image.title))
+                            map = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape))
                             signal_interval_graphic = target_interval
                             api.library.create_computation(
                                 "eels.mapping3",

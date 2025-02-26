@@ -19,7 +19,7 @@ _ = gettext.gettext
 
 
 class FitZeroLossPeak:
-    label = _("Zero Loss Peak Subtraction")
+    label = _("Fit ZLP")
     inputs = {
         "eels_spectrum_data_item": {"label": _("EELS Spectrum")},
         "zlp_model": {"label": _("Zero Loss Peak Model"), "entity_id": "zlp_model"},
@@ -64,8 +64,8 @@ class FitZeroLossPeak:
 
 
 def add_peak_fitting_computation(api: Facade.API_1, library: Facade.Library, display_item: Facade.Display, data_item: Facade.DataItem) -> None:
-    zero_loss_peak = api.library.create_data_item(title="{} Zero Loss Peak".format(data_item.title))
-    signal = api.library.create_data_item(title="{} Subtracted".format(data_item.title))
+    zero_loss_peak = api.library.create_data_item()
+    signal = api.library.create_data_item()
 
     zlp_model = DataStructure.DataStructure(structure_type="simple_peak_model")
     library._document_model.append_data_structure(zlp_model)
