@@ -28,12 +28,12 @@ class MeasureTemperature:
         "near_data_item": {"label": _("Near")},
         "far_data_item": {"label": _("Far")},
         "fit_interval_graphic": {"label": _("Fit")},
-        }
+    }
     outputs = {
-        "gain_fit_data_item": {"label": _("Gain fit")},
+        "gain_fit_data_item": {"label": _("Gain Fit")},
         "gain_data_item": {"label": _("Gain")},
-        "difference_data_item": {"label": _("Difference Near - Far")}
-               }
+        "difference_data_item": {"label": _("Near - Far")}
+    }
 
     def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
@@ -128,15 +128,15 @@ def measure_temperature(api: Facade.API_1, window: Facade.DocumentWindow, *, dis
     assert near_data_item.xdata
     assert far_data_item.xdata
     difference_xdata = near_data_item.xdata - far_data_item.xdata
-    difference_data_item = api.library.create_data_item_from_data_and_metadata(difference_xdata, title=f"Difference (Near - Far), ({near_data_item.title} - {far_data_item.title})")
+    difference_data_item = api.library.create_data_item_from_data_and_metadata(difference_xdata)
     window.display_data_item(difference_data_item)
     calibration = difference_xdata.dimensional_calibrations[0]
     # Create the default interval from 20 meV to 100 meV
     graphic = difference_data_item.add_interval_region(calibration.convert_from_calibrated_value(0.02) / len(difference_xdata.data),
                                                        calibration.convert_from_calibrated_value(0.1) / len(difference_xdata.data))
 
-    gain_data_item = api.library.create_data_item(title="Gain")
-    gain_fit_data_item = api.library.create_data_item(title="Gain Fit")
+    gain_data_item = api.library.create_data_item()
+    gain_fit_data_item = api.library.create_data_item()
 
     # Create the computation
     api.library.create_computation("eels.measure_temperature",
@@ -158,4 +158,3 @@ def measure_temperature(api: Facade.API_1, window: Facade.DocumentWindow, *, dis
         gain_fit_display_item._set_display_layer_properties(0, label=_("Fit"), fill_color=None, stroke_color="#F00", stroke_width=2)
         gain_fit_display_item._set_display_layer_properties(1, label=_("Gain"), fill_color="#1E90FF", stroke_color=None)
         gain_fit_display_item.set_display_property("legend_position", "top-right")
-        gain_fit_display_item.title = "Temperature Measurement Fit"

@@ -223,6 +223,7 @@ class TestBackgroundSubtraction(unittest.TestCase):
                 data_descriptor=DataAndMetadata.DataDescriptor(False, 2, 1)
             )
             si_data_item = DataItem.new_data_item(si_xdata)
+            si_data_item.title = "SI"
             document_model.append_data_item(si_data_item)
             si_display_item = document_model.get_display_item_for_data_item(si_data_item)
             data_item = document_model.get_pick_new(si_display_item, si_data_item)
@@ -253,7 +254,7 @@ class TestBackgroundSubtraction(unittest.TestCase):
             document_controller.periodic()
             self.assertFalse(any(computation.error_text for computation in document_model.computations))
             self.assertEqual(5, len(document_model.data_items))
-            self.assertIn("Background Removed", document_model.data_items[4].title)
+            self.assertIn("(EELS Subtract Background)", document_model.data_items[4].title)
 
     def test_signal_map_computation(self) -> None:
         with TestContext.create_memory_context() as profile_context:
@@ -306,7 +307,7 @@ class TestBackgroundSubtraction(unittest.TestCase):
             document_controller.periodic()
             self.assertFalse(any(computation.error_text for computation in document_model.computations))
             self.assertEqual(6, len(document_model.data_items))
-            self.assertIn("Map", document_model.data_items[5].title)
+            self.assertIn("(EELS Map Background Subtracted Signal)", document_model.data_items[5].title)
 
 
 if __name__ == '__main__':

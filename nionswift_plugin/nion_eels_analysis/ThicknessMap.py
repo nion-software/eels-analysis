@@ -1,4 +1,5 @@
 # imports
+import gettext
 import numpy
 import typing
 
@@ -6,6 +7,9 @@ import typing
 from nion.data import DataAndMetadata
 from nion.swift import Facade
 from nion.swift.model import Symbolic
+
+
+_ = gettext.gettext
 
 
 def map_thickness_xdata(src_xdata: DataAndMetadata.DataAndMetadata) -> typing.Optional[DataAndMetadata.DataAndMetadata]:
@@ -47,6 +51,8 @@ def map_thickness_xdata(src_xdata: DataAndMetadata.DataAndMetadata) -> typing.Op
 
 
 class EELSThicknessMapping:
+    label = _("Thickness Map")
+
     def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
         self.__mapped_xdata: typing.Optional[DataAndMetadata.DataAndMetadata] = None
@@ -68,7 +74,7 @@ def map_thickness(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
         spectrum_image = Facade.DataItem(target_data_item_)
         if spectrum_image:
             assert spectrum_image.display_xdata
-            map = api.library.create_data_item_from_data(numpy.zeros_like(spectrum_image.display_xdata.data), title="{} Thickness Map".format(spectrum_image.title))
+            map = api.library.create_data_item_from_data(numpy.zeros_like(spectrum_image.display_xdata.data))
             api.library.create_computation("eels.thickness_mapping", inputs={"spectrum_image_data_item": spectrum_image}, outputs={"map": map})
             window.display_data_item(map)
 
