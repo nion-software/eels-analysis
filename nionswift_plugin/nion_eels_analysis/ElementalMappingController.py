@@ -39,8 +39,11 @@ class EELSBackgroundSubtraction:
     def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
 
-    def execute(self, eels_xdata: DataAndMetadata.DataAndMetadata, region: Facade.Graphic, fit_interval: DataArrayType, signal_interval: DataArrayType, **kwargs: typing.Any) -> None:
-        eels_spectrum_xdata = xd.sum_region(eels_xdata, region.mask_xdata_with_shape(eels_xdata.data_shape[0:2]))
+    def execute(self, eels_xdata: Facade.DataSource, region: Facade.Graphic, fit_interval: DataArrayType, signal_interval: DataArrayType, **kwargs: typing.Any) -> None:
+        # note: 'eels_xdata' is actually a 'data source' and not a 'data item'. leaving name as is for now for backward compatibility.
+        eels_xdata_xdata = eels_xdata.xdata
+        assert eels_xdata_xdata
+        eels_spectrum_xdata = xd.sum_region(eels_xdata_xdata, region.mask_xdata_with_shape(eels_xdata_xdata.data_shape[0:2]))
         signal = eels_analysis.make_signal_like(eels_analysis.extract_original_signal(eels_spectrum_xdata, [fit_interval], signal_interval), eels_spectrum_xdata)
         background_xdata = eels_analysis.make_signal_like(eels_analysis.calculate_background_signal(eels_spectrum_xdata, [fit_interval], signal_interval), eels_spectrum_xdata)
         assert signal
@@ -211,7 +214,8 @@ class EELSMapping:
         self.computation = computation
 
     def execute(self, **kwargs: typing.Any) -> None:
-        spectrum_image_xdata = kwargs["spectrum_image_xdata"]
+        # note: 'spectrum_image_xdata' is actually a 'data source' and not a 'data item'. leaving name as is for now for backward compatibility.
+        spectrum_image = typing.cast(Facade.DataSource, kwargs["spectrum_image_xdata"])
         fit_interval = kwargs["fit_interval"]
         signal_interval = kwargs["signal_interval"]
         atomic_number = kwargs.get("atomic_number")
@@ -220,6 +224,8 @@ class EELSMapping:
         electron_shell = None
         if atomic_number is not None and shell_number is not None and subshell_index is not None:
             electron_shell = PeriodicTable.ElectronShell(atomic_number, shell_number, subshell_index)
+        spectrum_image_xdata = spectrum_image.xdata
+        assert spectrum_image_xdata
         self.__mapped_xdata = eels_analysis.map_background_subtracted_signal(spectrum_image_xdata, electron_shell, [fit_interval], signal_interval)
 
     def commit(self) -> None:
