@@ -18,10 +18,10 @@ Facade.initialize()
 class TestBackgroundSubtraction(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.app = Application.Application(TestUI.UserInterface(), set_global=True)
+        self._test_setup = TestContext.TestSetup(set_global=True)
 
     def tearDown(self) -> None:
-        pass
+        self._test_setup = typing.cast(typing.Any, None)
 
     def test_calibrate_spectrum_for_single_spectrum(self) -> None:
         with TestContext.create_memory_context() as profile_context:

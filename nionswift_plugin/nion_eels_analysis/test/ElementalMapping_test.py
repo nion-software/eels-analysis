@@ -29,10 +29,10 @@ Facade.initialize()
 class TestElementalMappingController(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.app = Application.Application(TestUI.UserInterface(), set_global=False)
+        self._test_setup = TestContext.TestSetup()
 
     def tearDown(self) -> None:
-        pass
+        self._test_setup = typing.cast(typing.Any, None)
 
     def __create_spectrum_image(self) -> DataItem.DataItem:
         return DataItem.new_data_item(self.__create_spectrum_image_xdata())
