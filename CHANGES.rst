@@ -1,6 +1,11 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.9 (2025-04-23):
+-------------------
+- Package dependencies updated.
+- Modify computations to use auto-titling.
+
 0.6.8 (2025-01-07):
 -------------------
 - Package dependencies updated.
