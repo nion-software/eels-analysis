@@ -37,7 +37,7 @@ def core_loss_edge(core_loss_spectra: DataArrayType, core_loss_range_eV: DataArr
         profile_range - contiguous union of edge delta and background ranges
     """
     edge_onset_margin_eV = 0
-    assert edge_onset_eV > core_loss_range_eV[0] + edge_onset_margin_eV
+    assert edge_onset_eV > core_loss_range_eV[0] + edge_onset_margin_eV, "Edge onset not within core loss range."
 
     edge_range = numpy.full_like(core_loss_range_eV, edge_onset_eV)
     edge_range[0] -= edge_onset_margin_eV
