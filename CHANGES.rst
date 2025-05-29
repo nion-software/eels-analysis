@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.10 (2025-05-29):
+--------------------
+- Maintenance release.
+
 0.6.9 (2025-04-23):
 -------------------
 - Package dependencies updated.
