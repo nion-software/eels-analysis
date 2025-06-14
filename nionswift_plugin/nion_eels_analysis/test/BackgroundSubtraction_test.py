@@ -257,6 +257,46 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(5, len(document_model.data_items))
             self.assertIn("(EELS Subtract Background)", document_model.data_items[4].title)
 
+    def test_subtraction_computation_with_swapped_interval(self) -> None:
+        # this can happen during dragging of intervals
+        with TestContext.create_memory_context() as profile_context:
+            document_controller = profile_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            peak_xdata = generate_peak_data()
+            si_data = numpy.empty((4, 4, peak_xdata.data.shape[0]), dtype=numpy.float32)
+            for i in range(si_data.shape[0]):
+                for j in range(si_data.shape[1]):
+                    si_data[i, j] = generate_peak_data(add_noise=True)
+            si_xdata = DataAndMetadata.new_data_and_metadata(
+                si_data,
+                intensity_calibration=peak_xdata.intensity_calibration,
+                dimensional_calibrations=[Calibration.Calibration(), Calibration.Calibration(), peak_xdata.dimensional_calibrations[-1]],
+                data_descriptor=DataAndMetadata.DataDescriptor(False, 2, 1)
+            )
+            si_data_item = DataItem.new_data_item(si_xdata)
+            si_data_item.title = "SI"
+            document_model.append_data_item(si_data_item)
+            si_display_item = document_model.get_display_item_for_data_item(si_data_item)
+            data_item = document_model.get_pick_new(si_display_item, si_data_item)
+            document_model.recompute_all()
+            document_controller.periodic()
+            self.assertFalse(any(computation.error_text for computation in document_model.computations))
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            interval = Graphics.IntervalGraphic()
+            interval.start = 0.3
+            interval.end = 0.2
+            display_item.add_graphic(interval)
+            display_panel = document_controller.selected_display_panel
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            display_panel.set_display_panel_display_item(display_item)
+            api = Facade.get_api("~1.0", "~1.0")
+            BackgroundSubtraction.add_background_subtraction_computation(api, Facade.Library(document_model),
+                                                                         Facade.Display(display_item), Facade.DataItem(data_item),
+                                                                         [Facade.Graphic(interval)])
+            document_model.recompute_all()
+            document_controller.periodic()
+            self.assertFalse(any(computation.error_text for computation in document_model.computations))
+
     def test_signal_map_computation(self) -> None:
         with TestContext.create_memory_context() as profile_context:
             document_controller = profile_context.create_document_controller_with_application()

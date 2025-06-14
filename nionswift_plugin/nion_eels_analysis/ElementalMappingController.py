@@ -541,7 +541,10 @@ class ElementalMappingController:
 
     def graphic_property_changed(self, graphic: Graphics.IntervalGraphic, data_item: DataItem.DataItem, dimensional_shape: DataAndMetadata.ShapeType, dimensional_calibrations: DataAndMetadata.CalibrationListType, key: str) -> None:
         if key == "interval":
-            value = graphic.interval
+            def normalized_interval(interval: tuple[float, float]) -> tuple[float, float]:
+                return min(interval), max(interval)
+
+            value = normalized_interval(graphic.interval)
             ss = value[0] * dimensional_shape[-1]
             ee = value[1] * dimensional_shape[-1]
             s = dimensional_calibrations[-1].convert_to_calibrated_value(ss)

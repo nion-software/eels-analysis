@@ -10,6 +10,7 @@ from nion.data import Core
 from nion.data import DataAndMetadata
 from nion.eels_analysis import BackgroundModel
 from nion.swift.model import DataStructure
+from nion.swift.model import Graphics
 from nion.swift.model import Symbolic
 from nion.swift.model import Schema
 from nion.swift import Facade
@@ -17,6 +18,15 @@ from nion.utils import Registry
 
 
 _ = gettext.gettext
+
+
+def normalized_interval(interval: tuple[float, float]) -> tuple[float, float]:
+    """Ensure the interval is normalized, i.e., the first value is less than the second.
+
+    This can happen during dragging of the interval graphics, where the user might drag the left handle to the right
+    of the right handle. Until this is handled cleanly in the UI, ensure the interval is normalized here.
+    """
+    return min(interval), max(interval)
 
 
 class EELSFitBackground:
@@ -45,7 +55,7 @@ class EELSFitBackground:
         # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
         fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
         for fit_interval_graphic in fit_interval_graphics:
-            fit_intervals.append(fit_interval_graphic.interval)
+            fit_intervals.append(normalized_interval(fit_interval_graphic.interval))
         fit_minimum = min([fit_interval[0] for fit_interval in fit_intervals])
         signal_interval = fit_minimum, 1.0
         signal_xdata = BackgroundModel.get_calibrated_interval_slice(eels_spectrum_xdata, signal_interval)
@@ -95,7 +105,7 @@ class EELSSubtractBackground:
         # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
         fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
         for fit_interval_graphic in fit_interval_graphics:
-            fit_intervals.append(fit_interval_graphic.interval)
+            fit_intervals.append(normalized_interval(fit_interval_graphic.interval))
         subtracted_xdata = None
         background_model_id = background_model.structure_type
         for component in Registry.get_components_by_type("background-model"):
@@ -146,8 +156,8 @@ class EELSMapBackgroundSubtractedSignal:
         # fit_interval_graphics.interval returns normalized coordinates. create calibrated intervals.
         fit_intervals: typing.List[BackgroundModel.BackgroundInterval] = list()
         for fit_interval_graphic in fit_interval_graphics:
-            fit_intervals.append(fit_interval_graphic.interval)
-        signal_interval = signal_interval_graphic.interval
+            fit_intervals.append(normalized_interval(fit_interval_graphic.interval))
+        signal_interval = normalized_interval(signal_interval_graphic.interval)
         mapped_xdata = None
         background_model_id = background_model.structure_type
         for component in Registry.get_components_by_type("background-model"):
