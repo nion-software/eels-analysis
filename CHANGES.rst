@@ -1,8 +1,8 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
-0.6.11 (2025-06-21):
--------------------
+0.6.12 (2025-06-21):
+--------------------
 - Handle case where user drags interval right-over-left resulting in temporary max/min interval.
 
 0.6.10 (2025-05-29):
