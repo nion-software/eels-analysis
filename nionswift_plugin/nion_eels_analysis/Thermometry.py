@@ -103,7 +103,7 @@ ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.Compu
 Symbolic.register_computation_type("eels.measure_temperature", typing.cast(ComputationCallable, MeasureTemperature))
 
 
-def measure_temperature(api: Facade.API_1, window: Facade.DocumentWindow, *, display_items: tuple[tuple[DisplayItem.DisplayItem, Graphics.Graphic | None], tuple[DisplayItem.DisplayItem, Graphics.Graphic | None]] | None) -> None:
+def measure_temperature(api: Facade.API_1, window: Facade.DocumentWindow, *, display_items: tuple[tuple[DisplayItem.DisplayItem, Graphics.Graphic | None], tuple[DisplayItem.DisplayItem, Graphics.Graphic | None]] | None = None) -> None:
     selected_display_items = window._document_controller._get_two_data_sources() if display_items is None else display_items
     document_model = window._document_controller.document_model
     error_msg = "Select two data items each containing one EEL spectrum in order to use this computation."
