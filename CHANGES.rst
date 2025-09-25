@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.13 (2025-09-25):
+--------------------
+- Fix issue with measure temperature.
+
 0.6.12 (2025-06-21):
 --------------------
 - Handle case where user drags interval right-over-left resulting in temporary max/min interval.
