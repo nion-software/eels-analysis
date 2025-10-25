@@ -8,7 +8,7 @@ version = "0.6.13"
 authors = [
     { name = "Nion Software", email = "swift@nion.com" }
 ]
-description = "Nion UI framework."
+description = "Library and UI for doing EELS analysis with Nion Swift."
 readme = "README.rst"
 requires-python = ">=3.12"
 license = "GPL-3.0-only"
