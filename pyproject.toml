@@ -2,6 +2,44 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "nionswift-eels-analysis"
+version = "0.6.13"
+authors = [
+    { name = "Nion Software", email = "swift@nion.com" }
+]
+description = "Nion UI framework."
+readme = "README.rst"
+requires-python = ">=3.12"
+license = "GPL-3.0-only"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14"
+]
+urls = { "Homepage" = "https://github.com/nion-software/nionui" }
+dependencies = [
+    "nionswift >=16.16,<17.0",
+    "nionui >=10.2,<11.0",
+    "numpy >=2.0,<3.0"
+]
+
+[tool.setuptools.packages.find]
+include = [
+    "nion",
+    "nion.eels_analysis",
+    "nion.eels_analysis.test",
+    "nionswift_plugin",
+    "nionswift_plugin.nion_eels_analysis",
+    "nionswift_plugin.nion_eels_analysis.test"
+]
+
+[tool.setuptools.package-data]
+"nion.eels_analysis" = ["resources/*"]
+"nionswift_plugin.nion_eels_analysis" = ["resources/color_maps/*"]
+
 [tool.pytest.ini_options]
 testpaths = [
     "nionswift_plugin/nion_eels_analysis/test",
