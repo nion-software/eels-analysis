@@ -1,21 +1,31 @@
 # imports
-import logging
-import copy
-import numpy
-import typing
 import contextlib
+import copy
+import gettext
+import logging
+import math
+import typing
+
+# third party libraries
+import numpy
 import scipy.ndimage
 
 # local libraries
 from nion.data import DataAndMetadata
 from nion.eels_analysis import ZLP_Analysis
 from nion.swift import Facade
+from nion.swift.model import DocumentModel
+from nion.swift.model import Symbolic
 from nion.typeshed import API_1_0 as API
 from nion.ui import Declarative
 from nion.ui import Dialog
 from nion.ui import Window
 from nion.utils import Converter
 from nion.utils import Event
+
+
+_ = gettext.gettext
+
 
 DataArrayType = numpy.typing.NDArray[typing.Any]
 
@@ -337,3 +347,71 @@ def _calibrate_spectrum(api: Facade.API_1, window: Facade.DocumentWindow) -> typ
 
 def calibrate_spectrum(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
     _calibrate_spectrum(api, window)
+
+
+class AlignZLPComputation(Symbolic.ComputationHandlerLike):
+
+    def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
+        self.computation = computation
+        self.__aligned_eels_data: typing.Optional[DataAndMetadata.DataAndMetadata] = None
+
+    def execute(self, **kwargs: typing.Any) -> None:
+        eels_data_item = typing.cast(Facade.DataSource, kwargs["eels_data_item"])
+        target_index = typing.cast(int, kwargs.get("target_index", 50))
+        eels_data_xdata = eels_data_item.xdata
+        assert eels_data_xdata
+        mx_pos = ZLP_Analysis.estimate_zlp_amplitude_position_width_com(eels_data_xdata.data)[1] or 0.0
+        # fallback to simple max
+        if not math.isfinite(mx_pos):
+            mx_pos = float(numpy.argmax(eels_data_xdata.data))
+        # determine the offset and apply it
+        interpolation_order = 1
+        offset = mx_pos - target_index
+        aligned_eels_data = scipy.ndimage.shift(eels_data_xdata.data, -offset, order=interpolation_order)
+
+        eels_data_calibration = eels_data_xdata.dimensional_calibrations[-1]
+        eels_data_calibration.offset = -(target_index + 0.5) * eels_data_calibration.scale
+
+        offset_calibration = copy.copy(eels_data_calibration)
+        offset_calibration.offset = 0
+
+        self.__aligned_eels_data = DataAndMetadata.new_data_and_metadata(aligned_eels_data, eels_data_xdata.intensity_calibration, (eels_data_calibration, ))
+
+    def commit(self) -> None:
+        assert self.__aligned_eels_data
+        self.computation.set_referenced_xdata("aligned_eels_data", self.__aligned_eels_data)
+
+
+def apply_align_zlp(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
+    target_display = window.target_display
+    target_data_item_ = target_display._display_item.data_items[0] if target_display and len(target_display._display_item.data_items) > 0 else None
+    if target_data_item_ and target_display:
+        eels_data_item = Facade.DataItem(target_data_item_)
+        if eels_data_item:
+            assert eels_data_item.display_xdata
+            if not eels_data_item.display_xdata.is_data_1d:
+                logging.error("Failed: Data is not a sequence or collection of 1D spectra.")
+                return
+            aligned_eels_data_item = api.library.create_data_item_from_data(numpy.zeros_like(eels_data_item.display_xdata.data))
+            api.library.create_computation("eels.align_zlp.a0", inputs={"eels_data_item": eels_data_item, "target_index": 50}, outputs={"aligned_eels_data": aligned_eels_data_item})
+            window.display_data_item(aligned_eels_data_item)
+
+
+ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
+Symbolic.register_computation_type("eels.align_zlp.a0", typing.cast(ComputationCallable, AlignZLPComputation))
+
+
+DocumentModel.DocumentModel.register_processing_descriptions({
+    "eels.align_zlp.a0": {
+        "title": _("Align ZLP"),
+        "sources": [
+            {"name": "eels_data_item", "label": _("EELS Data"), "data_type": "xdata", "requirements": [{"type": "datum_rank", "values": (1,)}]}
+        ],
+        "parameters": [
+            {"name": "target_index", "label": _("Target Index"), "type": "integral", "value": 50, "value_default": 50, "value_min": 0}
+        ],
+        "outputs": [
+            {"name": "aligned_eels_data", "label": _("Aligned EELS Data")}
+        ]
+    }
+})

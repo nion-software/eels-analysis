@@ -1,19 +1,35 @@
-import numpy
 import typing
 import unittest
 
+import numpy
+import scipy
+
 from nion.data import Calibration
 from nion.data import DataAndMetadata
-from nion.swift import Application
 from nion.swift import Facade
 from nion.swift.model import DataItem
 from nion.swift.test import TestContext
-from nion.ui import TestUI
 
 from .. import AlignZLP
 
 
 Facade.initialize()
+
+
+def create_memory_profile_context() -> TestContext.MemoryProfileContext:
+    return TestContext.MemoryProfileContext()
+
+
+def generate_peak_data(*, range_ev: float = 100.0, length: int = 1000, add_noise: bool = False, is_biased: bool = False) -> DataAndMetadata.DataAndMetadata:
+    x_axis = numpy.arange(-range_ev / 10, range_ev, range_ev / length)
+    if is_biased:
+        x_axis[length // 10:] = numpy.arange(0, range_ev / 2.5, range_ev / 2.5 / length)
+    data = 1e6 * scipy.stats.norm.pdf(x_axis, 0, 1)
+    if add_noise:
+        data += numpy.abs(numpy.random.normal(0, 5, data.shape))
+    intensity_calibration = Calibration.Calibration(units="counts")
+    dimensional_calibrations = [Calibration.Calibration(scale=range_ev / length, offset=-range_ev / 10, units="eV")]
+    return DataAndMetadata.new_data_and_metadata(data, intensity_calibration=intensity_calibration, dimensional_calibrations=dimensional_calibrations)
 
 
 class TestBackgroundSubtraction(unittest.TestCase):
@@ -67,3 +83,23 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(0, len(document_model.data_items))
             self.assertEqual(0, len(document_model.display_items))
             self.assertEqual(0, len(document_model.data_structures))
+
+    def test_align_zlp_computation(self) -> None:
+        with create_memory_profile_context() as test_context:
+            document_controller = test_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            peak_xdata = generate_peak_data()
+            eels_data_item = DataItem.new_data_item(peak_xdata)
+            document_model.append_data_item(eels_data_item)
+            display_panel = document_controller.selected_display_panel
+            display_item = document_model.get_display_item_for_data_item(eels_data_item)
+            display_panel.set_display_panel_display_item(display_item)
+            api = Facade.get_api("~1.0", "~1.0")
+            AlignZLP.apply_align_zlp(api, Facade.DocumentWindow(document_controller))
+            document_model.recompute_all()
+            document_controller.periodic()
+            self.assertFalse(any(computation.error_text for computation in document_model.computations))
+            self.assertEqual(2, len(document_model.data_items))
+            self.assertIn("(Align ZLP)", document_model.data_items[1].title)
+            self.assertAlmostEqual(50.0, numpy.argmax(document_model.data_items[1].xdata))
+            self.assertAlmostEqual(0.0, document_model.data_items[1].dimensional_calibrations[-1].convert_to_calibrated_value(50.5))
