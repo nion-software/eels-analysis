@@ -73,8 +73,11 @@ async def pick_new_edge(document_controller: DocumentController.DocumentControll
     model_display_item = document_model.get_display_item_for_data_item(model_data_item)
     assert model_display_item
 
+    model_data_metadata = model_data_item.data_metadata
+    assert model_data_metadata
+
     pick_region = Graphics.RectangleGraphic()
-    pick_region.size = Geometry.FloatSize(min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1]))
+    pick_region.size = Geometry.FloatSize(min(1 / 16, 16 / model_data_metadata.dimensional_shape[0]), min(1 / 16, 16 / model_data_metadata.dimensional_shape[1]))
     pick_region.label = "{} {}".format(_("Pick"), str(edge.electron_shell))
     model_display_item.add_graphic(pick_region)
 
@@ -482,12 +485,14 @@ class ElementalMappingController:
 
     def __is_model(self, data_item: typing.Optional[DataItem.DataItem]) -> bool:
         if isinstance(data_item, DataItem.DataItem):
-            return data_item.is_data_3d
+            data_metadata = data_item.data_metadata
+            return data_metadata is not None and data_metadata.is_data_3d
         return False
 
     def __is_explorer(self, document_model: DocumentModel.DocumentModel, data_item: typing.Optional[DataItem.DataItem]) -> bool:
         if isinstance(data_item, DataItem.DataItem):
-            if data_item.is_data_1d:
+            data_metadata = data_item.data_metadata
+            if data_metadata and data_metadata.is_data_1d:
                 for display_item in document_model.get_display_items_for_data_item(data_item):
                     for graphic in display_item.graphics:
                         if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
@@ -496,8 +501,9 @@ class ElementalMappingController:
 
     def __is_calibrated_map(self, data_item: DataItem.DataItem) -> bool:
         if isinstance(data_item, DataItem.DataItem):
-            if data_item.is_data_2d and data_item.intensity_calibration:
-                return data_item.title.startswith("Map") and data_item.intensity_calibration.units.startswith("~")
+            data_metadata = data_item.data_metadata
+            if data_metadata and data_metadata.is_data_2d and data_metadata.intensity_calibration:
+                return data_item.title.startswith("Map") and data_metadata.intensity_calibration.units.startswith("~")
         return False
 
     async def explore_edges(self, document_controller: DocumentController.DocumentController) -> None:
@@ -507,8 +513,10 @@ class ElementalMappingController:
         model_display_item = document_model.get_display_item_for_data_item(model_data_item)
         assert model_display_item
         assert model_display_item.data_item
+        model_data_metadata = model_data_item.data_metadata
+        assert model_data_metadata
         pick_region = Graphics.RectangleGraphic()
-        pick_region.size = Geometry.FloatSize(min(1 / 16, 16 / model_data_item.dimensional_shape[0]), min(1 / 16, 16 / model_data_item.dimensional_shape[1]))
+        pick_region.size = Geometry.FloatSize(min(1 / 16, 16 / model_data_metadata.dimensional_shape[0]), min(1 / 16, 16 / model_data_metadata.dimensional_shape[1]))
         pick_region.label = _("Explore")
         model_display_item.add_graphic(pick_region)
         pick_data_item = document_model.get_pick_region_new(model_display_item, model_display_item.data_item, pick_region=pick_region)
@@ -553,12 +561,13 @@ class ElementalMappingController:
             self.__explorer_interval_changed(data_item, (s, e))
 
     def __connect_explorer_interval(self, document_model: DocumentModel.DocumentModel, data_item: DataItem.DataItem) -> None:
-        if data_item.is_data_1d:
+        data_metadata = data_item.data_metadata
+        if data_metadata and data_metadata.is_data_1d:
             for display_item in document_model.get_display_items_for_data_item(data_item):
                 for graphic in display_item.graphics:
                     if isinstance(graphic, Graphics.IntervalGraphic) and graphic.graphic_id == "explore":
-                        dimensional_shape = data_item.dimensional_shape
-                        dimensional_calibrations = data_item.dimensional_calibrations
+                        dimensional_shape = data_metadata.dimensional_shape
+                        dimensional_calibrations = data_metadata.dimensional_calibrations
                         self.__explorer_property_changed_listeners[data_item.uuid] = graphic.property_changed_event.listen(functools.partial(self.graphic_property_changed, graphic, data_item, dimensional_shape, dimensional_calibrations))
                         self.graphic_property_changed(graphic, data_item, dimensional_shape, dimensional_calibrations, "interval")
 
@@ -570,12 +579,13 @@ class ElementalMappingController:
 
     def add_edge(self, electron_shell: PeriodicTable.ElectronShell) -> typing.Optional[ElementalMappingEdge]:
         model_data_item = self.__model_data_item
-        if model_data_item:
+        model_data_metadata = model_data_item.data_metadata if model_data_item else None
+        if model_data_item and model_data_metadata:
             binding_energy_eV = PeriodicTable.PeriodicTable().nominal_binding_energy_ev(electron_shell)
             signal_interval_eV = binding_energy_eV, binding_energy_eV * 1.10
             fit_interval_eV = binding_energy_eV * 0.93, binding_energy_eV * 0.98
-            dimensional_shape = model_data_item.dimensional_shape
-            dimensional_calibrations = model_data_item.dimensional_calibrations
+            dimensional_shape = model_data_metadata.dimensional_shape
+            dimensional_calibrations = model_data_metadata.dimensional_calibrations
             if dimensional_shape is not None and dimensional_calibrations is not None and len(dimensional_calibrations) > 0:
                 calibration = dimensional_calibrations[-1]
                 if calibration.units == "eV":
