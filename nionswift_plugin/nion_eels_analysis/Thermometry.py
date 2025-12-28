@@ -43,14 +43,14 @@ class MeasureTemperature:
         self.__fit: typing.Optional[DataArrayType] = None
 
     def execute(self, near_data_item: DataItem.DataItem, far_data_item: DataItem.DataItem, fit_interval_graphic: Graphics.IntervalGraphic, **kwargs: typing.Any) -> None:
-        assert near_data_item.xdata
-        assert near_data_item.xdata.is_data_1d
-        assert far_data_item.xdata
-        assert far_data_item.xdata.is_data_1d
-        # Only allow data of same shape for now. A future version could crop to the smaller size of the two.
-        assert near_data_item.data is not None and far_data_item.data is not None and len(near_data_item.data) == len(far_data_item.data)
         near_xdata = near_data_item.xdata
         far_xdata = far_data_item.xdata
+        assert near_xdata
+        assert near_xdata.is_data_1d
+        assert far_xdata
+        assert far_xdata.is_data_1d
+        # Only allow data of same shape for now. A future version could crop to the smaller size of the two.
+        assert len(near_xdata.data) == len(far_xdata.data)
         # For now only allow near and far having the same calibration. A future version could allow different
         # offsets and shift the data accordingly
         assert near_xdata.dimensional_calibrations == far_xdata.dimensional_calibrations
@@ -111,13 +111,13 @@ def measure_temperature(api: Facade.API_1, window: Facade.DocumentWindow, *, dis
     assert selected_display_items[1][0] is not None, error_msg
     assert selected_display_items[0][0].data_item is not None, error_msg
     assert selected_display_items[1][0].data_item is not None, error_msg
-    assert selected_display_items[0][0].data_item.data is not None, error_msg
-    assert selected_display_items[1][0].data_item.data is not None, error_msg
-    assert selected_display_items[0][0].data_item.is_data_1d, error_msg
-    assert selected_display_items[1][0].data_item.is_data_1d, error_msg
+    assert selected_display_items[0][0].data_item.xdata, error_msg
+    assert selected_display_items[1][0].data_item.xdata, error_msg
+    assert selected_display_items[0][0].data_item.xdata.is_data_1d, error_msg
+    assert selected_display_items[1][0].data_item.xdata.is_data_1d, error_msg
 
     # First find out which data item is near and which is far. Far should have the higher maximum.
-    if np.amax(selected_display_items[0][0].data_item.data) > np.amax(selected_display_items[1][0].data_item.data):
+    if np.amax(selected_display_items[0][0].data_item.xdata.data) > np.amax(selected_display_items[1][0].data_item.xdata.data):
         far_data_item = selected_display_items[0][0].data_item
         near_data_item = selected_display_items[1][0].data_item
     else:
