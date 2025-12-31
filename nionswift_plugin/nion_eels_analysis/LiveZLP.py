@@ -14,7 +14,7 @@ class MeasureZLP:
         """Initialize the computation."""
         self.computation = computation
 
-    def execute(self, src: Facade.DataItem) -> None:
+    def execute(self, src: Facade.DataItem, **kwargs: typing.Any) -> None:
         """Execute the computation.
 
         This method will run in a thread and should not make any modifications to the library.
