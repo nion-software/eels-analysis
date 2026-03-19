@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.14 (2026-03-19):
+--------------------
+- Python 3.14 support. Drop Python 3.11 support.
+
 0.6.13 (2025-09-25):
 --------------------
 - Fix issue with measure temperature.
