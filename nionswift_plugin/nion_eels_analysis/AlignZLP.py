@@ -254,6 +254,8 @@ def _calibrate_spectrum(api: Facade.API_1, window: Facade.DocumentWindow) -> typ
 
     class DummyHandler:
         def close(self) -> None: pass
+        def get_object_converter(self, item: typing.Any) -> typing.Callable[..., Facade.ObjectConverter]:
+            return lambda c: Facade.ObjectConverter(item, c)
 
     if not data_item or not data_item.display_xdata or not data_item.display_xdata.is_data_1d:
 
