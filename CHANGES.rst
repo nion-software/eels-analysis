@@ -1,10 +1,14 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
-0.6.14 (2026-06-05):
+0.6.16 (2026-06-05):
 --------------------
 - Remove conda build support.
 - Fix calibrate spectrum's use of modeless dialogs.
+
+0.6.14 (2026-03-19):
+--------------------
+- Python 3.14 support. Drop Python 3.11 support.
 
 0.6.13 (2025-09-25):
 --------------------
