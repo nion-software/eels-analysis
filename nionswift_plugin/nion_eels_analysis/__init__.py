@@ -71,6 +71,8 @@ class MenuExtension:
         eels_menu.add_menu_item(_("Align ZLP (com method)"), functools.partial(AlignZLP.align_zlp_com, api, window))
         eels_menu.add_menu_item(_("Align ZLP (peak fit method)"), functools.partial(AlignZLP.align_zlp_fit, api, window))
         eels_menu.add_separator()
+        eels_menu.add_menu_item(_("Align ZLP"), lambda: document_window.perform_action("processing.eels.align_zlp.a0"))
+        eels_menu.add_separator()
         eels_menu.add_menu_item(_("Show Live Thickness Measurement"), functools.partial(LiveThickness.attach_measure_thickness, api, window))
         eels_menu.add_menu_item(_("Show Live ZLP Measurement"), functools.partial(LiveZLP.attach_measure_zlp, api, window))
         eels_menu.add_separator()

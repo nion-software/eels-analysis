@@ -6,6 +6,7 @@ import typing
 # local libraries
 from nion.data import DataAndMetadata
 from nion.swift import Facade
+from nion.swift.model import DocumentModel
 from nion.swift.model import Symbolic
 
 
@@ -51,7 +52,6 @@ def map_thickness_xdata(src_xdata: DataAndMetadata.DataAndMetadata) -> typing.Op
 
 
 class EELSThicknessMapping:
-    label = _("Thickness Map")
 
     def __init__(self, computation: Facade.Computation, **kwargs: typing.Any) -> None:
         self.computation = computation
@@ -81,3 +81,16 @@ def map_thickness(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
 
 ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
 Symbolic.register_computation_type("eels.thickness_mapping", typing.cast(ComputationCallable, EELSThicknessMapping))
+
+
+DocumentModel.DocumentModel.register_processing_descriptions({
+    "eels.thickness_mapping": {
+        "title": _("Thickness Map"),
+        "sources": [
+            {"name": "spectrum_image_data_item", "label": _("Spectrum Image"), "data_type": "xdata"}
+        ],
+        "outputs": [
+            {"name": "map", "label": _("Thickness Map")}
+        ]
+    }
+})
