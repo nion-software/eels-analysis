@@ -47,6 +47,7 @@ class MeasureZLP:
             zlp_interval.interval = start, end
             zlp_interval.graphic_id = "zlp_interval"
             zlp_interval._graphic.color = "black"
+            zlp_interval._graphic.role = "measurement"
 
 ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
 

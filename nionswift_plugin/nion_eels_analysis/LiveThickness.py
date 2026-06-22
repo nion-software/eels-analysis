@@ -66,6 +66,7 @@ class MeasureThickness:
             thickness_interval.graphic_id = "thickness_interval"
             thickness_interval.label = f"{self.__thickness:0.4f}"
             thickness_interval._graphic.color = "#CE00AC"
+            thickness_interval._graphic.role = "measurement"
 
 
 ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
