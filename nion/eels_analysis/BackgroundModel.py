@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import functools
 import gettext
+import math
 import numpy
 import scipy
 import scipy.integrate
@@ -121,7 +122,7 @@ class AbstractBackgroundModel:
         fs = numpy.linspace(interval_start, interval_end, n, dtype=numpy.float32)
         if spectrum_xdata.is_navigable:
             calibrations = list(copy.deepcopy(spectrum_xdata.navigation_dimensional_calibrations)) + [calibration]
-            yss = numpy.reshape(ys, (numpy.prod(ys.shape[:-1]),) + (ys.shape[-1],))
+            yss = numpy.reshape(ys, (math.prod(ys.shape[:-1]),) + (ys.shape[-1],))
             fit_data = self._perform_fits(xs, yss, fs, es)
             data_descriptor = DataAndMetadata.DataDescriptor(False, spectrum_xdata.navigation_dimension_count,
                                                              spectrum_xdata.datum_dimension_count)
