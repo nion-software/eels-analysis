@@ -1,6 +1,10 @@
 Changelog (nionswift-eels-analysis)
 ===================================
 
+0.6.17 (2026-07-22):
+--------------------
+- Improve display of ZLP interval by setting role to 'measurement'.
+
 0.6.16 (2026-06-05):
 --------------------
 - Remove conda build support.
