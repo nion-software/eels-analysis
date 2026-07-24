@@ -93,7 +93,7 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata,
         shift_xdata = None
         if flat_pos_data.size > 1:
             shift_xdata = DataAndMetadata.new_data_and_metadata(flat_pos_data.reshape(src_shape[:-d_rank]), shift_calibration, dimensional_calibrations[:-d_rank])
-        return (DataAndMetadata.new_data_and_metadata(flat_dst_data.reshape(src_shape), src_xdata.intensity_calibration, dimensional_calibrations, data_descriptor=data_descriptor, metadata=copy.deepcopy(src_xdata.metadata)),
+        return (DataAndMetadata.new_data_and_metadata(flat_dst_data.reshape(src_shape), src_xdata.intensity_calibration, dimensional_calibrations, data_descriptor=data_descriptor, metadata=src_xdata.metadata),
                 shift_xdata)
 
     return None, None
