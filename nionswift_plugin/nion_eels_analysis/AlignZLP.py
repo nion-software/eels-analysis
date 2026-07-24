@@ -20,6 +20,15 @@ from nion.utils import Event
 DataArrayType = numpy.typing.NDArray[typing.Any]
 
 
+def _get_base_metadata(src_xdata: DataAndMetadata.DataAndMetadata) -> DataAndMetadata.MetadataType | None:
+    metadata = src_xdata.metadata
+    if not metadata:
+        return None
+    if "source_metadata" not in metadata:
+        metadata = {"source_metadata": metadata}
+    return metadata
+
+
 def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata,
                     progress_fn: typing.Optional[typing.Callable[[int], None]] = None, method: str = 'com',
                     roi: typing.Optional[Facade.Graphic] = None, ref_index: int = 0) -> typing.Tuple[typing.Optional[DataAndMetadata.DataAndMetadata], typing.Optional[DataAndMetadata.DataAndMetadata]]:
@@ -93,7 +102,9 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata,
         shift_xdata = None
         if flat_pos_data.size > 1:
             shift_xdata = DataAndMetadata.new_data_and_metadata(flat_pos_data.reshape(src_shape[:-d_rank]), shift_calibration, dimensional_calibrations[:-d_rank])
-        return (DataAndMetadata.new_data_and_metadata(flat_dst_data.reshape(src_shape), src_xdata.intensity_calibration, dimensional_calibrations, data_descriptor=data_descriptor, metadata=src_xdata.metadata),
+
+        metadata = _get_base_metadata(src_xdata)
+        return (DataAndMetadata.new_data_and_metadata(flat_dst_data.reshape(src_shape), src_xdata.intensity_calibration, dimensional_calibrations, data_descriptor=data_descriptor, metadata=metadata),
                 shift_xdata)
 
     return None, None
