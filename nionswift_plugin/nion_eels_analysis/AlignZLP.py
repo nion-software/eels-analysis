@@ -20,13 +20,16 @@ from nion.utils import Event
 DataArrayType = numpy.typing.NDArray[typing.Any]
 
 
-def _get_base_metadata(src_xdata: DataAndMetadata.DataAndMetadata) -> DataAndMetadata.MetadataType | None:
+def _get_source_metadata(src_xdata: DataAndMetadata.DataAndMetadata) -> DataAndMetadata.MetadataType:
     metadata = src_xdata.metadata
-    if not metadata:
-        return None
-    if "source_metadata" not in metadata:
-        metadata = {"source_metadata": metadata}
-    return metadata
+    if "source_metadata" in metadata:
+        metadata = metadata["source_metadata"]
+    copy_keys = ("hardware_source", "instrument", "scan")
+    data_item_d = dict[str, typing.Any]()
+    for key in copy_keys:
+        if key in metadata:
+            data_item_d[key] = metadata[key]
+    return data_item_d
 
 
 def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata,
@@ -103,7 +106,9 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata,
         if flat_pos_data.size > 1:
             shift_xdata = DataAndMetadata.new_data_and_metadata(flat_pos_data.reshape(src_shape[:-d_rank]), shift_calibration, dimensional_calibrations[:-d_rank])
 
-        metadata = _get_base_metadata(src_xdata)
+        metadata = dict[str, typing.Any]()
+        if source_metadata := _get_source_metadata(src_xdata):
+            metadata["source_metadata"] = source_metadata
         return (DataAndMetadata.new_data_and_metadata(flat_dst_data.reshape(src_shape), src_xdata.intensity_calibration, dimensional_calibrations, data_descriptor=data_descriptor, metadata=metadata),
                 shift_xdata)
 
