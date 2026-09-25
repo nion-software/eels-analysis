@@ -96,7 +96,7 @@ class MeasureTemperature:
         self.computation.set_referenced_xdata("gain_fit_data_item", self.__gain_fit_xdata)
         self.computation.set_referenced_xdata("difference_data_item", self.__difference_xdata)
         gain_fit_display_item = self.computation.get_result("gain_fit_data_item").display._display_item
-        gain_fit_display_item._set_display_layer_properties(0, label=_(f"Fit T = {self.__fit[0] - 273.15:.0f} °C"))
+        gain_fit_display_item._set_display_layer_properties(0, label=_("Fit T = {temperature:.0f} °C").format(temperature=self.__fit[0] - 273.15))
 
 
 ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]
