@@ -20,6 +20,8 @@ from nion.utils import Event
 
 DataArrayType = numpy.typing.NDArray[typing.Any]
 
+_READ_BLOCK_BYTE_BUDGET = 4 * 1024 * 1024
+
 
 def _get_source_metadata(src_xdata: DataAndMetadata.DataAndMetadata) -> DataAndMetadata.MetadataType:
     metadata = src_xdata.metadata
@@ -69,9 +71,19 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata,
         else:
             data_slice = slice(0, None)
 
-        flat_src_data = numpy.reshape(src_data, (-1,) + d_shape)
-        flat_dst_data = numpy.zeros_like(flat_src_data)
-        flat_pos_data: DataArrayType = numpy.zeros(flat_src_data.shape[0], dtype=numpy.float32)
+        # read the source in blocks of indices of its first axis, since an h5py dataset or a data handle reads only what
+        # is indexed. the byte budget keeps each read large while bounding its memory.
+        navigation_shape = src_shape[:-d_rank]
+        index_count = navigation_shape[0] if navigation_shape else 1
+        index_spectrum_count = int(numpy.prod(navigation_shape[1:], dtype=numpy.uint64)) if navigation_shape else 1
+        index_byte_count = index_spectrum_count * int(numpy.prod(d_shape, dtype=numpy.uint64)) * src_data.dtype.itemsize
+        block_index_count = max(1, _READ_BLOCK_BYTE_BUDGET // max(1, index_byte_count))
+
+        def read_block(start_index: int) -> DataArrayType:
+            return numpy.reshape(src_data[start_index:start_index + block_index_count] if navigation_shape else src_data[...], (-1,) + d_shape)
+
+        flat_dst_data = numpy.zeros((index_count * index_spectrum_count,) + d_shape, dtype=src_data.dtype)
+        flat_pos_data: DataArrayType = numpy.zeros(flat_dst_data.shape[0], dtype=numpy.float32)
 
         get_position_fn: typing.Callable[[DataArrayType], typing.Tuple[typing.Optional[float], ...]]
         if method == "com":
@@ -87,26 +99,31 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata,
             raise ValueError(f"Method {method} is not supported. Allowed options are 'com', 'fit' and 'max'.")
 
         # use this as the reference position. all other spectra will be aligned to this one.
-        ref_pos = get_position_fn(flat_src_data[ref_index, data_slice])[1] or 0.0
+        ref_spectrum_data = src_data[numpy.unravel_index(ref_index, navigation_shape)] if navigation_shape else src_data[...]
+        ref_pos = get_position_fn(ref_spectrum_data[data_slice])[1] or 0.0
         # put the first spectrum in the result
-        flat_dst_data[ref_index] = flat_src_data[ref_index]
+        flat_dst_data[ref_index] = ref_spectrum_data
         # loop over all non-datum dimensions linearly
-        for i in range(len(flat_src_data)):
-            if i == ref_index:
-                continue
-            # the algorithm in this early version is to find the max value
-            mx_pos = get_position_fn(flat_src_data[i, data_slice])[1] or 0.0
-            # fallback to simple max if get_position_fun failed
-            if mx_pos is numpy.nan:
-                mx_pos = typing.cast(float, numpy.argmax(flat_src_data[i, data_slice]))
-            # determine the offset and apply it
-            offset = ref_pos - mx_pos
-            flat_dst_data[i] = scipy.ndimage.shift(flat_src_data[i], offset, order=interpolation_order)
-            flat_pos_data[i] = -offset
-            # every row, report progress (will also work for a sequence or 1d collection
-            # because there we have only 1 row anyways)
-            if i % src_shape[1] == 0 and callable(progress_fn):
-                progress_fn(i//src_shape[1])
+        for start_index in range(0, index_count, block_index_count):
+            block_data = read_block(start_index)
+            for block_spectrum_index in range(block_data.shape[0]):
+                i = start_index * index_spectrum_count + block_spectrum_index
+                if i == ref_index:
+                    continue
+                spectrum_data = block_data[block_spectrum_index]
+                # the algorithm in this early version is to find the max value
+                mx_pos = get_position_fn(spectrum_data[data_slice])[1] or 0.0
+                # fallback to simple max if get_position_fun failed
+                if mx_pos is numpy.nan:
+                    mx_pos = typing.cast(float, numpy.argmax(spectrum_data[data_slice]))
+                # determine the offset and apply it
+                offset = ref_pos - mx_pos
+                flat_dst_data[i] = scipy.ndimage.shift(spectrum_data, offset, order=interpolation_order)
+                flat_pos_data[i] = -offset
+                # every row, report progress (will also work for a sequence or 1d collection
+                # because there we have only 1 row anyways)
+                if i % src_shape[1] == 0 and callable(progress_fn):
+                    progress_fn(i//src_shape[1])
 
         dimensional_calibrations = copy.deepcopy(src_xdata.dimensional_calibrations)
         energy_calibration = dimensional_calibrations[-1]
