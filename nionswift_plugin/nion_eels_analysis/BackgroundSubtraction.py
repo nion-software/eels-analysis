@@ -246,7 +246,7 @@ def subtract_background(api: Facade.API_1, window: Facade.DocumentWindow) -> Non
                         assert source_data_metadata
                         if source_data_metadata.is_navigable and source_data_metadata.datum_dimension_count == 1:
                             spectrum_image = api._new_api_object(source_data_items[0])
-                            subtracted = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape))
+                            subtracted = api.library.create_data_item_from_data(numpy.zeros(source_data_metadata.navigation_dimension_shape))
                             api.library.create_computation(
                                 "eels.subtract_background",
                                 inputs={
@@ -309,7 +309,9 @@ def use_signal_for_map(api: Facade.API_1, window: Facade.DocumentWindow) -> None
         fit_interval_graphics = [api._new_api_object(g) for g in computation.get_input("fit_interval_graphics")]
         background_model = api._new_api_object(computation.get_input("background_model"))
         spectrum_image = api._new_api_object(spectrum_image_data_item)
-        map = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape))
+        spectrum_image_data_metadata = spectrum_image_data_item.data_metadata
+        assert spectrum_image_data_metadata
+        map = api.library.create_data_item_from_data(numpy.zeros(spectrum_image_data_metadata.navigation_dimension_shape))
         signal_interval_graphic = target_display.selected_graphics[0]
         api.library.create_computation(
             "eels.mapping3",
