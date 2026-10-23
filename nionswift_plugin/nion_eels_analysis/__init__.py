@@ -47,12 +47,15 @@ class MenuExtension:
             name: str
             xml_str: str
 
-        Registry.register_component(ColorMapDescription("areels-high-contrast", _("AREELS High Contrast"), xml_str), {"color-map-description"})
+        # the color map component is kept so that close can unregister it.
+        self.__color_map_description = ColorMapDescription("areels-high-contrast", _("AREELS High Contrast"), xml_str)
+        Registry.register_component(self.__color_map_description, {"color-map-description"})
 
     def close(self) -> None:
         self.__api.application._application.unregister_menu_handler(self.__build_menus)
         for eels_menu_action_type in EELSMenuActions.eels_menu_action_types:
             Window.unregister_action(eels_menu_action_type.action_id)
+        Registry.unregister_component(self.__color_map_description, {"color-map-description"})
 
     def __build_menus(self, document_window: DocumentController.DocumentController) -> None:
         eels_menu = document_window.get_or_create_menu("eels_menu", _("EELS"), "window_menu")
