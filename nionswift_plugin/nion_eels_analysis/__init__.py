@@ -63,10 +63,10 @@ class MenuExtension:
         document_window.build_menu(eels_menu, [
             {"type": "separator"},
             {"type": "item", "action_id": EELSMenuActions.FitBackgroundAction.action_id},
-            # eels_menu.add_menu_item(_("Fit Zero Loss Peak"), functools.partial(PeakFitting.fit_zero_loss_peak, api, window))
+            # {"type": "item", "action_id": "eels.fit_zero_loss_peak"},  # Fit Zero Loss Peak, calling PeakFitting.fit_zero_loss_peak
             {"type": "separator"},
-            # eels_menu.add_menu_item(_("Subtract Background"), functools.partial(BackgroundSubtraction.subtract_background, api, window))
-            # eels_menu.add_separator()
+            # {"type": "item", "action_id": "eels.subtract_background"},  # Subtract Background, calling BackgroundSubtraction.subtract_background
+            # {"type": "separator"},
             {"type": "item", "action_id": EELSMenuActions.MapSignalAction.action_id},
             {"type": "item", "action_id": EELSMenuActions.MapThicknessAction.action_id},
             {"type": "separator"},
