@@ -1,5 +1,4 @@
 import dataclasses
-import functools
 import gettext
 import pkgutil
 
@@ -7,18 +6,15 @@ import pkgutil
 from nion.eels_analysis import BackgroundModel
 from nion.eels_analysis import PeakModel
 
-from . import AlignZLP
-from . import BackgroundSubtraction
+from . import EELSMenuActions
 from . import ElementalMappingPanel
 from . import LiveThickness
 from . import LiveZLP
 from . import PeakFitting
-from . import ThicknessMap
-from . import Thermometry
 
 from nion.swift import DocumentController
-from nion.swift import Facade
 from nion.swift.model import PlugInManager
+from nion.ui import Window
 from nion.utils import Registry
 
 _ = gettext.gettext
@@ -32,6 +28,10 @@ class MenuExtension:
     def __init__(self, api_broker: PlugInManager.APIBroker) -> None:
         # grab the api object.
         self.__api = api_broker.get_api(version="~1.0")
+
+        # register the actions once for every window, and before the menu handler, which builds the menu of each existing window from them.
+        for eels_menu_action_type in EELSMenuActions.eels_menu_action_types:
+            Window.register_action(eels_menu_action_type())
         self.__api.application._application.register_menu_handler(self.__build_menus)
 
         LiveThickness.register_measure_thickness_process(self.__api)
@@ -51,30 +51,31 @@ class MenuExtension:
 
     def close(self) -> None:
         self.__api.application._application.unregister_menu_handler(self.__build_menus)
+        for eels_menu_action_type in EELSMenuActions.eels_menu_action_types:
+            Window.unregister_action(eels_menu_action_type.action_id)
 
     def __build_menus(self, document_window: DocumentController.DocumentController) -> None:
-        api = self.__api
-        window = Facade.DocumentWindow(document_window)
-
         eels_menu = document_window.get_or_create_menu("eels_menu", _("EELS"), "window_menu")
 
-        eels_menu.add_separator()
-        eels_menu.add_menu_item(_("Fit Background"), functools.partial(BackgroundSubtraction.subtract_background_from_signal, api, window))
-        # eels_menu.add_menu_item(_("Fit Zero Loss Peak"), functools.partial(PeakFitting.fit_zero_loss_peak, api, window))
-        eels_menu.add_separator()
-        # eels_menu.add_menu_item(_("Subtract Background"), functools.partial(BackgroundSubtraction.subtract_background, api, window))
-        # eels_menu.add_separator()
-        eels_menu.add_menu_item(_("Map Signal"), functools.partial(BackgroundSubtraction.use_signal_for_map, api, window))
-        eels_menu.add_menu_item(_("Map Thickness"), functools.partial(ThicknessMap.map_thickness, api, window))
-        eels_menu.add_separator()
-        eels_menu.add_menu_item(_("Align ZLP (max method)"), functools.partial(AlignZLP.align_zlp, api, window))
-        eels_menu.add_menu_item(_("Align ZLP (com method)"), functools.partial(AlignZLP.align_zlp_com, api, window))
-        eels_menu.add_menu_item(_("Align ZLP (peak fit method)"), functools.partial(AlignZLP.align_zlp_fit, api, window))
-        eels_menu.add_separator()
-        eels_menu.add_menu_item(_("Show Live Thickness Measurement"), functools.partial(LiveThickness.attach_measure_thickness, api, window))
-        eels_menu.add_menu_item(_("Show Live ZLP Measurement"), functools.partial(LiveZLP.attach_measure_zlp, api, window))
-        eels_menu.add_separator()
-        eels_menu.add_menu_item(_("Calibrate Spectrum"), functools.partial(AlignZLP.calibrate_spectrum, api, window))
-        eels_menu.add_separator()
-        eels_menu.add_menu_item(_("Measure Temperature"), functools.partial(Thermometry.measure_temperature, api, window))
-        eels_menu.add_separator()
+        document_window.build_menu(eels_menu, [
+            {"type": "separator"},
+            {"type": "item", "action_id": EELSMenuActions.FitBackgroundAction.action_id},
+            # eels_menu.add_menu_item(_("Fit Zero Loss Peak"), functools.partial(PeakFitting.fit_zero_loss_peak, api, window))
+            {"type": "separator"},
+            # eels_menu.add_menu_item(_("Subtract Background"), functools.partial(BackgroundSubtraction.subtract_background, api, window))
+            # eels_menu.add_separator()
+            {"type": "item", "action_id": EELSMenuActions.MapSignalAction.action_id},
+            {"type": "item", "action_id": EELSMenuActions.MapThicknessAction.action_id},
+            {"type": "separator"},
+            {"type": "item", "action_id": EELSMenuActions.AlignZLPMaxAction.action_id},
+            {"type": "item", "action_id": EELSMenuActions.AlignZLPComAction.action_id},
+            {"type": "item", "action_id": EELSMenuActions.AlignZLPFitAction.action_id},
+            {"type": "separator"},
+            {"type": "item", "action_id": EELSMenuActions.ShowLiveThicknessAction.action_id},
+            {"type": "item", "action_id": EELSMenuActions.ShowLiveZLPAction.action_id},
+            {"type": "separator"},
+            {"type": "item", "action_id": EELSMenuActions.CalibrateSpectrumAction.action_id},
+            {"type": "separator"},
+            {"type": "item", "action_id": EELSMenuActions.MeasureTemperatureAction.action_id},
+            {"type": "separator"},
+        ])
