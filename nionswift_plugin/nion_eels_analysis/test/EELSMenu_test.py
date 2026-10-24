@@ -135,3 +135,28 @@ class TestEELSMenu(unittest.TestCase):
                 self.assertEqual(1, len(dialogs), "Map Signal on a spectrum which isn't background subtracted doesn't explain how to use it")
             finally:
                 menu_extension.close()
+
+    def test_map_thickness_chosen_from_eels_menu_with_a_spectrum_selected_explains_and_adds_nothing(self) -> None:
+        with TestContext.create_memory_context() as profile_context:
+            document_controller = profile_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            data = numpy.random.uniform(10, 1000, 1024).astype(numpy.float32)
+            xdata = DataAndMetadata.new_data_and_metadata(data, intensity_calibration=Calibration.Calibration(units="~"), dimensional_calibrations=[Calibration.Calibration(scale=2.0, units="eV")])
+            data_item = DataItem.new_data_item(xdata)
+            document_model.append_data_item(data_item)
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            assert display_item
+            document_controller.selected_display_panel.set_display_panel_display_item(display_item)
+            menu_extension = MenuExtension(PlugInManager.APIBroker())
+            try:
+                eels_menu = document_controller.get_or_create_menu("eels_menu", "EELS", "window_menu")
+                map_thickness_menu_action = next(menu_action for menu_action in eels_menu.get_menu_actions() if menu_action.title == "Map Thickness")
+                map_thickness_menu_action.trigger()
+                # the instructions are in a dialog, which is closed here since the test context doesn't close it.
+                dialogs = [window for window in document_controller.app.windows if window is not document_controller]
+                for dialog in dialogs:
+                    dialog.request_close()
+                self.assertEqual(1, len(document_model.data_items), "Map Thickness with a spectrum selected maps it to a single value")
+                self.assertEqual(1, len(dialogs), "Map Thickness with a spectrum selected doesn't explain how to use it")
+            finally:
+                menu_extension.close()

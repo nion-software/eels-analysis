@@ -95,6 +95,10 @@ class MapSignalAction(EELSMenuAction):
 class MapThicknessAction(EELSMenuAction):
     action_id = "eels.map_thickness"
     action_name = _("Map Thickness")
+    instructions = _("Select a spectrum image to map its thickness.")
+
+    def is_selection_suitable(self, context: DocumentController.DocumentController.ActionContext) -> bool:
+        return ThicknessMap.can_map_thickness(context.display_item)
 
     def run_menu_item(self, api: Facade.API_1, window: Facade.DocumentWindow) -> None:
         ThicknessMap.map_thickness(api, window)
