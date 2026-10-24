@@ -9,7 +9,10 @@ import typing
 from nion.data import Core
 from nion.data import DataAndMetadata
 from nion.eels_analysis import BackgroundModel
+from nion.swift.model import DataItem
 from nion.swift.model import DataStructure
+from nion.swift.model import DisplayItem
+from nion.swift.model import DocumentModel
 from nion.swift.model import Graphics
 from nion.swift.model import Symbolic
 from nion.swift.model import Schema
@@ -204,14 +207,24 @@ def add_background_subtraction_computation(api: Facade.API_1, library: Facade.Li
     display_item._display_item.set_display_property("legend_position", "top-right")
 
 
+def can_fit_background(display_item: DisplayItem.DisplayItem | None) -> bool:
+    """Return whether Fit Background can fit a background to the display item.
+
+    It needs the display item to show one data item, and at least one selected interval graphic, which gives the range
+    of the fit.
+    """
+    if not display_item or not display_item.data_item:
+        return False
+    return any(isinstance(graphic, Graphics.IntervalGraphic) for graphic in display_item.selected_graphics)
+
+
 def subtract_background_from_signal(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
     target_data_item = window.target_data_item
     target_display_item = window.target_display
-    if target_display_item and target_data_item:
+    if target_display_item and target_data_item and can_fit_background(target_display_item._display_item):
         target_intervals = [graphic for graphic in target_display_item.selected_graphics if
                             graphic.graphic_type == "interval-graphic"]
-        if target_intervals:
-            add_background_subtraction_computation(api, window.library, target_display_item, target_data_item, target_intervals)
+        add_background_subtraction_computation(api, window.library, target_display_item, target_data_item, target_intervals)
 
 
 def subtract_background(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
@@ -249,44 +262,69 @@ def subtract_background(api: Facade.API_1, window: Facade.DocumentWindow) -> Non
                     break
 
 
+def _find_spectrum_image_background_subtraction(document_model: DocumentModel.DocumentModel, display_item: DisplayItem.DisplayItem) -> tuple[Symbolic.Computation, DataItem.DataItem] | None:
+    # find the background subtraction whose spectrum and subtracted signal the display item shows, and the spectrum
+    # image which the spectrum was picked from. only the first background subtraction shown is considered.
+    display_item_data_items = display_item.data_items
+    for computation in document_model.computations:
+        if computation.processing_id == "eels.background_subtraction3":
+            eels_spectrum_data_item = computation.get_input("eels_spectrum_data_item")
+            if eels_spectrum_data_item in display_item_data_items and computation.get_output("subtracted") in display_item_data_items:
+                source_data_items = document_model.get_source_data_items(eels_spectrum_data_item)
+                if len(source_data_items) == 1:
+                    source_data_metadata = source_data_items[0].data_metadata
+                    if source_data_metadata and source_data_metadata.is_navigable and source_data_metadata.datum_dimension_count == 1:
+                        return computation, source_data_items[0]
+                return None
+    return None
+
+
+def _has_one_selected_interval(display_item: DisplayItem.DisplayItem) -> bool:
+    # whether the display item has exactly one selected graphic, and it is an interval.
+    selected_graphics = display_item.selected_graphics
+    return len(selected_graphics) == 1 and isinstance(selected_graphics[0], Graphics.IntervalGraphic)
+
+
+def can_map_signal(document_model: DocumentModel.DocumentModel, display_item: DisplayItem.DisplayItem | None) -> bool:
+    """Return whether Map Signal can map the signal in the display item's selected interval.
+
+    It needs one selected interval graphic, on a display item which shows a background subtraction of a spectrum picked
+    from a spectrum image, as Fit Background makes.
+    """
+    if not display_item or not _has_one_selected_interval(display_item):
+        return False
+    return _find_spectrum_image_background_subtraction(document_model, display_item) is not None
+
+
 def use_signal_for_map(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
     target_display = window.target_display
-    target_graphic = target_display.selected_graphics[0] if target_display and len(target_display.selected_graphics) == 1 else None
-    target_interval = target_graphic if target_graphic and target_graphic.graphic_type == "interval-graphic" else None
-    if target_display and target_interval:
-        target_display_item_data_items = target_display._display_item.data_items
-        for computation in api.library._document_model.computations:
-            if computation.processing_id == "eels.background_subtraction3":
-                if computation.get_input("eels_spectrum_data_item") in target_display_item_data_items and computation.get_output("subtracted") in target_display_item_data_items:
-                    eels_spectrum_data_item = computation.get_input("eels_spectrum_data_item")
-                    eels_spectrum_data_item = api._new_api_object(eels_spectrum_data_item)
-                    fit_interval_graphics = computation.get_input("fit_interval_graphics")
-                    fit_interval_graphics = [api._new_api_object(g) for g in fit_interval_graphics]
-                    background_model = computation.get_input("background_model")
-                    background_model = api._new_api_object(background_model)
-                    source_data_items = api.library._document_model.get_source_data_items(eels_spectrum_data_item._data_item)
-                    if len(source_data_items) == 1:
-                        source_data_metadata = source_data_items[0].data_metadata
-                        assert source_data_metadata
-                        if source_data_metadata.is_navigable and source_data_metadata.datum_dimension_count == 1:
-                            spectrum_image = api._new_api_object(source_data_items[0])
-                            map = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape))
-                            signal_interval_graphic = target_interval
-                            api.library.create_computation(
-                                "eels.mapping3",
-                                inputs={
-                                    "spectrum_image_data_item": spectrum_image,
-                                    "eels_spectrum_data_item": eels_spectrum_data_item,
-                                    "fit_interval_graphics": fit_interval_graphics,
-                                    "signal_interval_graphic": signal_interval_graphic,
-                                    "background_model": background_model,
-                                },
-                                outputs={
-                                    "map": map
-                                }
-                            )
-                            window.display_data_item(map)
-                    break
+    if not target_display:
+        return
+    display_item = target_display._display_item
+    document_model = api.library._document_model
+    # map the selected interval using the background subtraction shown in this display.
+    if _has_one_selected_interval(display_item) and (background_subtraction := _find_spectrum_image_background_subtraction(document_model, display_item)):
+        computation, spectrum_image_data_item = background_subtraction
+        eels_spectrum_data_item = api._new_api_object(computation.get_input("eels_spectrum_data_item"))
+        fit_interval_graphics = [api._new_api_object(g) for g in computation.get_input("fit_interval_graphics")]
+        background_model = api._new_api_object(computation.get_input("background_model"))
+        spectrum_image = api._new_api_object(spectrum_image_data_item)
+        map = api.library.create_data_item_from_data(numpy.zeros(spectrum_image._data_item.xdata.navigation_dimension_shape))
+        signal_interval_graphic = target_display.selected_graphics[0]
+        api.library.create_computation(
+            "eels.mapping3",
+            inputs={
+                "spectrum_image_data_item": spectrum_image,
+                "eels_spectrum_data_item": eels_spectrum_data_item,
+                "fit_interval_graphics": fit_interval_graphics,
+                "signal_interval_graphic": signal_interval_graphic,
+                "background_model": background_model,
+            },
+            outputs={
+                "map": map
+            }
+        )
+        window.display_data_item(map)
 
 
 ComputationCallable = typing.Callable[[Symbolic._APIComputation], Symbolic.ComputationHandlerLike]

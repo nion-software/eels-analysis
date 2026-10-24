@@ -71,6 +71,10 @@ class EELSMenuAction(Window.Action):
 class FitBackgroundAction(EELSMenuAction):
     action_id = "eels.fit_background"
     action_name = _("Fit Background")
+    instructions = _("Add an interval to a spectrum and select it to fit a background in that interval.")
+
+    def is_selection_suitable(self, context: DocumentController.DocumentController.ActionContext) -> bool:
+        return BackgroundSubtraction.can_fit_background(context.display_item)
 
     def run_menu_item(self, api: Facade.API_1, window: Facade.DocumentWindow) -> None:
         BackgroundSubtraction.subtract_background_from_signal(api, window)
@@ -79,6 +83,10 @@ class FitBackgroundAction(EELSMenuAction):
 class MapSignalAction(EELSMenuAction):
     action_id = "eels.map_signal"
     action_name = _("Map Signal")
+    instructions = _("Select one interval on a spectrum picked from a spectrum image, after using Fit Background on it, to map the signal in that interval.")
+
+    def is_selection_suitable(self, context: DocumentController.DocumentController.ActionContext) -> bool:
+        return BackgroundSubtraction.can_map_signal(context.model, context.display_item)
 
     def run_menu_item(self, api: Facade.API_1, window: Facade.DocumentWindow) -> None:
         BackgroundSubtraction.use_signal_for_map(api, window)
