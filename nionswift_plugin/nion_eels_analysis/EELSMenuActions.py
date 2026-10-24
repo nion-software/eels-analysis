@@ -140,6 +140,10 @@ class AlignZLPFitAction(AlignZLPAction):
 class ShowLiveThicknessAction(EELSMenuAction):
     action_id = "eels.show_live_thickness"
     action_name = _("Show Live Thickness Measurement")
+    instructions = _("Select a spectrum to show its thickness as it changes.")
+
+    def is_selection_suitable(self, context: DocumentController.DocumentController.ActionContext) -> bool:
+        return LiveThickness.can_measure_thickness(context.display_item)
 
     def run_menu_item(self, api: Facade.API_1, window: Facade.DocumentWindow) -> None:
         LiveThickness.attach_measure_thickness(api, window)
@@ -148,6 +152,10 @@ class ShowLiveThicknessAction(EELSMenuAction):
 class ShowLiveZLPAction(EELSMenuAction):
     action_id = "eels.show_live_zlp"
     action_name = _("Show Live ZLP Measurement")
+    instructions = _("Select a spectrum to show its zero-loss peak as it changes.")
+
+    def is_selection_suitable(self, context: DocumentController.DocumentController.ActionContext) -> bool:
+        return LiveZLP.can_measure_zlp(context.display_item)
 
     def run_menu_item(self, api: Facade.API_1, window: Facade.DocumentWindow) -> None:
         LiveZLP.attach_measure_zlp(api, window)
