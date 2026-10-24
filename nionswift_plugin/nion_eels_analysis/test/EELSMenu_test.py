@@ -186,3 +186,75 @@ class TestEELSMenu(unittest.TestCase):
                 self.assertEqual(1, len(dialogs), "Align ZLP with a sequence of images selected doesn't explain how to use it")
             finally:
                 menu_extension.close()
+
+    def test_show_live_thickness_chosen_from_eels_menu_with_an_image_selected_explains_and_adds_nothing(self) -> None:
+        with TestContext.create_memory_context() as profile_context:
+            document_controller = profile_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            data_item = DataItem.new_data_item(DataAndMetadata.new_data_and_metadata(numpy.random.uniform(10, 1000, (16, 16)).astype(numpy.float32)))
+            document_model.append_data_item(data_item)
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            assert display_item
+            document_controller.selected_display_panel.set_display_panel_display_item(display_item)
+            menu_extension = MenuExtension(PlugInManager.APIBroker())
+            try:
+                eels_menu = document_controller.get_or_create_menu("eels_menu", "EELS", "window_menu")
+                show_live_thickness_menu_action = next(menu_action for menu_action in eels_menu.get_menu_actions() if menu_action.title == "Show Live Thickness Measurement")
+                show_live_thickness_menu_action.trigger()
+                # the instructions are in a dialog, which is closed here since the test context doesn't close it.
+                dialogs = [window for window in document_controller.app.windows if window is not document_controller]
+                for dialog in dialogs:
+                    dialog.request_close()
+                self.assertEqual(0, len(document_model.computations), "Show Live Thickness Measurement with an image selected attaches a thickness measurement")
+                self.assertEqual(1, len(dialogs), "Show Live Thickness Measurement with an image selected doesn't explain how to use it")
+            finally:
+                menu_extension.close()
+
+    def test_show_live_thickness_chosen_from_eels_menu_with_a_sequence_of_spectra_selected_attaches_measurement(self) -> None:
+        # a sequence of spectra, as a live acquisition makes, isn't 1D data, but its display shows a spectrum, which suits the measurement.
+        with TestContext.create_memory_context() as profile_context:
+            document_controller = profile_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            data = numpy.random.uniform(10, 1000, (4, 1024)).astype(numpy.float32)
+            dimensional_calibrations = [Calibration.Calibration(), Calibration.Calibration(scale=0.5, units="eV")]
+            xdata = DataAndMetadata.new_data_and_metadata(data, dimensional_calibrations=dimensional_calibrations, data_descriptor=DataAndMetadata.DataDescriptor(True, 0, 1))
+            data_item = DataItem.new_data_item(xdata)
+            document_model.append_data_item(data_item)
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            assert display_item
+            document_controller.selected_display_panel.set_display_panel_display_item(display_item)
+            menu_extension = MenuExtension(PlugInManager.APIBroker())
+            try:
+                eels_menu = document_controller.get_or_create_menu("eels_menu", "EELS", "window_menu")
+                show_live_thickness_menu_action = next(menu_action for menu_action in eels_menu.get_menu_actions() if menu_action.title == "Show Live Thickness Measurement")
+                show_live_thickness_menu_action.trigger()
+                dialogs = [window for window in document_controller.app.windows if window is not document_controller]
+                for dialog in dialogs:
+                    dialog.request_close()
+                self.assertEqual(0, len(dialogs), "Show Live Thickness Measurement with a sequence of spectra selected asks for a spectrum")
+                self.assertEqual(1, len(document_model.computations), "Show Live Thickness Measurement with a sequence of spectra selected doesn't attach a thickness measurement")
+            finally:
+                menu_extension.close()
+
+    def test_show_live_zlp_chosen_from_eels_menu_with_an_image_selected_explains_and_adds_nothing(self) -> None:
+        with TestContext.create_memory_context() as profile_context:
+            document_controller = profile_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            data_item = DataItem.new_data_item(DataAndMetadata.new_data_and_metadata(numpy.random.uniform(10, 1000, (16, 16)).astype(numpy.float32)))
+            document_model.append_data_item(data_item)
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            assert display_item
+            document_controller.selected_display_panel.set_display_panel_display_item(display_item)
+            menu_extension = MenuExtension(PlugInManager.APIBroker())
+            try:
+                eels_menu = document_controller.get_or_create_menu("eels_menu", "EELS", "window_menu")
+                show_live_zlp_menu_action = next(menu_action for menu_action in eels_menu.get_menu_actions() if menu_action.title == "Show Live ZLP Measurement")
+                show_live_zlp_menu_action.trigger()
+                # the instructions are in a dialog, which is closed here since the test context doesn't close it.
+                dialogs = [window for window in document_controller.app.windows if window is not document_controller]
+                for dialog in dialogs:
+                    dialog.request_close()
+                self.assertEqual(0, len(document_model.computations), "Show Live ZLP Measurement with an image selected attaches a ZLP measurement")
+                self.assertEqual(1, len(dialogs), "Show Live ZLP Measurement with an image selected doesn't explain how to use it")
+            finally:
+                menu_extension.close()

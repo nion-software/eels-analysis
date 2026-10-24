@@ -4,6 +4,7 @@ import typing
 # local libraries
 from nion.eels_analysis import ZLP_Analysis
 from nion.swift import Facade
+from nion.swift.model import DisplayItem
 from nion.swift.model import Symbolic
 
 
@@ -56,9 +57,21 @@ def register_measure_zlp_process(api: Facade.API_1) -> None:
     api.register_computation_type("nion.eels_analysis.measure_zlp", typing.cast(ComputationCallable, MeasureZLP))
 
 
+def can_measure_zlp(display_item: DisplayItem.DisplayItem | None) -> bool:
+    """Return whether the live ZLP measurement can be attached to the display item's data item.
+
+    It needs the display item to show a spectrum, such as a spectrum or one of a sequence of spectra. The display data
+    shape comes from the metadata, so the data isn't loaded.
+    """
+    data_item = display_item.data_item if display_item else None
+    display_data_channel = display_item.display_data_channel if display_item else None
+    display_data_shape = display_data_channel.display_data_shape if display_data_channel else None
+    return data_item is not None and display_data_shape is not None and len(display_data_shape) == 1
+
+
 def attach_measure_zlp(api: Facade.API_1, window: Facade.DocumentWindow) -> None:
     """Attaches the measure ZLP computation to the target data item in the window."""
+    target_display = window.target_display
     target_data_item = window.target_data_item
-    target_xdata = target_data_item.display_xdata if target_data_item else None
-    if target_xdata and target_xdata.is_data_1d:
+    if target_display and target_data_item and can_measure_zlp(target_display._display_item):
         api.library.create_computation("nion.eels_analysis.measure_zlp", inputs={"src": target_data_item}, outputs={"zlp_interval": None})
