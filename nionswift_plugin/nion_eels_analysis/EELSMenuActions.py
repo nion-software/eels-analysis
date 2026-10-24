@@ -1,4 +1,5 @@
 import gettext
+import logging
 import typing
 
 from . import AlignZLP
@@ -18,12 +19,40 @@ _ = gettext.gettext
 class EELSMenuAction(Window.Action):
     """An item of the EELS menu, run on the window which the action context describes.
 
-    A subclass gives the action id and name, and implements run_menu_item. A single instance of each subclass is shared
-    by every window, so the action gets the window from the context each time it runs.
+    A subclass gives the action id and name, and implements run_menu_item. If the item needs a particular selection, it
+    also gives instructions and implements is_selection_suitable. Choosing the item without a suitable selection shows
+    the instructions in a dialog; running it from code logs them instead.
+
+    One instance of each subclass is shared by every window, so the window comes from the context each time.
     """
 
+    instructions: str = str()
+
     def execute(self, context: Window.ActionContext) -> Window.ActionResult:
+        if not self.__is_context_suitable(context):
+            logging.debug("%s: %s", self.action_name, self.instructions)
+            return Window.ActionResult(Window.ActionStatus.CANCELLED)
         return self._run_in_context_window(context)
+
+    def invoke(self, context: Window.ActionContext) -> Window.ActionResult:
+        if not self.__is_context_suitable(context):
+            if context.window and context.window.app:
+                context.window.app.show_ok_dialog(self.action_name, self.instructions)
+            return Window.ActionResult(Window.ActionStatus.CANCELLED)
+        return self._run_in_context_window(context)
+
+    def is_selection_suitable(self, context: DocumentController.DocumentController.ActionContext) -> bool:
+        """Return whether the selection in the context suits the item.
+
+        It runs on the main thread just before the item, so it looks only at metadata and doesn't load any data.
+        """
+        return True
+
+    def __is_context_suitable(self, context: Window.ActionContext) -> bool:
+        # without a document window there's no selection to check, and _run_in_context_window cancels the item anyway.
+        if not isinstance(context, DocumentController.DocumentController.ActionContext):
+            return True
+        return self.is_selection_suitable(context)
 
     def _run_in_context_window(self, context: Window.ActionContext) -> Window.ActionResult:
         # each item works on the selection of a document window. code may run the action without a window, such as
@@ -111,9 +140,6 @@ class CalibrateSpectrumAction(EELSMenuAction):
     def execute(self, context: Window.ActionContext) -> Window.ActionResult:
         raise NotImplementedError()
 
-    def invoke(self, context: Window.ActionContext) -> Window.ActionResult:
-        return self._run_in_context_window(context)
-
     def run_menu_item(self, api: Facade.API_1, window: Facade.DocumentWindow) -> None:
         AlignZLP.calibrate_spectrum(api, window)
 
@@ -121,6 +147,17 @@ class CalibrateSpectrumAction(EELSMenuAction):
 class MeasureTemperatureAction(EELSMenuAction):
     action_id = "eels.measure_temperature"
     action_name = _("Measure Temperature")
+    instructions = _("Select two spectra, in the Data panel or in two display panels, to measure the temperature.")
+
+    def is_selection_suitable(self, context: DocumentController.DocumentController.ActionContext) -> bool:
+        # the measurement compares two different spectra, so two displays of the same spectrum don't count.
+        display_items = context.display_items
+        if len(display_items) != 2:
+            return False
+        data_items = [display_item.data_item for display_item in display_items]
+        if data_items[0] is data_items[1]:
+            return False
+        return all(data_item is not None and data_item.is_data_1d for data_item in data_items)
 
     def run_menu_item(self, api: Facade.API_1, window: Facade.DocumentWindow) -> None:
         Thermometry.measure_temperature(api, window)
