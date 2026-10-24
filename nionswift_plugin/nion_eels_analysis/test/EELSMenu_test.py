@@ -160,3 +160,29 @@ class TestEELSMenu(unittest.TestCase):
                 self.assertEqual(1, len(dialogs), "Map Thickness with a spectrum selected doesn't explain how to use it")
             finally:
                 menu_extension.close()
+
+    def test_align_zlp_chosen_from_eels_menu_with_a_sequence_of_images_selected_explains_and_adds_nothing(self) -> None:
+        # the three Align ZLP items take their check from AlignZLPAction, so this test of one of them covers all three.
+        with TestContext.create_memory_context() as profile_context:
+            document_controller = profile_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            data = numpy.random.uniform(10, 1000, (4, 16, 16)).astype(numpy.float32)
+            xdata = DataAndMetadata.new_data_and_metadata(data, data_descriptor=DataAndMetadata.DataDescriptor(True, 0, 2))
+            data_item = DataItem.new_data_item(xdata)
+            document_model.append_data_item(data_item)
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            assert display_item
+            document_controller.selected_display_panel.set_display_panel_display_item(display_item)
+            menu_extension = MenuExtension(PlugInManager.APIBroker())
+            try:
+                eels_menu = document_controller.get_or_create_menu("eels_menu", "EELS", "window_menu")
+                align_zlp_menu_action = next(menu_action for menu_action in eels_menu.get_menu_actions() if menu_action.title == "Align ZLP (max method)")
+                align_zlp_menu_action.trigger()
+                # the instructions are in a dialog, which is closed here since the test context doesn't close it.
+                dialogs = [window for window in document_controller.app.windows if window is not document_controller]
+                for dialog in dialogs:
+                    dialog.request_close()
+                self.assertEqual(1, len(document_model.data_items), "Align ZLP with a sequence of images selected adds an aligned sequence")
+                self.assertEqual(1, len(dialogs), "Align ZLP with a sequence of images selected doesn't explain how to use it")
+            finally:
+                menu_extension.close()

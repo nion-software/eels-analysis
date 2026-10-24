@@ -10,6 +10,7 @@ import scipy.ndimage
 from nion.data import DataAndMetadata
 from nion.eels_analysis import ZLP_Analysis
 from nion.swift import Facade
+from nion.swift.model import DisplayItem
 from nion.typeshed import API_1_0 as API
 from nion.ui import Declarative
 from nion.ui import Dialog
@@ -32,12 +33,26 @@ def _get_source_metadata(src_xdata: DataAndMetadata.DataAndMetadata) -> DataAndM
     return data_item_d
 
 
+def is_zlp_alignable(data_metadata: DataAndMetadata.DataMetadata) -> bool:
+    """Return whether align_zlp_xdata can align the zero-loss peaks of data with the metadata.
+
+    It aligns spectra, singly or in a sequence or collection, and plain images whose rows are spectra.
+    """
+    return data_metadata.is_datum_1d or (data_metadata.is_datum_2d and not (data_metadata.is_sequence or data_metadata.is_collection))
+
+
+def can_align_zlp(display_item: DisplayItem.DisplayItem | None) -> bool:
+    """Return whether Align ZLP can align the zero-loss peaks of the display item's data item."""
+    data_item = display_item.data_item if display_item else None
+    data_metadata = data_item.data_metadata if data_item else None
+    return data_metadata is not None and is_zlp_alignable(data_metadata)
+
+
 def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata,
                     progress_fn: typing.Optional[typing.Callable[[int], None]] = None, method: str = 'com',
                     roi: typing.Optional[Facade.Graphic] = None, ref_index: int = 0) -> typing.Tuple[typing.Optional[DataAndMetadata.DataAndMetadata], typing.Optional[DataAndMetadata.DataAndMetadata]]:
     # check to make sure it is suitable for this algorithm
-    # if (src_xdata.is_datum_1d and (src_xdata.is_sequence or src_xdata.is_collection)) or (src_xdata.is_datum_2d and not (src_xdata.is_sequence or src_xdata.is_collection)):
-    if src_xdata.is_datum_1d or (src_xdata.is_datum_2d and not (src_xdata.is_sequence or src_xdata.is_collection)):
+    if is_zlp_alignable(src_xdata.data_metadata):
         # get the numpy array and create the destination data
         src_data = src_xdata.data
         assert src_data is not None
@@ -116,9 +131,10 @@ def align_zlp_xdata(src_xdata: DataAndMetadata.DataAndMetadata,
 
 
 def _run_align_zlp(api: API.API, window: Facade.DocumentWindow, method_id: str, method_name: str) -> None:
-    # find the focused data item
+    # find the focused data item. the EELS menu tells a person what to select when it doesn't suit, so the function
+    # does nothing then.
     src_display = window.target_display
-    if src_display and src_display.data_item:
+    if src_display and src_display.data_item and can_align_zlp(src_display._display_item):
         assert src_display.data_item.xdata
 
         ref_index = 0
@@ -144,10 +160,6 @@ def _run_align_zlp(api: API.API, window: Facade.DocumentWindow, method_id: str, 
 
             # display the data item.
             window.display_data_item(data_item)
-        else:
-            logging.error("Failed: Data is not a sequence or collection of 1D spectra.")
-    else:
-        logging.error("Failed: No data item selected.")
 
 
 def align_zlp(api: API.API, window: Facade.DocumentWindow) -> None:

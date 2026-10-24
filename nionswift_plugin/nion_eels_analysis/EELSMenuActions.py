@@ -104,7 +104,16 @@ class MapThicknessAction(EELSMenuAction):
         ThicknessMap.map_thickness(api, window)
 
 
-class AlignZLPMaxAction(EELSMenuAction):
+class AlignZLPAction(EELSMenuAction):
+    """An Align ZLP item of the EELS menu. A subclass gives the action id and name, and runs the item's method."""
+
+    instructions = _("Select a sequence or collection of spectra to align their zero-loss peaks.")
+
+    def is_selection_suitable(self, context: DocumentController.DocumentController.ActionContext) -> bool:
+        return AlignZLP.can_align_zlp(context.display_item)
+
+
+class AlignZLPMaxAction(AlignZLPAction):
     action_id = "eels.align_zlp_max"
     action_name = _("Align ZLP (max method)")
 
@@ -112,7 +121,7 @@ class AlignZLPMaxAction(EELSMenuAction):
         AlignZLP.align_zlp(api, window)
 
 
-class AlignZLPComAction(EELSMenuAction):
+class AlignZLPComAction(AlignZLPAction):
     action_id = "eels.align_zlp_com"
     action_name = _("Align ZLP (com method)")
 
@@ -120,7 +129,7 @@ class AlignZLPComAction(EELSMenuAction):
         AlignZLP.align_zlp_com(api, window)
 
 
-class AlignZLPFitAction(EELSMenuAction):
+class AlignZLPFitAction(AlignZLPAction):
     action_id = "eels.align_zlp_fit"
     action_name = _("Align ZLP (peak fit method)")
 
