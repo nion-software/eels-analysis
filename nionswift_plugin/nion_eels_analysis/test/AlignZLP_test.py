@@ -1,4 +1,7 @@
+import h5py
 import numpy
+import pathlib
+import tempfile
 import typing
 import unittest
 
@@ -67,3 +70,29 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(0, len(document_model.data_items))
             self.assertEqual(0, len(document_model.display_items))
             self.assertEqual(0, len(document_model.data_structures))
+
+    def test_align_zlp_shifts_spectrum_image_to_reference_in_middle_row(self) -> None:
+        # each spectrum has one peak, at a position and of a height of its own. aligning moves each peak to the position
+        # of the reference spectrum's peak, which is in the middle row.
+        peak_positions = [8 + (5 * i) % 11 for i in range(12)]
+        ref_index = 6
+        data = numpy.zeros((3, 4, 32), dtype=numpy.float32)
+        expected_data = numpy.zeros_like(data)
+        for i, peak_position in enumerate(peak_positions):
+            data[i // 4, i % 4, peak_position] = 10 + i
+            expected_data[i // 4, i % 4, peak_positions[ref_index]] = 10 + i
+        expected_shifts = numpy.reshape(numpy.subtract(peak_positions, peak_positions[ref_index]), (3, 4)).astype(numpy.float32)
+        dimensional_calibrations = [Calibration.Calibration(), Calibration.Calibration(), Calibration.Calibration(scale=1.0, units="eV")]
+        data_descriptor = DataAndMetadata.DataDescriptor(False, 2, 1)
+        with tempfile.TemporaryDirectory() as directory:
+            with h5py.File(pathlib.Path(directory) / "data.h5", "w") as file:
+                # nionswift hands out data stored in HDF5 as an h5py dataset, or a data handle over one.
+                for label, source_data in (("in memory", data), ("in an HDF5 file", file.create_dataset("data", data=data))):
+                    with self.subTest(label):
+                        src_xdata = DataAndMetadata.DataAndMetadata(source_data, data_shape_and_dtype=(data.shape, data.dtype),
+                                                                    dimensional_calibrations=dimensional_calibrations, data_descriptor=data_descriptor)
+                        aligned_xdata, shift_xdata = AlignZLP.align_zlp_xdata(src_xdata, method="max", ref_index=ref_index)
+                        assert aligned_xdata
+                        assert shift_xdata
+                        self.assertTrue(numpy.array_equal(expected_data, aligned_xdata.data), "an aligned peak is not at the reference position, or not of its spectrum's height")
+                        self.assertTrue(numpy.array_equal(expected_shifts, shift_xdata.data), "a shift is not the distance between a spectrum's peak and the reference peak")
