@@ -152,20 +152,23 @@ def _run_align_zlp(api: API.API, window: Facade.DocumentWindow, method_id: str, 
     # does nothing then.
     src_display = window.target_display
     if src_display and src_display.data_item and can_align_zlp(src_display._display_item):
-        assert src_display.data_item.xdata
+        src_data_metadata = src_display.data_item.data_metadata
+        assert src_data_metadata
 
         ref_index = 0
         if src_display._display_item.display_data_channel:
             # Using the sequence index as reference only makes sense for "pure" sequences because the index will be
             # interpreted as index in the flattened non-datum axes
-            if src_display.data_item.xdata.is_sequence and not src_display.data_item.xdata.is_collection:
+            if src_data_metadata.is_sequence and not src_data_metadata.is_collection:
                 ref_index = src_display._display_item.display_data_channel.sequence_index
 
         def progress(i: int) -> None:
             logging.info(f"Processing row {i} (align zlp)")
 
         roi = src_display.selected_graphics[0] if src_display.selected_graphics else None
-        dst_xdata, shift_xdata = align_zlp_xdata(src_display.data_item.xdata, progress, method=method_id, roi=roi, ref_index=ref_index)
+        src_xdata = src_display.data_item.xdata
+        assert src_xdata
+        dst_xdata, shift_xdata = align_zlp_xdata(src_xdata, progress, method=method_id, roi=roi, ref_index=ref_index)
 
         if dst_xdata:
             # create a new data item in the library and set its title.
