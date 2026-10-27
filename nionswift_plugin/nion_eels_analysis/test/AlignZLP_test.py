@@ -71,6 +71,30 @@ class TestBackgroundSubtraction(unittest.TestCase):
             self.assertEqual(0, len(document_model.display_items))
             self.assertEqual(0, len(document_model.data_structures))
 
+    def test_calibrate_spectrum_on_pick_calibrates_energy_axis_of_spectrum_image(self) -> None:
+        with TestContext.create_memory_context() as profile_context:
+            document_controller = profile_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            data = numpy.zeros((4, 5, 100), dtype=numpy.float32)
+            data[..., 10] = 1
+            navigation_calibrations = [Calibration.Calibration(offset=1.0, scale=2.0, units="nm"), Calibration.Calibration(offset=-3.0, scale=0.5, units="um")]
+            data_descriptor = DataAndMetadata.DataDescriptor(is_sequence=False, collection_dimension_count=2, datum_dimension_count=1)
+            # zero is already at the peak, so the pick is up to date when Calibrate Spectrum reads it
+            xdata = DataAndMetadata.new_data_and_metadata(data, dimensional_calibrations=navigation_calibrations + [Calibration.Calibration(offset=-10.5, scale=1.0, units="eV")], data_descriptor=data_descriptor)
+            data_item = DataItem.new_data_item(xdata)
+            document_model.append_data_item(data_item)
+            pick_data_item = document_model.get_pick_new(document_model.get_display_item_for_data_item(data_item), data_item)
+            document_model.recompute_all()
+            document_controller.select_display_items_in_data_panel([document_model.get_display_item_for_data_item(pick_data_item)])
+            document_controller.data_panel_focused()
+            api = Facade.get_api("~1.0", "~1.0")
+            AlignZLP._calibrate_spectrum(api, api.application.document_windows[0])
+            # halving the distance between the graphics doubles the scale and keeps the offset point at 0 eV
+            offset_graphic, scale_graphic = Facade.DataItem(pick_data_item).graphics[-2:]
+            scale_graphic.position = (offset_graphic.position + scale_graphic.position) / 2
+            self.assertEqual(navigation_calibrations, data_item.dimensional_calibrations[:2])
+            self.assertEqual(Calibration.Calibration(offset=-21.0, scale=2.0, units="eV"), data_item.dimensional_calibrations[2])
+
     def test_align_zlp_shifts_spectrum_image_to_reference_in_middle_row(self) -> None:
         # each spectrum has one peak, at a position and of a height of its own. aligning moves each peak to the position
         # of the reference spectrum's peak, which is in the middle row.
