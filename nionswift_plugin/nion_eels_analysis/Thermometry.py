@@ -109,25 +109,29 @@ def measure_temperature(api: Facade.API_1, window: Facade.DocumentWindow, *, dis
     error_msg = "Select two data items each containing one EEL spectrum in order to use this computation."
     assert selected_display_items[0][0] is not None, error_msg
     assert selected_display_items[1][0] is not None, error_msg
-    assert selected_display_items[0][0].data_item is not None, error_msg
-    assert selected_display_items[1][0].data_item is not None, error_msg
-    assert selected_display_items[0][0].data_item.xdata, error_msg
-    assert selected_display_items[1][0].data_item.xdata, error_msg
-    assert selected_display_items[0][0].data_item.xdata.is_data_1d, error_msg
-    assert selected_display_items[1][0].data_item.xdata.is_data_1d, error_msg
+    first_data_item = selected_display_items[0][0].data_item
+    second_data_item = selected_display_items[1][0].data_item
+    assert first_data_item is not None, error_msg
+    assert second_data_item is not None, error_msg
+    assert first_data_item.data_metadata and first_data_item.data_metadata.is_data_1d, error_msg
+    assert second_data_item.data_metadata and second_data_item.data_metadata.is_data_1d, error_msg
+
+    # read each spectrum's data once, since reading a spectrum which isn't displayed loads it from storage each time.
+    first_xdata = first_data_item.xdata
+    second_xdata = second_data_item.xdata
+    assert first_xdata, error_msg
+    assert second_xdata, error_msg
 
     # First find out which data item is near and which is far. Far should have the higher maximum.
-    if np.amax(selected_display_items[0][0].data_item.xdata.data) > np.amax(selected_display_items[1][0].data_item.xdata.data):
-        far_data_item = selected_display_items[0][0].data_item
-        near_data_item = selected_display_items[1][0].data_item
+    if np.amax(first_xdata.data) > np.amax(second_xdata.data):
+        far_data_item, far_xdata = first_data_item, first_xdata
+        near_data_item, near_xdata = second_data_item, second_xdata
     else:
-        far_data_item = selected_display_items[1][0].data_item
-        near_data_item = selected_display_items[0][0].data_item
+        far_data_item, far_xdata = second_data_item, second_xdata
+        near_data_item, near_xdata = first_data_item, first_xdata
 
     # Now we need to calculate the difference and display it so that we have a place to put the interval on
-    assert near_data_item.xdata
-    assert far_data_item.xdata
-    difference_xdata = near_data_item.xdata - far_data_item.xdata
+    difference_xdata = near_xdata - far_xdata
     difference_data_item = api.library.create_data_item_from_data_and_metadata(difference_xdata)
     window.display_data_item(difference_data_item)
     calibration = difference_xdata.dimensional_calibrations[0]
