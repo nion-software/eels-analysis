@@ -263,8 +263,7 @@ def _calibrate_spectrum(api: Facade.API_1, window: Facade.DocumentWindow) -> typ
             offset = self.__offset_energy - typing.cast(float, self.__offset_graphic.position) * len(self.__data_item.display_xdata.data) * scale
             energy_calibration.scale = scale
             energy_calibration.offset = offset
-            assert self.__src_data_item.xdata
-            dimensional_calibrations = list(self.__src_data_item.xdata.dimensional_calibrations)
+            dimensional_calibrations = list(self.__src_data_item.dimensional_calibrations)
             dimensional_calibrations[-1] = energy_calibration
             self.__src_data_item.set_dimensional_calibrations(dimensional_calibrations)
             offset_graphic_position = (self.offset_energy - offset) / scale / len(self.__data_item.display_xdata.data)
