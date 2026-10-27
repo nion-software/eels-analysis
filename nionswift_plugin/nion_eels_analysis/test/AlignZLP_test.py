@@ -96,3 +96,25 @@ class TestBackgroundSubtraction(unittest.TestCase):
                         assert shift_xdata
                         self.assertTrue(numpy.array_equal(expected_data, aligned_xdata.data), "an aligned peak is not at the reference position, or not of its spectrum's height")
                         self.assertTrue(numpy.array_equal(expected_shifts, shift_xdata.data), "a shift is not the distance between a spectrum's peak and the reference peak")
+
+    def test_align_zlp_menu_aligns_sequence_to_displayed_frame(self) -> None:
+        # each frame has its peak at a channel of its own. the menu action aligns the frames to the displayed frame.
+        with TestContext.create_memory_context() as profile_context:
+            document_controller = profile_context.create_document_controller_with_application()
+            document_model = document_controller.document_model
+            peak_positions = [6, 12, 20, 25]
+            data = numpy.zeros((4, 32), dtype=numpy.float32)
+            data[range(4), peak_positions] = 1
+            dimensional_calibrations = [Calibration.Calibration(), Calibration.Calibration(scale=1.0, units="eV")]
+            data_descriptor = DataAndMetadata.DataDescriptor(True, 0, 1)
+            data_item = DataItem.new_data_item(DataAndMetadata.new_data_and_metadata(data, dimensional_calibrations=dimensional_calibrations, data_descriptor=data_descriptor))
+            document_model.append_data_item(data_item)
+            display_item = document_model.get_display_item_for_data_item(data_item)
+            display_item.display_data_channel.sequence_index = 2
+            document_controller.select_display_items_in_data_panel([display_item])
+            document_controller.data_panel_focused()
+            document_controller.periodic()
+            api = Facade.get_api("~1.0", "~1.0")
+            AlignZLP.align_zlp(api, api.application.document_windows[0])
+            aligned_data = document_model.data_items[-1].data
+            self.assertEqual([peak_positions[2]] * 4, numpy.argmax(aligned_data, axis=-1).tolist(), "a frame's peak is not at the peak of the displayed frame")
