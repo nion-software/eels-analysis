@@ -10,13 +10,11 @@ authors = [
 ]
 description = "Library and UI for doing EELS analysis with Nion Swift."
 readme = "README.rst"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 license = "GPL-3.0-only"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14"
 ]
 urls = { "Homepage" = "https://github.com/nion-software/eels-analysis" }
